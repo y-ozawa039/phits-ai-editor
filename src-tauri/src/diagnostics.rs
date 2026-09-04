@@ -208,19 +208,23 @@ pub(crate) fn phits_wrapper_path(root: &Path) -> PathBuf {
 }
 
 fn diagnose_codex(messages: &mut Vec<String>) -> (Option<String>, Option<String>, bool) {
-    let output = match Command::new("codex").arg("--version").output() {
+    let Some(executable) = resolve_codex_executable() else {
+        messages.push("Codex CLIを検出できません。編集とPHITS実行は引き続き利用できます。".into());
+        return (None, None, false);
+    };
+    let output = match Command::new(&executable).arg("--version").output() {
         Ok(output) => output,
         Err(error) => {
             messages.push(format!(
                 "Codex CLIを起動できません。編集とPHITS実行は引き続き利用できます: {error}"
             ));
-            return (None, None, false);
+            return (Some(executable.to_string_lossy().into_owned()), None, false);
         }
     };
     if !output.status.success() {
         messages
             .push("Codex CLIのバージョン確認に失敗しました。Codex機能だけを無効化します。".into());
-        return (Some("codex".into()), None, false);
+        return (Some(executable.to_string_lossy().into_owned()), None, false);
     }
     let text = String::from_utf8_lossy(&output.stdout).trim().to_owned();
     let version = parse_semver(&text);
@@ -236,7 +240,45 @@ fn diagnose_codex(messages: &mut Vec<String>) -> (Option<String>, Option<String>
     } else {
         messages.push("Codex CLIのバージョンを解釈できません。Codex機能を無効化します。".into());
     }
-    (Some("codex".into()), Some(text), compatible)
+    (
+        Some(executable.to_string_lossy().into_owned()),
+        Some(text),
+        compatible,
+    )
+}
+
+pub(crate) fn resolve_codex_executable() -> Option<PathBuf> {
+    let executable_name = if cfg!(windows) { "codex.exe" } else { "codex" };
+    if let Some(paths) = env::var_os("PATH") {
+        for directory in env::split_paths(&paths) {
+            let candidate = directory.join(executable_name);
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+    }
+
+    #[cfg(windows)]
+    {
+        let base = env::var_os("LOCALAPPDATA")
+            .map(PathBuf::from)?
+            .join("OpenAI/Codex/bin");
+        let mut candidates = Vec::new();
+        for entry in fs::read_dir(base).ok()?.filter_map(Result::ok) {
+            let candidate = entry.path().join("codex.exe");
+            if candidate.is_file() {
+                let modified = fs::metadata(&candidate)
+                    .and_then(|metadata| metadata.modified())
+                    .ok();
+                candidates.push((modified, candidate));
+            }
+        }
+        candidates.sort_by_key(|left| std::cmp::Reverse(left.0));
+        candidates.into_iter().next().map(|(_, path)| path)
+    }
+
+    #[cfg(not(windows))]
+    None
 }
 
 fn parse_semver(text: &str) -> Option<(u64, u64, u64)> {

@@ -21,6 +21,7 @@ use tokio::{
 
 use crate::{
     contracts::{CodexConnectResult, CodexModel, CodexThreadLink},
+    diagnostics::resolve_codex_executable,
     error::{AppError, AppResult},
 };
 
@@ -184,8 +185,10 @@ fn parse_version(text: &str) -> Option<(u32, u32, u32)> {
     ))
 }
 
-async fn verify_codex_version() -> AppResult<()> {
-    let output = Command::new("codex")
+async fn verify_codex_version() -> AppResult<PathBuf> {
+    let executable = resolve_codex_executable()
+        .ok_or_else(|| AppError::Message("Codex CLI was not found".into()))?;
+    let output = Command::new(&executable)
         .arg("--version")
         .stdin(Stdio::null())
         .output()
@@ -198,7 +201,7 @@ async fn verify_codex_version() -> AppResult<()> {
             "Codex CLI {version:?} is older than the tested baseline 0.153.1"
         )));
     }
-    Ok(())
+    Ok(executable)
 }
 
 async fn current_connection() -> AppResult<Arc<CodexConnection>> {
@@ -267,8 +270,8 @@ async fn start_connection(
     app: AppHandle,
     workspace_root: PathBuf,
 ) -> AppResult<Arc<CodexConnection>> {
-    verify_codex_version().await?;
-    let mut child = Command::new("codex")
+    let executable = verify_codex_version().await?;
+    let mut child = Command::new(executable)
         .arg("app-server")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
