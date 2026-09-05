@@ -30,11 +30,16 @@ const EVENT_OUTPUT: &str = "phits://output";
 const EVENT_STATE: &str = "phits://state";
 const MAX_EVENT_BYTES: usize = 16 * 1024;
 const FINGERPRINT_TAIL_BYTES: u64 = 64 * 1024;
+type CommandEnvironment = Vec<(OsString, OsString)>;
+
+#[cfg(windows)]
+type WindowsBatchSpec = (PathBuf, Vec<OsString>, CommandEnvironment);
 
 #[derive(Debug, Clone)]
 struct CommandSpec {
     program: PathBuf,
     args: Vec<OsString>,
+    environment: CommandEnvironment,
     cwd: PathBuf,
     phits_root: PathBuf,
 }
@@ -699,6 +704,7 @@ fn phits_command_spec(context: &RunContext) -> AppResult<CommandSpec> {
     Ok(CommandSpec {
         program,
         args,
+        environment: Vec::new(),
         cwd: context.work_dir.clone(),
         phits_root: context.phits_root.clone(),
     })
@@ -714,38 +720,39 @@ fn utility_command_spec(
         .file_name()
         .ok_or_else(|| AppError::Message("対象ファイル名がありません。".into()))?;
     #[cfg(windows)]
-    let (program, args) = match kind {
+    let (program, args, environment) = match kind {
         UtilityKind::Angel => windows_batch_spec(root.join("bin/angel.bat"), name)?,
         UtilityKind::Dchain => windows_batch_spec(root.join("dchain-sp/bin/dchain.bat"), name)?,
         UtilityKind::Phig3d => {
             let executable = root.join("utility/phig3d/windows-x64/phig3d.exe");
             require_file(&executable)?;
-            (executable, vec![name.to_owned()])
+            (executable, vec![name.to_owned()], Vec::new())
         }
     };
     #[cfg(target_os = "linux")]
-    let (program, args) = {
+    let (program, args, environment) = {
         let script = match kind {
             UtilityKind::Angel => root.join("workbench/task/linux/run_angel.sh"),
             UtilityKind::Dchain => root.join("workbench/task/linux/run_dchain.sh"),
             UtilityKind::Phig3d => root.join("workbench/task/linux/run_phig3d.sh"),
         };
         require_file(&script)?;
-        (script, vec![name.to_owned()])
+        (script, vec![name.to_owned()], Vec::new())
     };
     #[cfg(not(any(windows, target_os = "linux")))]
-    let (program, args) = {
+    let (program, args, environment) = {
         let script = match kind {
             UtilityKind::Angel => root.join("workbench/task/mac/run_angel.sh"),
             UtilityKind::Dchain => root.join("workbench/task/mac/run_dchain.sh"),
             UtilityKind::Phig3d => root.join("workbench/task/mac/run_phig3d.sh"),
         };
         require_file(&script)?;
-        (script, vec![name.to_owned()])
+        (script, vec![name.to_owned()], Vec::new())
     };
     Ok(CommandSpec {
         program,
         args,
+        environment,
         cwd: cwd.to_path_buf(),
         phits_root: root.to_path_buf(),
     })
@@ -755,31 +762,41 @@ fn utility_command_spec(
 fn windows_batch_spec(
     batch: PathBuf,
     target_name: &std::ffi::OsStr,
-) -> AppResult<(PathBuf, Vec<OsString>)> {
+) -> AppResult<WindowsBatchSpec> {
     require_file(&batch)?;
-    let batch = cmd_quoted(&batch.into_os_string())?;
-    let target = cmd_quoted(target_name)?;
-    let command_line = format!(r#""{batch} {target}""#);
+    let batch = safe_cmd_environment_value(batch.as_os_str())?;
+    let target = safe_cmd_environment_value(target_name)?;
+    let command_line = format!(
+        r#"call "{}" "{}""#,
+        batch.to_string_lossy(),
+        target.to_string_lossy()
+    );
     Ok((
         PathBuf::from("cmd.exe"),
-        vec!["/D".into(), "/S".into(), "/C".into(), command_line.into()],
+        vec![
+            "/D".into(),
+            "/S".into(),
+            "/C".into(),
+            "%PHITS_EDITOR_COMMAND%".into(),
+        ],
+        vec![("PHITS_EDITOR_COMMAND".into(), command_line.into())],
     ))
 }
 
 #[cfg(windows)]
-fn cmd_quoted(value: &std::ffi::OsStr) -> AppResult<String> {
+fn safe_cmd_environment_value(value: &std::ffi::OsStr) -> AppResult<OsString> {
     let value = value
         .to_str()
         .ok_or_else(|| AppError::Message("Windowsコマンドで表現できないパスです。".into()))?;
     if value
         .chars()
-        .any(|character| matches!(character, '"' | '%' | '\r' | '\n'))
+        .any(|character| matches!(character, '"' | '%' | '!' | '\r' | '\n'))
     {
         return Err(AppError::Message(
             "Windowsバッチに安全に渡せない文字がパスに含まれています。".into(),
         ));
     }
-    Ok(format!(r#""{value}""#))
+    Ok(value.into())
 }
 
 fn require_file(path: &Path) -> AppResult<()> {
@@ -798,7 +815,8 @@ fn command_from_spec(spec: &CommandSpec, detached: bool) -> Command {
     command
         .args(&spec.args)
         .current_dir(&spec.cwd)
-        .env("PHITSPATH", &spec.phits_root);
+        .env("PHITSPATH", &spec.phits_root)
+        .envs(spec.environment.iter().map(|(key, value)| (key, value)));
     #[cfg(windows)]
     if detached {
         use windows_sys::Win32::System::Threading::{CREATE_NEW_PROCESS_GROUP, CREATE_NO_WINDOW};
@@ -997,6 +1015,7 @@ mod tests {
         assert_eq!(spec.program, PathBuf::from("powershell.exe"));
         assert_eq!(spec.cwd, PathBuf::from(r"C:\work"));
         assert_eq!(spec.phits_root, PathBuf::from(r"C:\phits"));
+        assert!(spec.environment.is_empty());
         assert_eq!(spec.args.last(), Some(&OsString::from("case.inp")));
         assert!(
             !spec
@@ -1029,24 +1048,63 @@ mod tests {
             utility_command_spec(root.path(), &work, &target, UtilityKind::Dchain).unwrap();
         let phig = utility_command_spec(root.path(), &work, &target, UtilityKind::Phig3d).unwrap();
         assert_eq!(angel.program, PathBuf::from("cmd.exe"));
-        let angel_command = angel
-            .args
-            .last()
-            .unwrap()
-            .to_string_lossy()
-            .replace('/', "\\");
-        let dchain_command = dchain
-            .args
-            .last()
-            .unwrap()
-            .to_string_lossy()
-            .replace('/', "\\");
-        assert!(angel_command.contains("bin\\angel.bat"));
-        assert!(dchain_command.contains("dchain-sp\\bin\\dchain.bat"));
+        assert_eq!(
+            angel.args.last(),
+            Some(&OsString::from("%PHITS_EDITOR_COMMAND%"))
+        );
+        assert_eq!(angel.environment.len(), 1);
+        assert_eq!(
+            angel.environment[0].0,
+            OsString::from("PHITS_EDITOR_COMMAND")
+        );
+        assert_eq!(
+            angel.environment[0].1.to_string_lossy().replace('/', "\\"),
+            format!(
+                r#"call "{}" "result.out""#,
+                root.path()
+                    .join("bin/angel.bat")
+                    .to_string_lossy()
+                    .replace('/', "\\")
+            )
+        );
+        assert!(
+            dchain.environment[0]
+                .1
+                .to_string_lossy()
+                .replace('/', "\\")
+                .contains("dchain-sp\\bin\\dchain.bat")
+        );
         assert_eq!(
             phig.program,
             root.path().join("utility/phig3d/windows-x64/phig3d.exe")
         );
         assert_eq!(phig.args, vec![OsString::from("result.out")]);
+        assert!(phig.environment.is_empty());
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn windows_batch_launch_does_not_trigger_wrapper_drag_and_drop_detection() {
+        let root = tempdir().unwrap();
+        let work = root.path().join("work");
+        let batch = root.path().join("bin/angel.bat");
+        fs::create_dir_all(batch.parent().unwrap()).unwrap();
+        fs::create_dir_all(&work).unwrap();
+        fs::write(
+            &batch,
+            b"@echo off\r\nsetlocal enableDelayedExpansion\r\nset \"cmd=!cmdcmdline!\"\r\nset \"cmd2=!cmd:*%~f0=!\"\r\nif \"!cmd2!\" neq \"!cmd!\" exit /b 17\r\nif not \"%~1\"==\"result.out\" exit /b 18\r\nexit /b 0\r\n",
+        )
+        .unwrap();
+        let target = work.join("result.out");
+        fs::write(&target, b"test").unwrap();
+
+        let spec = utility_command_spec(root.path(), &work, &target, UtilityKind::Angel).unwrap();
+        let status = command_from_spec(&spec, false)
+            .stdin(Stdio::null())
+            .status()
+            .await
+            .unwrap();
+
+        assert!(status.success(), "wrapper exited with {status}");
     }
 }

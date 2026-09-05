@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     process::Stdio,
     sync::{
@@ -36,6 +36,8 @@ struct CodexConnection {
     approvals: Mutex<HashMap<String, String>>,
     next_id: AtomicU64,
     workspace_root: PathBuf,
+    #[cfg(windows)]
+    turn_process_baseline: Mutex<HashSet<u32>>,
 }
 
 impl CodexConnection {
@@ -92,6 +94,79 @@ fn canonical_workspace(path: &str) -> AppResult<PathBuf> {
         return Err(AppError::Message("Workspace is not a directory".into()));
     }
     Ok(root)
+}
+
+fn descendant_process_ids(root_pid: u32, processes: &[(u32, u32)]) -> Vec<u32> {
+    let mut descendants = Vec::new();
+    let mut parents = vec![root_pid];
+    let mut seen = HashSet::from([root_pid]);
+    while let Some(parent) = parents.pop() {
+        for &(pid, parent_pid) in processes {
+            if parent_pid == parent && seen.insert(pid) {
+                descendants.push(pid);
+                parents.push(pid);
+            }
+        }
+    }
+    descendants
+}
+
+#[cfg(windows)]
+fn windows_descendant_process_ids(root_pid: u32) -> AppResult<Vec<u32>> {
+    use windows_sys::Win32::{
+        Foundation::{CloseHandle, INVALID_HANDLE_VALUE},
+        System::Diagnostics::ToolHelp::{
+            CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW,
+            TH32CS_SNAPPROCESS,
+        },
+    };
+
+    let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
+    if snapshot == INVALID_HANDLE_VALUE {
+        return Err(AppError::Message(
+            "Could not inspect Codex child processes".into(),
+        ));
+    }
+    let mut entry = PROCESSENTRY32W {
+        dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32,
+        ..Default::default()
+    };
+    let mut processes = Vec::new();
+    if unsafe { Process32FirstW(snapshot, &mut entry) } != 0 {
+        loop {
+            processes.push((entry.th32ProcessID, entry.th32ParentProcessID));
+            if unsafe { Process32NextW(snapshot, &mut entry) } == 0 {
+                break;
+            }
+        }
+    }
+    unsafe { CloseHandle(snapshot) };
+    Ok(descendant_process_ids(root_pid, &processes))
+}
+
+#[cfg(windows)]
+fn terminate_windows_turn_processes(root_pid: u32, baseline: &HashSet<u32>) -> AppResult<()> {
+    use windows_sys::Win32::{
+        Foundation::CloseHandle,
+        System::Threading::{OpenProcess, PROCESS_TERMINATE, TerminateProcess},
+    };
+
+    let mut descendants = windows_descendant_process_ids(root_pid)?;
+    descendants.reverse();
+    for pid in descendants {
+        if baseline.contains(&pid) {
+            continue;
+        }
+        let process = unsafe { OpenProcess(PROCESS_TERMINATE, 0, pid) };
+        if process.is_null() {
+            continue;
+        }
+        unsafe {
+            TerminateProcess(process, 1);
+            CloseHandle(process);
+        }
+    }
+    Ok(())
 }
 
 fn approval_key(id: &Value) -> AppResult<String> {
@@ -298,6 +373,8 @@ async fn start_connection(
         approvals: Mutex::new(HashMap::new()),
         next_id: AtomicU64::new(1),
         workspace_root,
+        #[cfg(windows)]
+        turn_process_baseline: Mutex::new(HashSet::new()),
     });
     tokio::spawn(reader_loop(connection.clone(), stdout, app.clone()));
     tokio::spawn(stderr_loop(stderr, app));
@@ -475,6 +552,19 @@ pub async fn codex_turn_start(
         return Err(AppError::Message("Message is empty".into()));
     }
     let connection = current_connection().await?;
+    #[cfg(windows)]
+    {
+        let app_server_pid = connection
+            .child
+            .lock()
+            .await
+            .id()
+            .ok_or_else(|| AppError::Message("Codex App Server is not running".into()))?;
+        *connection.turn_process_baseline.lock().await =
+            windows_descendant_process_ids(app_server_pid)?
+                .into_iter()
+                .collect();
+    }
     connection.request("turn/start", json!({
         "threadId": thread_id, "input": [{ "type": "text", "text": text }], "cwd": connection.workspace_root,
         "model": model, "effort": reasoning_effort, "approvalPolicy": "untrusted",
@@ -484,13 +574,30 @@ pub async fn codex_turn_start(
 
 #[tauri::command]
 pub async fn codex_turn_interrupt(thread_id: String, turn_id: String) -> AppResult<()> {
-    current_connection()
-        .await?
+    let connection = current_connection().await?;
+    #[cfg(windows)]
+    let (app_server_pid, baseline) = {
+        let app_server_pid = connection
+            .child
+            .lock()
+            .await
+            .id()
+            .ok_or_else(|| AppError::Message("Codex App Server is not running".into()))?;
+        let baseline = connection.turn_process_baseline.lock().await.clone();
+        (app_server_pid, baseline)
+    };
+    connection
         .request(
             "turn/interrupt",
             json!({ "threadId": thread_id, "turnId": turn_id }),
         )
         .await?;
+    #[cfg(windows)]
+    tokio::task::spawn_blocking(move || {
+        terminate_windows_turn_processes(app_server_pid, &baseline)
+    })
+    .await
+    .map_err(|error| AppError::Message(format!("Codex interruption cleanup failed: {error}")))??;
     Ok(())
 }
 
@@ -536,5 +643,15 @@ mod tests {
         );
         assert_eq!(models.len(), 1);
         assert_eq!(models[0].supported_reasoning_efforts, vec!["low", "medium"]);
+    }
+
+    #[test]
+    fn finds_nested_descendant_processes_without_cycles() {
+        let processes = [(11, 10), (12, 11), (13, 10), (14, 99), (10, 12)];
+        let descendants = descendant_process_ids(10, &processes);
+        assert_eq!(descendants.len(), 3);
+        assert!(descendants.contains(&11));
+        assert!(descendants.contains(&12));
+        assert!(descendants.contains(&13));
     }
 }

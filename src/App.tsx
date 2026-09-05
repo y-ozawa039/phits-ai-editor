@@ -4,6 +4,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { editor as MonacoEditor } from "monaco-editor";
 import { api } from "./api";
+import { codexTurnId, isCodexTurnCompleted, isCodexTurnStarted } from "./codexEvents";
 import { CodexPanel, type ChatMessage } from "./components/CodexPanel";
 import { EditorTabs } from "./components/EditorTabs";
 import { Icon } from "./components/Icons";
@@ -317,7 +318,7 @@ export default function App() {
   }, [model, reasoning, threadId]);
 
   const interruptCodex = useCallback(async () => {
-    if (!threadId || !turnId) { setCodexBusy(false); return; }
+    if (!threadId || !turnId) { notify("CodexのターンIDを待っています。もう一度中断してください。"); return; }
     try { await api.codexTurnInterrupt(threadId, turnId); } catch (error) { notify(`中断できませんでした: ${errorMessage(error)}`, "error"); }
   }, [notify, threadId, turnId]);
 
@@ -350,16 +351,22 @@ export default function App() {
     void attach<unknown>(EVENT_NAMES.codexDisconnected, () => { setCodexConnected(false); setCodexBusy(false); setTurnId(null); });
     void attach<CodexEvent>(EVENT_NAMES.codex, (event) => {
       const text = payloadText(event.params), method = event.method.toLowerCase();
+      const turnStarted = isCodexTurnStarted(method), turnCompleted = isCodexTurnCompleted(method);
+      if (turnStarted) {
+        const id = codexTurnId(event.params);
+        if (id) setTurnId(id);
+        setCodexBusy(true);
+      }
       if (method.includes("approval") && typeof event.params === "object" && event.params !== null) setApproval(event.params as ApprovalRequest);
       if (text) setMessages((current) => {
         let lastIndex = -1;
         for (let index = current.length - 1; index >= 0; index -= 1) {
           if (current[index].role === "assistant" && current[index].streaming) { lastIndex = index; break; }
         }
-        if (lastIndex < 0) return [...current, { id: crypto.randomUUID(), role: "assistant", text, streaming: !method.includes("complete") }];
-        return current.map((message, index) => index === lastIndex ? { ...message, text: message.text + text, streaming: !method.includes("complete") } : message);
+        if (lastIndex < 0) return [...current, { id: crypto.randomUUID(), role: "assistant", text, streaming: !turnCompleted }];
+        return current.map((message, index) => index === lastIndex ? { ...message, text: message.text + text, streaming: !turnCompleted } : message);
       });
-      if (["completed", "complete", "failed", "interrupted"].some((part) => method.includes(part))) {
+      if (turnCompleted) {
         setCodexBusy(false); setTurnId(null); setMessages((current) => current.map((message) => message.streaming ? { ...message, streaming: false } : message));
       }
     });
