@@ -135,8 +135,8 @@ svg { width: 18px; height: 18px; flex: none; }
 .codex-probe-summary:hover { background: #f3f6f8; }
 .codex-probe-summary strong { font-weight: 600; }
 .codex-probe-summary .diagnostic-dot { width: 6px; height: 6px; box-shadow: none; }
-.codex-probe-busy { color: #777; white-space: nowrap; }
-.codex-probe-chevron { width: 14px; transition: transform .16s ease; }
+.codex-probe-busy { grid-column: 3; color: #777; white-space: nowrap; }
+.codex-probe-chevron { grid-column: 4; justify-self: end; width: 14px; transition: transform .16s ease; }
 .codex-probe-summary[aria-expanded="true"] .codex-probe-chevron { transform: rotate(180deg); }
 .codex-feature-list { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 8px; margin-top: 4px; }
 .codex-feature-row { min-width: 0; display: grid; grid-template-columns: 7px minmax(0, 1fr) auto; align-items: center; gap: 6px; min-height: 24px; color: #444; font-size: 12px; }
