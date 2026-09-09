@@ -112,10 +112,10 @@ pub(crate) fn validate_relative_path(relative: &Path) -> AppResult<()> {
 
     for component in relative.components() {
         match component {
-            Component::Normal(value) =>
+            Component::Normal(_value) =>
             {
                 #[cfg(windows)]
-                if value.to_string_lossy().contains(':') {
+                if _value.to_string_lossy().contains(':') {
                     return Err(AppError::Message(
                         "文書パスにWindowsの代替データストリームは使用できません。".to_owned(),
                     ));
@@ -340,9 +340,14 @@ mod tests {
     }
 
     #[test]
-    fn rejects_traversal_and_absolute_document_paths() {
+    fn rejects_traversal_document_paths() {
         assert!(validate_relative_path(Path::new("../outside.inp")).is_err());
         assert!(validate_relative_path(Path::new("a/../../outside.inp")).is_err());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn rejects_windows_absolute_document_paths() {
         assert!(validate_relative_path(Path::new("C:\\outside.inp")).is_err());
     }
 

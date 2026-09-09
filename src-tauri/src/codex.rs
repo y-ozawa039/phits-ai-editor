@@ -172,6 +172,7 @@ fn require_codex_feature(
     }
 }
 
+#[cfg(any(windows, test))]
 fn descendant_process_ids(root_pid: u32, processes: &[(u32, u32)]) -> Vec<u32> {
     let mut descendants = Vec::new();
     let mut parents = vec![root_pid];
