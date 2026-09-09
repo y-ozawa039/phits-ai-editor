@@ -112,7 +112,10 @@ mod tests {
 
         let request = resolve_open_target(&input, directory.path()).unwrap();
         assert_eq!(request.kind, StartupOpenKind::File);
-        assert_eq!(request.workspace_root, path_to_string(directory.path()));
+        assert_eq!(
+            request.workspace_root,
+            path_to_string(&dunce::canonicalize(directory.path()).unwrap())
+        );
         assert_eq!(request.relative_path.as_deref(), Some("Case.InP"));
     }
 

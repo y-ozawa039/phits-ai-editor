@@ -571,8 +571,9 @@ fn resolve_relative_file(workspace: &Path, relative: &Path) -> AppResult<PathBuf
 }
 
 fn canonical_workspace_file(workspace: &Path, path: &Path) -> AppResult<PathBuf> {
+    let canonical_workspace = dunce::canonicalize(workspace)?;
     let canonical = dunce::canonicalize(path)?;
-    if !canonical.starts_with(workspace) {
+    if !canonical.starts_with(&canonical_workspace) {
         return Err(AppError::Message(
             "シンボリックリンク/ジャンクション経由の範囲外アクセスを拒否しました。".into(),
         ));

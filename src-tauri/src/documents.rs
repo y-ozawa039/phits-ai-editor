@@ -228,13 +228,17 @@ pub(crate) fn create_one_generation_backup_from_bytes(
 }
 
 pub(crate) fn secure_create_directories(root: &Path, requested: &Path) -> AppResult<PathBuf> {
-    let relative = requested.strip_prefix(root).map_err(|_| {
-        AppError::Message(format!(
-            "ワークスペース外にフォルダーを作成できません: {}",
-            requested.display()
-        ))
-    })?;
-    let mut current = root.to_path_buf();
+    let canonical_root = dunce::canonicalize(root)?;
+    let relative = requested
+        .strip_prefix(root)
+        .or_else(|_| requested.strip_prefix(&canonical_root))
+        .map_err(|_| {
+            AppError::Message(format!(
+                "ワークスペース外にフォルダーを作成できません: {}",
+                requested.display()
+            ))
+        })?;
+    let mut current = canonical_root.clone();
     for component in relative.components() {
         current.push(component.as_os_str());
         match fs::create_dir(&current) {
@@ -243,7 +247,7 @@ pub(crate) fn secure_create_directories(root: &Path, requested: &Path) -> AppRes
             Err(error) => return Err(error.into()),
         }
         let canonical = dunce::canonicalize(&current)?;
-        if !canonical.starts_with(root) || !canonical.is_dir() {
+        if !canonical.starts_with(&canonical_root) || !canonical.is_dir() {
             return Err(AppError::Message(format!(
                 "バックアップフォルダーがワークスペース外を参照しています: {}",
                 current.display()

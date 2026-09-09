@@ -181,10 +181,12 @@ pub(crate) fn resolve_save_path(root: &Path, relative: &Path) -> AppResult<PathB
 }
 
 fn ensure_under_root(root: &Path, target: &Path) -> AppResult<()> {
-    if !target.starts_with(root) {
+    let canonical_root = dunce::canonicalize(root)?;
+    let canonical_target = dunce::canonicalize(target)?;
+    if !canonical_target.starts_with(&canonical_root) {
         return Err(AppError::Message(format!(
             "ワークスペース外のパスにはアクセスできません: {}",
-            target.display()
+            canonical_target.display()
         )));
     }
     Ok(())
