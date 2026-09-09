@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     path::{Path, PathBuf},
     process::Stdio,
     sync::{
@@ -7,6 +7,9 @@ use std::{
         atomic::{AtomicU64, Ordering},
     },
 };
+
+#[cfg(any(windows, test))]
+use std::collections::HashSet;
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
