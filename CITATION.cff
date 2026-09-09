@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "Citation is optional. If this software makes a substantive contribution to published work, citation using the metadata below is appreciated."
+title: "PHITS AI Editor"
+type: software
+authors:
+  - family-names: "Ozawa"
+    given-names: "Yohei"
+    alias: "y-ozawa039"
+    orcid: "https://orcid.org/0009-0004-7814-2778"
+version: "0.0.1-alpha"
+license: "Apache-2.0"

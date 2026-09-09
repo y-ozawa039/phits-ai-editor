@@ -6,5 +6,16 @@ src-tauri/target/
 *.log
 coverage/
 .integration/
+.phits-editor/
+.env
+.env.*
+!.env.example
+*.bak
+*.dmp
+*.stackdump
+*.pem
+*.key
+*.p12
+*.pfx
 *.tsbuildinfo
 .DS_Store

@@ -15,9 +15,30 @@ use crate::{
 const EDITOR_METADATA_DIRECTORY: &str = ".phits-editor";
 
 #[tauri::command]
-pub fn workspace_open(app: AppHandle, path: String) -> AppResult<WorkspaceInfo> {
-    let info = inspect_workspace(path)?;
-    if let Ok(Some(status)) = crate::runner::restore_last_run(&info.root) {
+pub fn workspace_open(
+    app: AppHandle,
+    path: String,
+    restore_run_state: Option<bool>,
+    preferred_input: Option<String>,
+) -> AppResult<WorkspaceInfo> {
+    let mut info = inspect_workspace(path)?;
+    if let Some(preferred_input) = preferred_input {
+        validate_relative_path(Path::new(&preferred_input))?;
+        let selected = info
+            .candidate_inputs
+            .iter()
+            .find(|candidate| relative_paths_equal(candidate, &preferred_input))
+            .cloned()
+            .ok_or_else(|| {
+                AppError::Message(format!(
+                    "指定された実行対象はワークスペース直下の.inp/.phtではありません: {preferred_input}"
+                ))
+            })?;
+        info.primary_input = Some(selected);
+    }
+    if restore_run_state.unwrap_or(true)
+        && let Ok(Some(status)) = crate::runner::restore_last_run(&info.root)
+    {
         let _ = app.emit("phits://state", status);
     }
     Ok(info)
@@ -45,13 +66,6 @@ pub fn inspect_workspace(path: String) -> AppResult<WorkspaceInfo> {
     }
     sort_paths(&mut candidate_inputs);
 
-    if candidate_inputs.len() > 1 {
-        return Err(AppError::Message(format!(
-            "ワークスペース直下に複数のPHITS入力があります。MVPでは主入力は1件だけです: {}",
-            candidate_inputs.join(", ")
-        )));
-    }
-
     let mut auxiliary_files = Vec::new();
     let mut visited_directories = HashSet::new();
     visited_directories.insert(root.clone());
@@ -60,7 +74,7 @@ pub fn inspect_workspace(path: String) -> AppResult<WorkspaceInfo> {
 
     Ok(WorkspaceInfo {
         root: path_to_string(&root),
-        primary_input: candidate_inputs.first().cloned(),
+        primary_input: (candidate_inputs.len() == 1).then(|| candidate_inputs[0].clone()),
         candidate_inputs,
         auxiliary_files,
         writable: !fs::metadata(&root)?.permissions().readonly(),
@@ -166,41 +180,6 @@ pub(crate) fn resolve_save_path(root: &Path, relative: &Path) -> AppResult<PathB
     Ok(canonical_parent.join(file_name))
 }
 
-pub(crate) fn ensure_primary_save_allowed(root: &Path, relative: &Path) -> AppResult<()> {
-    let normal_component_count = relative
-        .components()
-        .filter(|component| matches!(component, Component::Normal(_)))
-        .count();
-    if normal_component_count != 1 || !is_primary_input(relative) {
-        return Ok(());
-    }
-
-    let mut conflicts = Vec::new();
-    for entry in fs::read_dir(root)? {
-        let entry = entry?;
-        if !is_primary_input(&entry.path()) {
-            continue;
-        }
-        let canonical = dunce::canonicalize(entry.path())?;
-        ensure_under_root(root, &canonical)?;
-        let is_requested_file = relative
-            .file_name()
-            .is_some_and(|requested| file_names_equal(&entry.file_name(), requested));
-        if !is_requested_file {
-            conflicts.push(path_to_string(Path::new(&entry.file_name())));
-        }
-    }
-    sort_paths(&mut conflicts);
-    if conflicts.is_empty() {
-        Ok(())
-    } else {
-        Err(AppError::Message(format!(
-            "主入力が既に存在するため、2件目のPHITS入力を保存できません: {}",
-            conflicts.join(", ")
-        )))
-    }
-}
-
 fn ensure_under_root(root: &Path, target: &Path) -> AppResult<()> {
     if !target.starts_with(root) {
         return Err(AppError::Message(format!(
@@ -277,13 +256,13 @@ fn is_primary_input(path: &Path) -> bool {
 }
 
 #[cfg(windows)]
-fn file_names_equal(left: &std::ffi::OsStr, right: &std::ffi::OsStr) -> bool {
-    left.to_string_lossy()
-        .eq_ignore_ascii_case(&right.to_string_lossy())
+pub(crate) fn relative_paths_equal(left: &str, right: &str) -> bool {
+    left.replace('\\', "/")
+        .eq_ignore_ascii_case(&right.replace('\\', "/"))
 }
 
 #[cfg(not(windows))]
-fn file_names_equal(left: &std::ffi::OsStr, right: &std::ffi::OsStr) -> bool {
+pub(crate) fn relative_paths_equal(left: &str, right: &str) -> bool {
     left == right
 }
 
@@ -350,15 +329,14 @@ mod tests {
     }
 
     #[test]
-    fn rejects_multiple_primary_inputs_and_lists_them() {
+    fn accepts_multiple_primary_inputs_and_requires_an_explicit_selection() {
         let directory = tempdir().unwrap();
         fs::write(directory.path().join("b.PHT"), "").unwrap();
         fs::write(directory.path().join("A.inp"), "").unwrap();
 
-        let error = inspect_workspace(path_to_string(directory.path())).unwrap_err();
-        let message = error.to_string();
-        assert!(message.contains("A.inp"));
-        assert!(message.contains("b.PHT"));
+        let info = inspect_workspace(path_to_string(directory.path())).unwrap();
+        assert_eq!(info.primary_input, None);
+        assert_eq!(info.candidate_inputs, ["A.inp", "b.PHT"]);
     }
 
     #[test]

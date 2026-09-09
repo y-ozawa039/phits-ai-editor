@@ -7,7 +7,7 @@ PHITS-Pad相当の編集・実行機能と、Codex App ServerによるAI支援�
 - Windows 11 x64（最初の検証対象）
 - Node.js 24 / pnpm 11
 - Rust stable / MSVC
-- PHITS 3.37（`PHITSPATH`を設定）
+- PHITS 3.37（`PHITSPATH`から自動検出、または「設定 → PHITS実行環境」で指定）
 - Codex CLI 0.153.1以降（AI機能を使う場合）
 
 ```powershell
@@ -18,19 +18,46 @@ pnpm tauri:dev
 
 PHITS本体、Codex CLI、認証情報、PHITS言語資産はアプリへ同梱しません。
 
-詳細は [MVP仕様](docs/mvp-specification.md) を参照してください。
+詳細は [MVP仕様](docs/mvp-specification.md) と [alpha版公開計画](docs/public-release-plan.md) を参照してください。
 
-## Windows α版
+## ライセンスと引用
+
+PHITS AI Editorは[Apache License 2.0](LICENSE)で公開します。著作権者と
+研究者識別情報は[AUTHORS.md](AUTHORS.md)、ソフトウェアを研究成果として
+引用するための機械可読な情報は[CITATION.cff](CITATION.cff)を参照してください。
+第三者依存関係のライセンス一覧は[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)です。
+
+引用は通常利用の条件ではありません。PHITS AI Editorが公開研究へ実質的に
+貢献した場合に限り、謝辞への記載または`CITATION.cff`を用いた任意の引用を
+歓迎します。
+
+本プロジェクトは個人による独立した開発であり、著者の所属機関による開発、
+承認または保証を意味しません。PHITS本体とCodex CLIは別製品であり、この
+リポジトリおよび配布物には含まれません。利用者はそれぞれを正規の提供元から
+入手し、各利用条件に従ってください。
+
+本プロジェクトは、生成AIなどを使って自分の用途へ改造できる基盤として公開する
+個人開発のalpha版です。問題発生時にログやソースコードを調べ、自力で調査・回避・
+復旧を進められる方を主な対象としており、個別サポートや回答期限は保証しません。
+IssueおよびPull Requestの方針は[CONTRIBUTING.md](CONTRIBUTING.md)を参照してください。
+
+## Windows alpha版（0.0.1-alpha）
 
 実装済みの主な機能:
 
 - Monacoによる複数タブ編集、検索・置換、Undo/Redo、新規作成、保存、名前を付けて保存
+- Explorerの「プログラムから開く」や実行ファイルへのドラッグ＆ドロップで`.inp`/`.pht`を直接開き、親フォルダーをワークスペース、対象ファイルを実行対象として自動選択。二重起動は既存ウィンドウへ転送し、通常起動では前回のワークスペースと保存済みタブを復元
+- 表示メニューのチェック状態と同期したエクスプローラー／Codex／出力パネル切替、およびエクスプローラー・エディター・Codexの個別文字サイズ設定（12～28px、工場出荷時14px、直接入力／候補一覧／A↑・A↓、アプリ全体のユーザー既定値を保存可能）。縮小側のAは拡大側より小さく表示する。アプリケーションの背景と外枠はニュートラルなグレー系とし、PHITS構文強調や正常・警告・異常を示す意味色は維持する。上部メニュー、ツールバー、タブ、ファイル一覧など主要操作部の文字は`#000000`、行番号はグレー、PロゴとCodexの主要操作は青系アクセントで表示する
 - UTF-8／BOM付きUTF-8／Windows-31JおよびCRLF／LFの保持、原子的保存、1世代バックアップ
 - 外部`phits-spec.json`による構文強調、補完、日英ホバー
 - 公式ラッパーを使う通常実行と、Editor/Codexを残さない本番実行（計算優先）
 - ANGEL、DCHAIN、PHIG-3Dの固定公式経路からの起動
-- Codex App Server 0.153.1の遅延起動、複数スレッド関連付け、履歴再開、モデル選択、承認UI
-- 前回本番実行の保守的な状態復元と、状態不明時の重複実行防止
+- Codex App Server 0.153.1を最低基準とする遅延起動、起動時Schema互換性プローブ、会話・スレッド・ファイル編集・承認の機能別可否表示と安全な縮退、タイトル付きスレッドの再開・名前変更・恒久削除、モデル選択、Markdown会話表示、安全なHTTP/HTTPSリンク
+- 現在のファイル・選択・未保存状態を128 KiB上限で渡すEditor Context、3つの承認モード、セッション許可、中央Monacoの全文差分レビュー（インライン／左右比較、変更箇所移動、変更後の「変更を保持／元に戻す」）、ターン単位チェックポイント、Codex変更後の再読込と競合保護。診断Contextの型は将来互換用に保持するが、実診断がない空の「診断」チップは表示・送信しない
+- Codexパネルはウィンドウ幅の1/3を既定とし、ドラッグで最小360pxから最大1/2まで変更可能。幅は比率でアプリ全体へ保存し、仕切りのダブルクリックで1/3へ戻せる
+- 「現在のファイル」への編集依頼をApp Server組み込み`fileChange`へ明示的に誘導し、チャットへ差分を書くだけでは編集完了としないAgent指示
+- Codexのストリーミング応答を最新位置まで自動追従し、過去ログを読むためにスクロールした場合だけ追従を一時停止する会話表示
+- 複数の`.inp`/`.pht`が同じワークスペースにあっても、Editorで選択した1件だけを実行対象とする方式。前回本番実行の保守的な状態復元と、状態不明時の重複実行防止
 
 署名なしNSISインストーラーは次のコマンドで生成します。
 
@@ -38,16 +65,20 @@ PHITS本体、Codex CLI、認証情報、PHITS言語資産はアプリへ同梱�
 pnpm tauri build --bundles nsis
 ```
 
-個人利用α版はコード署名を行わないため、インストール時にWindows SmartScreenの警告が表示される場合があります。PHITS、Codex、言語資産、認証情報はインストーラーへ含まれません。
+個人利用alpha版はコード署名を行わないため、インストール時にWindows SmartScreenの警告が表示される場合があります。PHITS、Codex、言語資産、認証情報はインストーラーへ含まれません。
 
 ## 検証
 
 ```powershell
 pnpm test
+pnpm test:codex-schema
 pnpm build
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml --all-targets
+node scripts/app-server-edit-smoke.mjs (Get-Command codex).Source .integration
 ```
 
-Windows実機の操作受入、公式ラッパーとの5回比較ベンチマーク、Ubuntu 24.04/26.04実機またはVM検証と`.deb`生成は配布前の未実施項目です。
+`.github/workflows/codex-cli-compatibility.yml`は毎週、最新版Codex CLIからApp Server Schemaを生成し、Editorが利用する4機能の契約を検査します。通常のCLI更新だけではEditorを再配布せず、この検査が失敗した場合にだけ互換対応を判断します。
+
+現在のWindows 11 x64 PCでは、実App Server承認試験、PHITS／補助ツール実行、公式ラッパーとの5回比較ベンチマークを含むalpha版受入を完了しています。クリーンWindows環境でのインストーラー試験、およびUbuntu 24.04/26.04実機またはVM検証と`.deb`生成は配布前の未実施項目です。詳細は [Windows alpha試験報告](docs/windows-alpha-test-report.md) を参照してください。

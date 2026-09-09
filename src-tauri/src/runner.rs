@@ -16,14 +16,15 @@ use uuid::Uuid;
 use crate::{
     contracts::{
         Compatibility, ExecutionMode, FileFingerprintV1, PhitsOutputEvent, RunManifestV1, RunState,
-        RunStatus, UtilityKind,
+        RunStatus, UtilityKind, WorkspaceInfo,
     },
     diagnostics::{
         phits_compatibility, phits_wrapper_path, read_phits_version, resolve_phits_root,
     },
     error::{AppError, AppResult},
+    settings::app_phits_root,
     state::AppState,
-    workspace::inspect_workspace,
+    workspace::{inspect_workspace, relative_paths_equal, validate_relative_path},
 };
 
 const EVENT_OUTPUT: &str = "phits://output";
@@ -64,9 +65,15 @@ pub async fn run_phits_normal(
     app: AppHandle,
     state: State<'_, AppState>,
     workspace_root: String,
+    input_relative_path: Option<String>,
     override_unresolved: Option<bool>,
 ) -> AppResult<RunStatus> {
-    let context = resolve_run_context(&workspace_root, override_unresolved.unwrap_or(false))?;
+    let context = resolve_run_context(
+        &app,
+        &workspace_root,
+        input_relative_path.as_deref(),
+        override_unresolved.unwrap_or(false),
+    )?;
     let spec = phits_command_spec(&context)?;
     acquire_run_lock(&state, &context.work_dir).await?;
 
@@ -164,9 +171,15 @@ pub async fn run_phits_production(
     app: AppHandle,
     state: State<'_, AppState>,
     workspace_root: String,
+    input_relative_path: Option<String>,
     override_unresolved: Option<bool>,
 ) -> AppResult<RunStatus> {
-    let context = resolve_run_context(&workspace_root, override_unresolved.unwrap_or(false))?;
+    let context = resolve_run_context(
+        &app,
+        &workspace_root,
+        input_relative_path.as_deref(),
+        override_unresolved.unwrap_or(false),
+    )?;
     let spec = phits_command_spec(&context)?;
     acquire_run_lock(&state, &context.work_dir).await?;
 
@@ -216,8 +229,12 @@ pub async fn run_phits_production(
 }
 
 #[tauri::command]
-pub fn run_phits_stop_graceful(workspace_root: String) -> AppResult<()> {
-    let context = resolve_run_context_core(&workspace_root)?;
+pub fn run_phits_stop_graceful(
+    app: AppHandle,
+    workspace_root: String,
+    input_relative_path: Option<String>,
+) -> AppResult<()> {
+    let context = resolve_run_context_core(&app, &workspace_root, input_relative_path.as_deref())?;
     let batch_path = context.work_dir.join("batch.out");
     let batch_path = canonical_workspace_file(&context.workspace, &batch_path)?;
     let original = fs::read(&batch_path)?;
@@ -235,7 +252,7 @@ pub fn run_phits_stop_graceful(workspace_root: String) -> AppResult<()> {
 
 #[tauri::command]
 pub async fn run_utility(
-    _app: AppHandle,
+    app: AppHandle,
     workspace_root: String,
     kind: UtilityKind,
     relative_path: String,
@@ -247,8 +264,11 @@ pub async fn run_utility(
         .ok_or_else(|| AppError::Message("入力ファイルの親フォルダがありません。".into()))?
         .to_path_buf();
     let mut messages = Vec::new();
-    let phits_root = resolve_phits_root(Some(&workspace), &mut messages)
-        .ok_or_else(|| AppError::Message(messages.join(" ")))?;
+    let configured_root = app_phits_root(&app)?;
+    let phits_root =
+        resolve_phits_root(Some(&workspace), configured_root.as_deref(), &mut messages)
+            .map(|value| value.root)
+            .ok_or_else(|| AppError::Message(messages.join(" ")))?;
     let spec = utility_command_spec(&phits_root, &work_dir, &target, kind)?;
     let status = command_from_spec(&spec, false)
         .stdin(Stdio::null())
@@ -280,22 +300,25 @@ async fn release_run_lock(state: &AppState, work_dir: &Path) {
     state.release_run_directory(work_dir).await;
 }
 
-fn resolve_run_context(workspace_root: &str, override_unresolved: bool) -> AppResult<RunContext> {
+fn resolve_run_context(
+    app: &AppHandle,
+    workspace_root: &str,
+    input_relative_path: Option<&str>,
+    override_unresolved: bool,
+) -> AppResult<RunContext> {
     let workspace = canonical_workspace(Path::new(workspace_root))?;
     handle_unresolved_runs(&workspace, override_unresolved)?;
-    resolve_run_context_core(workspace_root)
+    resolve_run_context_core(app, workspace_root, input_relative_path)
 }
 
-fn resolve_run_context_core(workspace_root: &str) -> AppResult<RunContext> {
+fn resolve_run_context_core(
+    app: &AppHandle,
+    workspace_root: &str,
+    input_relative_path: Option<&str>,
+) -> AppResult<RunContext> {
     let workspace = canonical_workspace(Path::new(workspace_root))?;
     let info = inspect_workspace(workspace.to_string_lossy().into_owned())?;
-    let relative = info.primary_input.ok_or_else(|| {
-        if info.candidate_inputs.is_empty() {
-            AppError::Message("ワークスペース直下に主入力(.inp/.pht)がありません。".into())
-        } else {
-            AppError::Message("主入力候補が複数あります。1ファイルに絞ってください。".into())
-        }
-    })?;
+    let relative = select_run_input(&info, input_relative_path)?;
     let input_relative = PathBuf::from(relative);
     let input = resolve_relative_file(&workspace, &input_relative)?;
     let work_dir = input
@@ -304,8 +327,11 @@ fn resolve_run_context_core(workspace_root: &str) -> AppResult<RunContext> {
         .to_path_buf();
 
     let mut messages = Vec::new();
-    let phits_root = resolve_phits_root(Some(&workspace), &mut messages)
-        .ok_or_else(|| AppError::Message(messages.join(" ")))?;
+    let configured_root = app_phits_root(app)?;
+    let phits_root =
+        resolve_phits_root(Some(&workspace), configured_root.as_deref(), &mut messages)
+            .map(|value| value.root)
+            .ok_or_else(|| AppError::Message(messages.join(" ")))?;
     let wrapper = phits_wrapper_path(&phits_root);
     if !wrapper.is_file() {
         return Err(AppError::Message(format!(
@@ -339,6 +365,31 @@ fn resolve_run_context_core(workspace_root: &str) -> AppResult<RunContext> {
         phits_version,
         wrapper,
     })
+}
+
+fn select_run_input(info: &WorkspaceInfo, input_relative_path: Option<&str>) -> AppResult<String> {
+    if let Some(requested) = input_relative_path {
+        validate_relative_path(Path::new(requested))?;
+        info.candidate_inputs
+            .iter()
+            .find(|candidate| relative_paths_equal(candidate, requested))
+            .cloned()
+            .ok_or_else(|| {
+                AppError::Message(format!(
+                    "選択された実行対象はワークスペース直下の.inp/.phtではありません: {requested}"
+                ))
+            })
+    } else {
+        info.primary_input.clone().ok_or_else(|| {
+            if info.candidate_inputs.is_empty() {
+                AppError::Message(
+                    "ワークスペース直下に入力ファイル(.inp/.pht)がありません。".into(),
+                )
+            } else {
+                AppError::Message("実行する.inp/.phtをエクスプローラーで選択してください。".into())
+            }
+        })
+    }
 }
 
 pub(crate) fn restore_last_run(workspace_root: &str) -> AppResult<Option<RunStatus>> {
@@ -879,6 +930,36 @@ fn replace_first_batch_count(input: &[u8]) -> Option<Vec<u8>> {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    fn workspace_info(candidate_inputs: &[&str], primary_input: Option<&str>) -> WorkspaceInfo {
+        WorkspaceInfo {
+            root: "unused".into(),
+            primary_input: primary_input.map(str::to_owned),
+            candidate_inputs: candidate_inputs
+                .iter()
+                .map(|value| (*value).to_owned())
+                .collect(),
+            auxiliary_files: Vec::new(),
+            writable: true,
+        }
+    }
+
+    #[test]
+    fn explicit_input_selects_one_of_multiple_candidates() {
+        let info = workspace_info(&["first.inp", "second.pht"], None);
+        assert_eq!(
+            select_run_input(&info, Some("second.pht")).unwrap(),
+            "second.pht"
+        );
+        assert!(select_run_input(&info, Some("missing.inp")).is_err());
+        assert!(select_run_input(&info, None).is_err());
+    }
+
+    #[test]
+    fn single_workspace_input_remains_the_implicit_default() {
+        let info = workspace_info(&["main.inp"], Some("main.inp"));
+        assert_eq!(select_run_input(&info, None).unwrap(), "main.inp");
+    }
 
     #[test]
     fn graceful_stop_only_replaces_first_number_on_first_line() {

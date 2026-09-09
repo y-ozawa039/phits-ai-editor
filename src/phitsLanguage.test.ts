@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fallbackPhitsSpec, normalizePhitsSpec, normalizeSectionName, sectionAtLine } from "./phitsLanguage";
+import { fallbackPhitsSpec, normalizePhitsSpec, normalizeSectionName, PHITS_MANUAL_SECTIONS, phitsSectionRanges, sectionAtLine } from "./phitsLanguage";
 
 describe("PHITS language specification", () => {
   it("normalizes generated workbench fields", () => {
@@ -39,5 +39,27 @@ describe("PHITS language specification", () => {
     expect(sectionAtLine(text, 2)).toBe("parameters");
     expect(sectionAtLine(text, 5)).toBe("t-track");
     expect(normalizeSectionName(" [ SOURCE ] ")).toBe("source");
+  });
+
+  it("maps every PHITS section to an outline range for sticky scrolling", () => {
+    const text = "[ P a r a m e t e r s ]\nmaxcas = 10\n\n[ Source ]\nproj = photon\n[ Material ]\nmat[1] H 2 O 1\n[not a PHITS section]\nignored";
+    expect(phitsSectionRanges(text)).toEqual([
+      { name: "[ P a r a m e t e r s ]", startLine: 1, endLine: 3 },
+      { name: "[ Source ]", startLine: 4, endLine: 5 },
+      { name: "[ Material ]", startLine: 6, endLine: 9 },
+    ]);
+  });
+
+  it("uses all 55 section names enumerated by manual tables 4.1.1 and 4.1.2", () => {
+    expect(PHITS_MANUAL_SECTIONS).toHaveLength(55);
+    expect(PHITS_MANUAL_SECTIONS).toContain("[material]");
+    expect(PHITS_MANUAL_SECTIONS).toContain("[t-interact]");
+    expect(PHITS_MANUAL_SECTIONS).toContain("[t-star]");
+    expect(PHITS_MANUAL_SECTIONS).toContain("[T-4Dtrack]");
+  });
+
+  it("follows the manual's four-leading-space limit for section headers", () => {
+    expect(phitsSectionRanges("    [material]\nmat[1] H 2 O 1")).toHaveLength(1);
+    expect(phitsSectionRanges("     [material]\nmat[1] H 2 O 1")).toHaveLength(0);
   });
 });

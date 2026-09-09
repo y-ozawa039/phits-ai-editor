@@ -4,6 +4,8 @@ export type IconName =
   | "folder"
   | "file"
   | "save"
+  | "undo"
+  | "redo"
   | "play"
   | "rocket"
   | "stop"
@@ -19,6 +21,8 @@ const paths: Record<IconName, React.ReactNode> = {
   folder: <path d="M3 6.5h6l2 2h10v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6.5Zm0 3h18" />,
   file: <path d="M7 2.8h7l4 4V21H7a2 2 0 0 1-2-2V4.8a2 2 0 0 1 2-2Zm7 0v5h4M8.5 12h6.8M8.5 16h6.8" />,
   save: <path d="M4 3h14l2 2v16H4V3Zm4 0v6h8V3M8 21v-7h8v7" />,
+  undo: <path d="M9 7 4 12l5 5m-5-5h9a7 7 0 0 1 7 7" />,
+  redo: <path d="m15 7 5 5-5 5m5-5h-9a7 7 0 0 0-7 7" />,
   play: <path d="m8 5 11 7-11 7V5Z" />,
   rocket: <path d="M14.7 4.1c2.2-1.6 4.7-1.5 5.2-1.4.1.5.2 3-1.4 5.2l-5.1 6.8-4.2.1.7-4.1 5.5-6.6ZM9.6 14.4l-2.7 2.7M5.5 13.8 3 15l3 2.9m4.2.6 2.9 3 1.2-2.6" />,
   stop: <path d="M7 7h10v10H7z" />,

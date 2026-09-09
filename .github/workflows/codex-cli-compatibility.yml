@@ -1,0 +1,41 @@
+name: Latest Codex CLI compatibility
+
+on:
+  schedule:
+    - cron: "30 0 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  app-server-schema:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install latest Codex CLI
+        run: npm install --global @openai/codex@latest
+      - name: Record Codex CLI version
+        run: codex --version
+      - name: Select report paths
+        shell: pwsh
+        run: |
+          "CODEX_SCHEMA_DIR=$(Join-Path $env:RUNNER_TEMP 'codex-schema')" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "CODEX_REPORT=$(Join-Path $env:RUNNER_TEMP 'codex-compatibility.json')" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - name: Generate installed App Server schema
+        shell: pwsh
+        run: codex app-server generate-json-schema --out "$env:CODEX_SCHEMA_DIR"
+      - name: Validate PHITS AI Editor feature contracts
+        shell: pwsh
+        run: node scripts/validate-codex-schema.mjs "$env:CODEX_SCHEMA_DIR" "$env:CODEX_REPORT"
+      - name: Upload compatibility report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: latest-codex-cli-compatibility
+          path: ${{ env.CODEX_REPORT }}
+          if-no-files-found: warn

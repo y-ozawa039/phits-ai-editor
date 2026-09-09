@@ -4,7 +4,7 @@ export interface TabView {
   id: string;
   name: string;
   dirty: boolean;
-  primary: boolean;
+  codexPending?: boolean;
 }
 
 interface EditorTabsProps {
@@ -28,7 +28,7 @@ export function EditorTabs({ tabs, activeId, onActivate, onClose }: EditorTabsPr
         >
           <Icon name="file" />
           <span>{tab.name}</span>
-          {tab.primary && <span className="primary-dot" title="主入力" />}
+          {tab.codexPending && <span className="codex-review-marker" aria-label="Codexの変更・未確認">AI</span>}
           {tab.dirty && <span className="dirty-dot" aria-label="未保存" />}
           <span
             className="tab-close"

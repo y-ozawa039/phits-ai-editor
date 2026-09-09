@@ -25,10 +25,73 @@ export interface NormalizedPhitsSpec {
   entries: PhitsEntrySpec[];
 }
 
-const fallbackSections = [
-  "[ Title ]", "[ Parameters ]", "[ Source ]", "[ Material ]", "[ Surface ]", "[ Cell ]",
-  "[ T-Track ]", "[ T-Cross ]", "[ T-Deposit ]", "[ T-Heat ]", "[ End ]",
-];
+export interface PhitsSectionRange {
+  name: string;
+  startLine: number;
+  endLine: number;
+}
+
+/** PHITS 3.37 Japanese manual, tables 4.1.1 and 4.1.2 (including the t-star legacy name). */
+export const PHITS_MANUAL_SECTIONS = [
+  "[title]",
+  "[parameters]",
+  "[source]",
+  "[material]",
+  "[surface]",
+  "[cell]",
+  "[transform]",
+  "[temperature]",
+  "[mat time change]",
+  "[magnetic field]",
+  "[electro magnetic field]",
+  "[delta ray]",
+  "[track structure]",
+  "[super mirror]",
+  "[elastic option]",
+  "[data max]",
+  "[frag data]",
+  "[importance]",
+  "[weight window]",
+  "[ww bias]",
+  "[forced collisions]",
+  "[Repeated collisions]",
+  "[volume]",
+  "[multiplier]",
+  "[mat name color]",
+  "[reg name]",
+  "[counter]",
+  "[timer]",
+  "[user defined interaction]",
+  "[user defined particle]",
+  "[libout]",
+  "[end]",
+  "[t-track]",
+  "[t-cross]",
+  "[t-point]",
+  "[t-deposit]",
+  "[t-deposit2]",
+  "[t-heat]",
+  "[t-yield]",
+  "[t-product]",
+  "[t-dpa]",
+  "[t-let]",
+  "[t-sed]",
+  "[t-time]",
+  "[t-interact]",
+  "[t-star]",
+  "[t-dchain]",
+  "[t-wwg]",
+  "[t-wwbg]",
+  "[t-volume]",
+  "[t-userdefined]",
+  "[t-gshow]",
+  "[t-rshow]",
+  "[t-3dshow]",
+  "[T-4Dtrack]",
+] as const;
+
+const fallbackSections = [...PHITS_MANUAL_SECTIONS];
+const manualSectionNames = new Set(PHITS_MANUAL_SECTIONS.map(normalizeSectionName));
 
 const fallbackEntries = [
   ["icntl", "parameters"], ["maxcas", "parameters"], ["maxbch", "parameters"],
@@ -87,7 +150,7 @@ export function normalizePhitsSpec(raw: unknown): NormalizedPhitsSpec {
 }
 
 export function normalizeSectionName(name: string): string {
-  return name.replace(/^\s*\[\s*|\s*\]\s*$/g, "").trim().toLowerCase();
+  return name.replace(/^\s*\[\s*|\s*\]\s*$/g, "").replace(/\s+/g, "").toLowerCase();
 }
 
 export function sectionAtLine(text: string, lineNumber: number): string | null {
@@ -97,6 +160,21 @@ export function sectionAtLine(text: string, lineNumber: number): string | null {
     if (match) return normalizeSectionName(match[1]);
   }
   return null;
+}
+
+/** Returns top-level PHITS section ranges for outline and sticky-scroll support. */
+export function phitsSectionRanges(text: string): PhitsSectionRange[] {
+  const lines = text.split(/\r?\n/);
+  const headings = lines.flatMap((line, index) => {
+    const match = line.match(/^ {0,4}(\[\s*[^\]]+?\s*\])/);
+    return match && manualSectionNames.has(normalizeSectionName(match[1]))
+      ? [{ name: match[1].trim(), startLine: index + 1 }]
+      : [];
+  });
+  return headings.map((heading, index) => ({
+    ...heading,
+    endLine: headings[index + 1]?.startLine ? headings[index + 1].startLine - 1 : lines.length,
+  }));
 }
 
 function entryDocumentation(entry: PhitsEntrySpec): string {
@@ -186,5 +264,18 @@ export function registerPhitsLanguage(monaco: typeof Monaco, rawSpec?: unknown):
     },
   });
 
-  return { dispose: () => { completion.dispose(); hover.dispose(); } };
+  const outline = monaco.languages.registerDocumentSymbolProvider(PHITS_LANGUAGE_ID, {
+    provideDocumentSymbols(model) {
+      return phitsSectionRanges(model.getValue()).map((section) => ({
+        name: section.name,
+        detail: "PHITS section",
+        kind: monaco.languages.SymbolKind.Module,
+        tags: [],
+        range: new monaco.Range(section.startLine, 1, section.endLine, model.getLineMaxColumn(section.endLine)),
+        selectionRange: new monaco.Range(section.startLine, 1, section.startLine, model.getLineMaxColumn(section.startLine)),
+      }));
+    },
+  });
+
+  return { dispose: () => { completion.dispose(); hover.dispose(); outline.dispose(); } };
 }

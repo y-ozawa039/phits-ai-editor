@@ -13,8 +13,8 @@ use crate::{
     contracts::{DocumentData, LineEnding, TextEncoding},
     error::{AppError, AppResult},
     workspace::{
-        canonical_workspace_root, ensure_primary_save_allowed, path_to_string,
-        resolve_existing_path, resolve_save_path, validate_relative_path,
+        canonical_workspace_root, path_to_string, resolve_existing_path, resolve_save_path,
+        validate_relative_path,
     },
 };
 
@@ -38,7 +38,6 @@ pub fn document_save(
     let relative = Path::new(&document.relative_path);
     validate_relative_path(relative)?;
     let target = resolve_save_path(&root, relative)?;
-    ensure_primary_save_allowed(&root, relative)?;
 
     // Encode first so an unrepresentable edit cannot create metadata or alter
     // the previous-generation backup.
@@ -89,7 +88,6 @@ pub fn document_save_as(
         .strip_prefix(&root)
         .map_err(|_| AppError::Message("保存先の相対パスを取得できません。".to_owned()))?;
     validate_relative_path(relative)?;
-    ensure_primary_save_allowed(&root, relative)?;
 
     let encoding = source_document
         .as_ref()
@@ -142,7 +140,7 @@ fn read_document(target: &Path, relative: &Path) -> AppResult<DocumentData> {
     })
 }
 
-fn decode_text(bytes: &[u8]) -> AppResult<(String, TextEncoding)> {
+pub(crate) fn decode_text(bytes: &[u8]) -> AppResult<(String, TextEncoding)> {
     if let Some(without_bom) = bytes.strip_prefix(UTF8_BOM) {
         return String::from_utf8(without_bom.to_vec())
             .map(|content| (content, TextEncoding::Utf8Bom))
@@ -200,7 +198,19 @@ fn normalize_line_endings(content: &str, line_ending: &LineEnding) -> String {
     }
 }
 
-fn create_one_generation_backup(root: &Path, relative: &Path, original: &Path) -> AppResult<()> {
+pub(crate) fn create_one_generation_backup(
+    root: &Path,
+    relative: &Path,
+    original: &Path,
+) -> AppResult<()> {
+    create_one_generation_backup_from_bytes(root, relative, &fs::read(original)?)
+}
+
+pub(crate) fn create_one_generation_backup_from_bytes(
+    root: &Path,
+    relative: &Path,
+    original_bytes: &[u8],
+) -> AppResult<()> {
     let relative_parent = relative.parent().unwrap_or_else(|| Path::new(""));
     let requested_parent = root
         .join(".phits-editor")
@@ -214,11 +224,10 @@ fn create_one_generation_backup(root: &Path, relative: &Path, original: &Path) -
         ))
     })?;
     let backup = backup_parent.join(file_name);
-    let original_bytes = fs::read(original)?;
-    atomic_write(&backup, &original_bytes)
+    atomic_write(&backup, original_bytes)
 }
 
-fn secure_create_directories(root: &Path, requested: &Path) -> AppResult<PathBuf> {
+pub(crate) fn secure_create_directories(root: &Path, requested: &Path) -> AppResult<PathBuf> {
     let relative = requested.strip_prefix(root).map_err(|_| {
         AppError::Message(format!(
             "ワークスペース外にフォルダーを作成できません: {}",
@@ -245,7 +254,7 @@ fn secure_create_directories(root: &Path, requested: &Path) -> AppResult<PathBuf
     Ok(current)
 }
 
-fn atomic_write(target: &Path, bytes: &[u8]) -> AppResult<()> {
+pub(crate) fn atomic_write(target: &Path, bytes: &[u8]) -> AppResult<()> {
     let parent = target.parent().ok_or_else(|| {
         AppError::Message(format!(
             "保存先の親フォルダーがありません: {}",
@@ -472,18 +481,18 @@ mod tests {
     }
 
     #[test]
-    fn refuses_a_second_direct_primary_but_allows_nested_input() {
+    fn allows_multiple_direct_inputs_and_nested_inputs() {
         let directory = tempdir().unwrap();
         fs::write(directory.path().join("main.inp"), b"main\n").unwrap();
         fs::create_dir(directory.path().join("parts")).unwrap();
 
-        let second = document_save(
+        document_save(
             path_to_string(directory.path()),
             data("second.PHT", TextEncoding::Utf8, LineEnding::Lf),
             "second\n".to_owned(),
-        );
-        assert!(second.is_err());
-        assert!(!directory.path().join("second.PHT").exists());
+        )
+        .unwrap();
+        assert!(directory.path().join("second.PHT").is_file());
 
         document_save(
             path_to_string(directory.path()),

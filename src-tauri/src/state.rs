@@ -1,12 +1,16 @@
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},
+    sync::Mutex as SyncMutex,
 };
 use tokio::sync::Mutex;
+
+use crate::contracts::StartupOpenRequest;
 
 #[derive(Default)]
 pub struct AppState {
     pub active_run_directories: Mutex<HashSet<PathBuf>>,
+    pub pending_open_requests: SyncMutex<Vec<StartupOpenRequest>>,
 }
 
 impl AppState {
@@ -16,6 +20,22 @@ impl AppState {
 
     pub async fn release_run_directory(&self, directory: &Path) {
         self.active_run_directories.lock().await.remove(directory);
+    }
+
+    pub fn queue_open_requests(&self, requests: impl IntoIterator<Item = StartupOpenRequest>) {
+        self.pending_open_requests
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .extend(requests);
+    }
+
+    pub fn take_open_requests(&self) -> Vec<StartupOpenRequest> {
+        std::mem::take(
+            &mut *self
+                .pending_open_requests
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+        )
     }
 }
 

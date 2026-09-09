@@ -45,6 +45,23 @@ pub struct WorkspaceInfo {
     pub writable: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct StartupOpenRequest {
+    pub id: String,
+    pub kind: StartupOpenKind,
+    pub path: String,
+    pub workspace_root: String,
+    pub relative_path: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum StartupOpenKind {
+    File,
+    Folder,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum TextEncoding {
@@ -75,14 +92,32 @@ pub struct DocumentData {
 #[serde(rename_all = "camelCase")]
 pub struct RuntimeDiagnostics {
     pub phits_root: Option<String>,
+    pub phits_path_source: PhitsPathSource,
     pub phits_version: Option<String>,
     pub compatibility: Compatibility,
+    pub phits_ready: bool,
     pub phits_wrapper: Option<String>,
     pub language_spec: Option<String>,
     pub codex_path: Option<String>,
     pub codex_version: Option<String>,
     pub codex_compatible: bool,
     pub messages: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PhitsPathSource {
+    WorkspaceSetting,
+    AppSetting,
+    Environment,
+    StandardLocation,
+    Unavailable,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct PhitsAppSettings {
+    pub phits_root: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -153,4 +188,119 @@ pub struct CodexConnectResult {
     pub models: Vec<CodexModel>,
     pub active_thread_id: Option<String>,
     pub threads: Vec<CodexThreadLink>,
+    pub compatibility: CodexCompatibilityReport,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CodexCompatibilityState {
+    Compatible,
+    Limited,
+    Incompatible,
+    Checking,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CodexFeatureId {
+    Chat,
+    Threads,
+    FileEditing,
+    Approvals,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CodexFeatureState {
+    Available,
+    Limited,
+    Unavailable,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexFeatureStatus {
+    pub id: CodexFeatureId,
+    pub state: CodexFeatureState,
+    pub detail: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexCompatibilityReport {
+    pub state: CodexCompatibilityState,
+    pub codex_path: Option<String>,
+    pub codex_version: Option<String>,
+    pub baseline_version: String,
+    pub checked_at: String,
+    pub features: Vec<CodexFeatureStatus>,
+    pub messages: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ApprovalMode {
+    ConfirmFirst,
+    ConsultationOnly,
+    OnRequest,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EditorPositionV1 {
+    pub line: u32,
+    pub column: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EditorSelectionV1 {
+    pub start_line: u32,
+    pub start_column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EditorDiagnosticV1 {
+    pub severity: String,
+    pub message: String,
+    pub start_line: u32,
+    pub start_column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EditorContextV1 {
+    pub version: u32,
+    pub active_document_path: Option<String>,
+    pub active_input_path: Option<String>,
+    pub cursor: Option<EditorPositionV1>,
+    pub selection: Option<EditorSelectionV1>,
+    pub dirty: bool,
+    pub dirty_buffer: Option<String>,
+    #[serde(default)]
+    pub open_document_paths: Vec<String>,
+    #[serde(default)]
+    pub diagnostics: Vec<EditorDiagnosticV1>,
+    pub phits_version: Option<String>,
+    pub attached_output_path: Option<String>,
+    pub attached_output_content: Option<String>,
+    pub content_warning: Option<String>,
+    #[serde(default)]
+    pub document_revisions: Vec<DocumentRevisionV1>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentRevisionV1 {
+    pub relative_path: String,
+    pub disk_sha256: String,
+    pub buffer_sha256: String,
+    pub modified_at_ms: u64,
+    pub dirty: bool,
 }
