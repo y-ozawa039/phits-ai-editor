@@ -147,7 +147,7 @@ node scripts/app-server-edit-smoke.mjs (Get-Command codex).Source .integration
 
 `.github/workflows/codex-cli-compatibility.yml`は毎週、最新版Codex CLIからApp Server Schemaを生成し、Editorが利用する4機能の契約を検査します。通常のCLI更新だけではEditorを再配布せず、この検査が失敗した場合にだけ互換対応を判断します。
 
-現在のWindows 11 x64 PCでは、実App Server承認試験、PHITS／補助ツール実行、公式ラッパーとの5回比較ベンチマークを含むalpha版受入を完了しています。初回alpha公開前に残る実機受入は、クリーンWindows環境でのインストーラー試験です。Ubuntu対応とLinux配布物の生成・受入は初回alphaの公開条件には含めず、将来の移植作業として扱います。詳細は [Windows alpha試験報告](docs/windows-alpha-test-report.md) を参照してください。
+現在のWindows 11 x64開発PCでは、実App Server承認試験、PHITS／補助ツール実行、公式ラッパーとの5回比較ベンチマークを含むalpha版受入を完了しています。さらに、別のWindows 11 x64端末で、インストーラーによる導入、右クリックの「プログラムから開く」による`.inp`直接起動、編集内容の上書き保存、アンインストールを確認しました。同端末ではCodex接続、開いた`.inp`への編集、差分表示と採用、Ctrl+Zによる復元、および「直前のCodex変更を確認」も動作確認済みです。PHIG-3D連携は開発PCで確認済みですが、別端末ではPHIG-3D自体を起動できなかったため、その端末での連携結果は未判定です。Ubuntu対応とLinux配布物の生成・受入は初回alphaの公開条件には含めず、将来の移植作業として扱います。詳細は [Windows alpha試験報告](docs/windows-alpha-test-report.md) を参照してください。
 
 初回alpha候補の概要は[リリースノート](docs/release-notes-v0.0.1-alpha.md)、
 制限事項は[既知の問題](docs/known-issues-v0.0.1-alpha.md)、配布物を作る手順は

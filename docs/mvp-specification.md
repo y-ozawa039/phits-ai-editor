@@ -2,7 +2,7 @@
 
 - 文書状態: Draft 0.8（Windows alpha実装基準）
 - 作成日: 2026-09-04
-- 更新日: 2026-09-10
+- 更新日: 2026-09-11
 - `0.0.1-alpha`対象: Windows 11 x64（Ubuntu LTS x86_64は将来の移植対象）
 - 仮称: PHITS AI Editor（正式名称は未決定）
 
@@ -12,7 +12,7 @@
 - 編集、言語支援、通常実行、本番実行、ANGEL、DCHAIN、PHIG-3D、Codex App Server連携を実装済み。
 - Rust単体テスト、Clippy、rustfmt、TypeScriptテスト、型検査、Viteビルドを自動検証する。
 - 現在のWindows 11 x64 PCでは、一連のGUI操作、PHITS・補助ツール、実App Server承認、5回比較ベンチマークのalpha版受入を完了済み。
-- クリーンWindows環境でのインストーラー受入は初回alpha公開前の未実施項目。Ubuntu実機またはVM検証は初回alphaの公開条件に含めず、将来の移植作業として扱う。
+- 別のWindows 11 x64端末で、インストール、`.inp`の「プログラムから開く」、上書き保存、アンインストール、およびCodexによる編集・差分採用・Undo・直前差分の再表示まで受入済み。PHIG-3Dは開発PCで連携確認済みだが、別端末ではPHIG-3D自体を起動できず、同端末での連携は未判定。Ubuntu実機またはVM検証は初回alphaの公開条件に含めず、将来の移植作業として扱う。
 - 開発用bundle identifierは`local.phits-ai-editor`、Codex CLIの検証基準は0.153.1。
 
 ## 1. 目的

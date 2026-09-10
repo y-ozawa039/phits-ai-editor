@@ -184,12 +184,18 @@ from the latest Codex CLI each week and checks the four contracts used by the
 editor. An ordinary CLI update does not require a new editor release; a failed
 check triggers a compatibility review.
 
-Acceptance on the current Windows 11 x64 development PC includes real App
-Server approvals, PHITS and utility execution, and a five-run comparison with
-the official wrapper. The remaining pre-release acceptance item is an
-installer test in a clean Windows environment. Ubuntu support and Linux
-packages are future portability work and are not release requirements for the
-first alpha. See the [Windows alpha test report](docs/windows-alpha-test-report.md).
+Acceptance on the Windows 11 x64 development PC includes real App Server
+approvals, PHITS and utility execution, and a five-run comparison with the
+official wrapper. A separate Windows 11 x64 PC was also used to verify
+installation, opening an `.inp` file through **Open with**, overwriting edited
+content, and uninstallation. On that PC, Codex connected successfully, edited
+the opened `.inp` file, displayed and accepted its diff, reverted the change
+with Ctrl+Z, and reopened the latest Codex change from the Edit menu. PHIG-3D
+integration is verified on the development PC; the result on the separate PC
+is inconclusive because PHIG-3D itself could not start there. Ubuntu support
+and Linux packages are future portability work and are not release
+requirements for the first alpha. See the
+[Windows alpha test report](docs/windows-alpha-test-report.md).
 
 See the [release notes](docs/release-notes-v0.0.1-alpha.en.md),
 [known issues](docs/known-issues-v0.0.1-alpha.en.md), and
