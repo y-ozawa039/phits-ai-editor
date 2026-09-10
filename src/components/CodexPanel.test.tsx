@@ -52,6 +52,12 @@ describe("CodexPanel", () => {
     expect(onSend).toHaveBeenCalledWith("入力を確認して");
   });
 
+  it("explains how to enable chat when no thread is selected", () => {
+    render(<CodexPanel {...baseProps} threadId={null} threads={[]} />);
+    const input = screen.getByPlaceholderText("[新しいスレッド]をクリックするか、既存スレッドを選択してください");
+    expect(input).toBeDisabled();
+  });
+
   it("shows approval details and resolves the decision", () => {
     const onApproval = vi.fn();
     render(<CodexPanel {...baseProps} approval={{
