@@ -2,8 +2,8 @@
 
 - 文書状態: Draft 0.8（Windows alpha実装基準）
 - 作成日: 2026-09-04
-- 更新日: 2026-09-08
-- 対象: Windows 11 x64 / ChatGPT Desktop Linux版が公式対応するUbuntu LTS x86_64
+- 更新日: 2026-09-10
+- `0.0.1-alpha`対象: Windows 11 x64（Ubuntu LTS x86_64は将来の移植対象）
 - 仮称: PHITS AI Editor（正式名称は未決定）
 
 ### 実装状態（2026-09-05）
@@ -12,7 +12,7 @@
 - 編集、言語支援、通常実行、本番実行、ANGEL、DCHAIN、PHIG-3D、Codex App Server連携を実装済み。
 - Rust単体テスト、Clippy、rustfmt、TypeScriptテスト、型検査、Viteビルドを自動検証する。
 - 現在のWindows 11 x64 PCでは、一連のGUI操作、PHITS・補助ツール、実App Server承認、5回比較ベンチマークのalpha版受入を完了済み。
-- クリーンWindows環境でのインストーラー受入と、Ubuntu 24.04/26.04実機またはVM検証は配布前受入として未実施。
+- クリーンWindows環境でのインストーラー受入は初回alpha公開前の未実施項目。Ubuntu実機またはVM検証は初回alphaの公開条件に含めず、将来の移植作業として扱う。
 - 開発用bundle identifierは`local.phits-ai-editor`、Codex CLIの検証基準は0.153.1。
 
 ## 1. 目的
@@ -86,15 +86,13 @@ MVPでは専用sidecarを同梱しない。
 
 ## 4. 対応環境
 
-### 4.1 MVP対象
+### 4.1 `0.0.1-alpha`対象
 
 - Windows 11 x64
-- Ubuntu 24.04 LTS x86_64
-- Ubuntu 26.04 LTS x86_64
 - PHITSがローカルにインストール済みであること
 - AI機能を使う場合はCodex CLIがインストール・認証済みであること
 
-Ubuntuについては、ChatGPT Desktop Linux版が公式にサポートするLTS版だけを対象とする。上記2版は2026-09-04時点の公式対応状況に基づく。開発・配布時にはOpenAI公式ドキュメントを再確認し、対応LTS版が変更されていればサポートマトリクス、CI、配布物および試験対象を更新する。ChatGPT Desktop Linux版がプレビュー提供中である点も、リリースノートと利用上の注意に明記する。
+Ubuntu LTS x86_64は将来の移植対象であり、`0.0.1-alpha`の公式バイナリおよび公開可否判定には含めない。Ubuntu向け配布を始める際に、対象LTS版、PHITS実行、Codex連携、GUI、`.deb`の実機またはVM受入を改めて定義する。
 
 ### 4.2 MVP対象外
 
@@ -595,10 +593,11 @@ MVPの確定初期値:
 - ストリーミング応答
 - ファイル変更・コマンド実行の承認表示
 - Codex未導入・未認証・オフライン時の非AI機能継続
-- Windows 11 x64、およびChatGPT Desktop Linux版が公式対応するUbuntu LTS x86_64での動作
+- Windows 11 x64での動作
 
 ### 14.2 MVP後
 
+- Ubuntu LTS x86_64への移植、実機またはVM受入、Linux配布物
 - Codexからの承認付きPHITS実行要求
 - 完全なプロセスツリー強制終了
 - 高度なPHITS診断・定義移動・参照検索
@@ -622,7 +621,7 @@ MVPの確定初期値:
 - PHITS 3.37を基準とする互換性ポリシーとバージョン比較仕様
 - テスト用PHITS入力とゴールデンファイルの選定
 
-完了条件: 両OSで空のTauriアプリをビルドできる。
+初回alphaの完了条件: WindowsでTauriアプリをバンドルでき、Windows/Ubuntu CIでソースのテストとコンパイルが成功する。Ubuntu向けバンドルは移植時に検証する。
 
 ### Phase 1: PhitsPad相当の編集基盤
 
@@ -655,7 +654,7 @@ MVPの確定初期値:
 - `PHITSPATH`自動検出と手動設定
 - PHITSバージョン検出、互換区分表示、未検証警告
 - WindowsRunner
-- LinuxRunner
+- LinuxRunner（Ubuntu移植時）
 - PHITS公式ラッパー起動
 - stdout/stderr表示
 - 主入力スナップショットと最小実行メタデータ保存
@@ -663,7 +662,7 @@ MVPの確定初期値:
 - 同一フォルダ重複実行防止
 - ANGEL/DCHAIN/PHIG-3Dアダプター
 
-完了条件: WindowsとUbuntuで同一の代表入力を実行し、正常終了と出力生成を確認できる。
+初回alphaの完了条件: Windowsで代表入力を実行し、正常終了と出力生成を確認できる。Ubuntuでの同等試験は移植時に行う。
 
 ### Phase 4: 本番実行（計算優先）
 
@@ -695,7 +694,7 @@ MVPの確定初期値:
 ### Phase 6: 配布・受入試験
 
 - Windows x64向けNSISインストーラー
-- Ubuntu x86_64向け`.deb`パッケージ
+- Ubuntu x86_64向け`.deb`パッケージ（初回alpha後の移植対象）
 - 初回起動診断
 - PHITS/Codex未導入時の案内
 - Codex未認証・オフライン時の縮退動作案内
@@ -703,7 +702,7 @@ MVPの確定初期値:
 - クラッシュ・停電・不完全ログの復旧試験
 - 利用手順書
 
-完了条件: 新規環境でインストールし、PHITS編集・実行・Codex会話まで完了できる。
+初回alphaの完了条件: 新規Windows環境でインストールし、PHITS編集・実行・Codex会話まで完了できる。
 
 ## 16. テスト方針
 
@@ -729,7 +728,7 @@ MVPの確定初期値:
 ### 16.2 統合テスト
 
 - Windows公式ラッパーによるPHITS実行
-- Linux公式ラッパーによるPHITS実行
+- Linux公式ラッパーによるPHITS実行（Ubuntu移植時）
 - エディター終了後の本番計算継続
 - 本番実行開始時の保存確認、App Server先行停止、切り離し起動、直後のEditor終了
 - PHITS起動後にSupervisor、常駐Launcher、監視・ポーリングプロセスが残らないこと
@@ -766,7 +765,7 @@ ChatGPTデスクトップ版のCodexを主開発エージェントとして使�
 
 - UI・Monaco・言語支援
 - Windows Runner
-- Linux Runner・CI
+- Linux Runner・実機受入（Ubuntu移植時。CIのソース検査は先行して維持）
 - Codex App Serverクライアントとプロトコルテスト
 - セキュリティ・テストレビュー
 
@@ -806,9 +805,9 @@ ChatGPTデスクトップ版のCodexを主開発エージェントとして使�
 実装判断は完了している。次の項目だけを限定配布または一般配布の直前に再確認する。
 
 1. 正式名称（開発中はPHITS AI Editor）と正式bundle identifier
-2. リリース時点のChatGPT Desktop Linux版公式対応Ubuntu LTS
+2. Ubuntu版の開発を開始する時点での対象Ubuntu LTSと必要なCodex実行環境
 3. PHITSおよび関連資産を同梱しない構成を含む配布・ライセンス表示
-4. 個人利用alpha版以降のWindowsおよびUbuntuコード署名方針
+4. 個人利用alpha版以降のWindowsコード署名方針（Ubuntuは移植開始時に別途決定）
 
 MVPでは印刷・ページ設定を含めず、個人利用Windows alpha版を先行する。Codex CLI 0.153.1を最低互換基準とし、それより古い版ではCodex機能だけを無効化する。0.153.1以降はインストール済みCLI自身が生成するApp Server Schemaを起動時に検査し、会話・スレッド・ファイル編集・承認を機能単位で有効化する。実行履歴と入力スナップショットは自動削除しない。PHITS状態判定は開始前の出力指紋と新しい`phits.out`の正常終了文字列、`*_geo.out`の生成・更新を用い、断定できない場合は状態不明とする。
 
@@ -838,7 +837,7 @@ MVPでは印刷・ページ設定を含めず、個人利用Windows alpha版を�
 
 - UIは「現行PhitsPad相当 + 右側Codexパネル」とする。
 - Tauri 2 + Rust + React/TypeScript + Monacoを採用する。
-- Windows 11 x64と、ChatGPT Desktop Linux版が公式対応するUbuntu LTS x86_64を対象とする。2026-09-04時点ではUbuntu 24.04 LTSおよび26.04 LTSを対象とする。
+- `0.0.1-alpha`はWindows 11 x64のみを公式バイナリ対象とする。Ubuntu LTS x86_64は将来の移植対象とし、実機またはVM受入が完了するまで公式バイナリを公開しない。
 - PHITS 3.37を検証済み・正式対応版とし、それより新しい版とバージョン検出不能時は警告付きで実行を許可する。3.37より古い版では入力編集だけを許可し、PHITS実行を無効化する。
 - 任意の`.inp`親ディレクトリをワークスペースとし、ワークスペース直下の複数`.inp`/`.pht`から現在の実行対象を1件選択する。
 - `.inp`/`.pht`以外の補助テキストは複数編集可能とするが、実行対象にはしない。
@@ -857,7 +856,7 @@ MVPでは印刷・ページ設定を含めず、個人利用Windows alpha版を�
 - Codex未導入・未認証・オフラインでも、編集とユーザー操作によるPHITS実行を利用可能とする。
 - Codexはワークスペース内だけを読み書き対象とし、ファイル変更は差分承認、コマンドは実行ごとの承認とする。
 - MVPのUIは日本語とし、将来の英語化が可能なリソース構造にする。
-- WindowsはNSIS、Ubuntuは`.deb`を第一配布形式とし、PHITS本体とCodex認証情報を同梱しない。
+- `0.0.1-alpha`の配布形式はWindows向けNSISとポータブルZIPとする。将来のUbuntu移植では`.deb`を候補とし、いずれもPHITS本体とCodex認証情報を同梱しない。
 - テレメトリーや診断情報を自動送信しない。
 - Codexによる承認付きPHITS実行はMVP後に追加する。
 

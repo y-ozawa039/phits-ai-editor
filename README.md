@@ -4,7 +4,7 @@ PHITS-Pad相当の編集・実行機能と、Codex App ServerによるAI支援�
 
 ## 開発環境
 
-- Windows 11 x64（最初の検証対象）
+- Windows 11 x64（`0.0.1-alpha`の公式バイナリ対象）
 - Node.js 24 / pnpm 11
 - Rust stable / MSVC
 - PHITS 3.37（`PHITSPATH`から自動検出、または「設定 → PHITS実行環境」で指定）
@@ -89,7 +89,7 @@ node scripts/app-server-edit-smoke.mjs (Get-Command codex).Source .integration
 
 `.github/workflows/codex-cli-compatibility.yml`は毎週、最新版Codex CLIからApp Server Schemaを生成し、Editorが利用する4機能の契約を検査します。通常のCLI更新だけではEditorを再配布せず、この検査が失敗した場合にだけ互換対応を判断します。
 
-現在のWindows 11 x64 PCでは、実App Server承認試験、PHITS／補助ツール実行、公式ラッパーとの5回比較ベンチマークを含むalpha版受入を完了しています。クリーンWindows環境でのインストーラー試験、およびUbuntu 24.04/26.04実機またはVM検証と`.deb`生成は配布前の未実施項目です。詳細は [Windows alpha試験報告](docs/windows-alpha-test-report.md) を参照してください。
+現在のWindows 11 x64 PCでは、実App Server承認試験、PHITS／補助ツール実行、公式ラッパーとの5回比較ベンチマークを含むalpha版受入を完了しています。初回alpha公開前に残る実機受入は、クリーンWindows環境でのインストーラー試験です。Ubuntu対応とLinux配布物の生成・受入は初回alphaの公開条件には含めず、将来の移植作業として扱います。詳細は [Windows alpha試験報告](docs/windows-alpha-test-report.md) を参照してください。
 
 初回alpha候補の概要は[リリースノート](docs/release-notes-v0.0.1-alpha.md)、
 制限事項は[既知の問題](docs/known-issues-v0.0.1-alpha.md)、配布物を作る手順は

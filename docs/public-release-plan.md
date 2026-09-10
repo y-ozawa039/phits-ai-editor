@@ -419,7 +419,7 @@ Release notesには次を明記する。
 - [x] AGENTS・ARCHITECTURE・カスタマイズガイド
 - [x] `.gitignore`と初回公開対象監査（公開直前に再監査する）
 - [x] 機密情報・PHITS資産の機械的監査（公開直前に人手で再監査する）
-- [x] CI定義構築とGitHub上のWindows/Ubuntu初回成功
+- [x] CI定義構築とGitHub上のWindows/Ubuntuソース検査初回成功（Ubuntuバイナリの受入ではない）
 - [x] Issue・Pull Request・Security template
 - [x] Dependabot設定（npm・Cargo・GitHub Actions、週次、手動レビュー前提）
 
