@@ -34,6 +34,18 @@ about setup, updates, uninstalling, SmartScreen, and SHA-256 verification.
 PHITS and Codex CLI are not bundled. You can launch the editor without a PHITS
 configuration when editing only. Codex CLI is required only for AI assistance.
 
+## Interface and workflow demo
+
+PHITS input editing, Codex conversations, and review of changes proposed by
+Codex are available in one workspace.
+
+![Reviewing a Codex change in PHITS AI Editor](docs/assets/demos/phits-ai-editor-overview.png)
+
+The following demo shows the workflow from asking Codex about the opened PHITS
+input through applying the resulting edit in the editor.
+
+![Codex editing a PHITS input](docs/assets/demos/codex-editing-demo.gif)
+
 ## Before using AI assistance
 
 Before first use, follow the official PHITS AI-agent setup in

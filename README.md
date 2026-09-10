@@ -32,6 +32,18 @@ PHITS-Pad相当の編集・実行機能と、Codex App ServerによるAI支援�
 PHITS本体とCodex CLIは同梱されません。PHITSは編集だけなら未設定でも起動でき、
 Codex CLIはAI支援を使う場合だけ必要です。
 
+## 画面と操作デモ
+
+PHITS入力の編集、Codexとの会話、およびCodexが提案した変更の差分確認を、
+一つの画面で行えます。
+
+![PHITS AI EditorでCodexの変更差分を確認している画面](docs/assets/demos/phits-ai-editor-overview.png)
+
+次のデモでは、開いているPHITS入力についてCodexへ依頼し、編集内容を
+エディタへ反映するまでの流れを確認できます。
+
+![CodexによるPHITS入力編集の操作デモ](docs/assets/demos/codex-editing-demo.gif)
+
 ## AI支援を使う前の準備
 
 CodexからPHITSのローカルマニュアルと注意事項を参照できるようにするため、
