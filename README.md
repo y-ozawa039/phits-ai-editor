@@ -4,18 +4,30 @@
 
 PHITS-Pad相当の編集・実行機能と、Codex App ServerによるAI支援を統合するTauriデスクトップアプリです。
 
-## Windows版を利用する方へ
+## Windows版をダウンロード
 
-初回alpha版はWindows 11 x64専用です。通常利用には、Windowsへの登録、
-`.inp`／`.pht`関連付け、アンインストーラーを備えた
-`PHITS-AI-Editor-v0.0.1-alpha-windows-x64-setup.exe`を推奨します。
-試用、複数版の比較、開発・調査には
-`PHITS-AI-Editor-v0.0.1-alpha-windows-x64-portable.zip`を利用できます。
+初回alpha版はWindows 11 x64専用です。
 
-GitHubが自動表示する`Source code (zip)`はポータブル実行版ではありません。
-裸のEXE単体ではなく、インストーラーまたは必要文書を含むポータブルZIPを
-ダウンロードしてください。導入、初期設定、更新、アンインストール、SmartScreen、
-SHA-256確認の詳細は[利用者向けインストールガイド](docs/installation.md)を参照してください。
+- **通常利用（推奨）:**
+  [インストーラー版をダウンロード](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.1-alpha/PHITS-AI-Editor-v0.0.1-alpha-windows-x64-setup.exe)
+- **試用・持ち運び・複数版の比較:**
+  [ポータブル版をダウンロード](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.1-alpha/PHITS-AI-Editor-v0.0.1-alpha-windows-x64-portable.zip)
+- **ダウンロード後の確認:**
+  [SHA-256一覧](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.1-alpha/SHA256SUMS.txt)
+
+| 目的 | 選ぶファイル | 選択理由 |
+|---|---|---|
+| 日常的にPHITS入力を編集する | インストーラー版 | スタートメニュー、アンインストーラー、`.inp`／`.pht`の関連付けが登録されます。Explorerから入力ファイルを直接開く使い方に適しています。 |
+| まず試してみる | ポータブル版 | インストールせず、ZIP全体を任意のフォルダーへ展開して`phits-ai-editor.exe`を起動できます。 |
+| 複数バージョンを比較する、USBメモリ等で持ち運ぶ | ポータブル版 | バージョンごとに別フォルダーへ展開でき、Windowsへのアプリ登録を増やさずに使えます。 |
+| ソースを生成AI等で改造・開発する | Source code | 開発用です。そのままでは起動できず、Node.js、pnpm、Rust等を用いたビルドが必要です。 |
+
+> **注意:** GitHubが自動表示する`Source code (zip)`と`Source code (tar.gz)`は、
+> ポータブル実行版ではありません。展開後に`index.html`が見えるZIPはソースコードです。
+> エディタを起動する場合は、上記のインストーラー版またはポータブル版を選んでください。
+
+導入、初期設定、更新、アンインストール、SmartScreen、SHA-256確認の詳細は
+[利用者向けインストールガイド](docs/installation.md)を参照してください。
 
 PHITS本体とCodex CLIは同梱されません。PHITSは編集だけなら未設定でも起動でき、
 Codex CLIはAI支援を使う場合だけ必要です。

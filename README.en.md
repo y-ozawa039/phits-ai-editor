@@ -5,19 +5,31 @@
 A Tauri desktop application that combines PHITS-Pad-style editing and
 execution with AI assistance through Codex App Server.
 
-## For Windows users
+## Download for Windows
 
-The first alpha release supports Windows 11 x64. For normal use, we recommend
-`PHITS-AI-Editor-v0.0.1-alpha-windows-x64-setup.exe`, which registers the app
-with Windows, associates `.inp` and `.pht` files, and provides an uninstaller.
-For evaluation, side-by-side versions, development, or investigation, use
-`PHITS-AI-Editor-v0.0.1-alpha-windows-x64-portable.zip`.
+The first alpha release supports Windows 11 x64.
 
-GitHub's automatically generated `Source code (zip)` is not the portable
-Windows application. Download either the installer or the portable ZIP with
-its required documents, rather than a bare executable. See the
-[installation and first-run guide](docs/installation.en.md) for details about
-setup, updates, uninstalling, SmartScreen, and SHA-256 verification.
+- **Regular use (recommended):**
+  [Download the installer](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.1-alpha/PHITS-AI-Editor-v0.0.1-alpha-windows-x64-setup.exe)
+- **Evaluation, portable use, or comparing versions:**
+  [Download the portable ZIP](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.1-alpha/PHITS-AI-Editor-v0.0.1-alpha-windows-x64-portable.zip)
+- **Verify after downloading:**
+  [SHA-256 checksums](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.1-alpha/SHA256SUMS.txt)
+
+| Purpose | Choose | Why |
+|---|---|---|
+| Edit PHITS inputs regularly | Installer | Adds Start menu and uninstall entries and registers `.inp`/`.pht` associations. It is the best choice for opening inputs directly from Explorer. |
+| Try the editor first | Portable ZIP | No installation is required. Extract the entire ZIP to a folder and run `phits-ai-editor.exe`. |
+| Compare multiple versions or carry it on removable storage | Portable ZIP | Extract each version to a separate folder without registering additional Windows applications. |
+| Customize or develop the source with generative AI or other tools | Source code | Intended for development. It cannot be launched as downloaded and must be built using Node.js, pnpm, Rust, and the other development prerequisites. |
+
+> **Important:** GitHub's automatically generated `Source code (zip)` and
+> `Source code (tar.gz)` are not the portable Windows application. A ZIP that
+> contains `index.html` after extraction is the source archive. To run the
+> editor, select the installer or portable ZIP linked above.
+
+See the [installation and first-run guide](docs/installation.en.md) for details
+about setup, updates, uninstalling, SmartScreen, and SHA-256 verification.
 
 PHITS and Codex CLI are not bundled. You can launch the editor without a PHITS
 configuration when editing only. Codex CLI is required only for AI assistance.
