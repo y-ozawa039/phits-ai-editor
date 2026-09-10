@@ -1,57 +1,58 @@
-# Customizing with generative AI
+# 生成AIを使ったカスタマイズ
 
-PHITS AI Editor is published as a starting point for users who want to adapt an
-editor to their own workflow without rebuilding every feature from zero. The
-alpha project assumes that you can inspect a diff, run tests, and restore a
-working revision yourself. An AI-generated change is a proposal, not evidence
-that the program remains safe.
+日本語 | [English](customizing-with-ai.en.md)
 
-## Give the agent the right context
+PHITS AI Editorは、利用者がすべての機能を一から作り直さず、自分の作業方法に合わせて
+エディタを変更するための出発点として公開しています。このalphaプロジェクトは、利用者が
+自分で差分を確認し、テストを実行し、正常なリビジョンへ復旧できることを前提とします。
+AIが生成した変更は提案であり、プログラムが安全なままであることの証明ではありません。
 
-Ask the agent to read, in this order:
+## Agentへ適切なコンテキストを渡す
+
+Agentには次の順番で読むよう依頼してください。
 
 1. `AGENTS.md`
 2. `ARCHITECTURE.md`
 3. `docs/safety-boundaries.md`
-4. the files and focused tests for the feature being changed
+4. 変更対象のファイルと、その機能に絞ったテスト
 
-Keep each request narrow. Ask for the expected UI behavior, affected files,
-tests, and known trade-offs. Review the patch before running it, especially when
-it touches Rust commands, paths, saving, execution, or approvals.
+依頼ごとの範囲を小さく保ち、期待するUI動作、影響するファイル、テスト、既知の
+トレードオフを明示してください。特にRustコマンド、パス、保存、実行、承認に触れる
+変更は、実行前にパッチを確認してください。
 
-## Good first customizations
+## 最初のカスタマイズに向く例
 
-- change neutral colors or font-size presets in the UI
-- add a toolbar command that operates only on the active Monaco model
-- add a PHITS keyword hover backed by redistributable local metadata
-- add a Composer prompt template without adding a new privileged tool
-- persist a harmless display preference using the existing preference pattern
+- UIの中立色または文字サイズプリセットを変更する
+- 現在のMonacoモデルだけを操作するツールバーコマンドを追加する
+- 再配布可能なローカルメタデータを使ったPHITSキーワードホバーを追加する
+- 新しい特権ツールを増やさず、Composerの定型依頼を追加する
+- 既存の設定保存方式を使って無害な表示設定を保存する
 
-For each, add or update a focused frontend test and run the full frontend check.
+各変更では、対象を絞ったフロントエンドテストを追加または更新し、フロントエンドの
+全検査を実行してください。
 
-## Advanced changes
+## 高度な変更
 
-Treat these as high risk:
+次の変更は高リスクとして扱ってください。
 
-- document save, backup, encoding, or line-ending logic
-- workspace path normalization or symlink handling
-- PHITS input selection, launch, stop, or process recovery
-- Codex sandbox, approval decisions, session authorization, or file changes
-- conflict detection, history snapshots, revert, or Monaco disk synchronization
-- installers, file association, or user-data removal
+- 文書保存、バックアップ、エンコーディング、改行形式
+- ワークスペースパスの正規化またはシンボリックリンクの処理
+- PHITS入力選択、起動、停止、プロセス復旧
+- Codexのsandbox、承認判断、セッション許可、ファイル変更
+- 競合検出、履歴スナップショット、復元、Monacoとディスクの同期
+- インストーラー、ファイル関連付け、ユーザーデータ削除
 
-Before merging such a change, add a regression test for rejection and failure as
-well as success. Re-read `docs/safety-boundaries.md` and perform the relevant
-manual Windows acceptance test in a disposable workspace.
+このような変更を統合する前に、成功時だけでなく拒否・失敗時の回帰テストも追加して
+ください。`docs/safety-boundaries.md`を読み直し、使い捨てワークスペースで関連する
+Windows実機受入試験を行ってください。
 
-## Keep a recovery path
+## 復旧経路を維持する
 
-- work on a branch and commit a known-good state first
-- never test with the only copy of an input or research output
-- inspect `git diff` and test output yourself
-- keep changes small enough to revert
-- return to an official tag when a customized build becomes unreliable
+- ブランチ上で作業し、最初に正常と分かっている状態をコミットする
+- 入力や研究出力の唯一のコピーでテストしない
+- `git diff`とテスト出力を自分で確認する
+- 元に戻せる大きさに変更を保つ
+- カスタムビルドが不安定になったら公式タグへ戻る
 
-Modified distributions should follow `TRADEMARKS.md`: clearly identify the
-different maintainer and use a distinct visible name/logo when needed to avoid
-confusion with the original alpha distribution.
+改変版を配布するときは`../TRADEMARKS.md`に従い、元のalpha配布物との混同を避けるため、
+保守者が異なることを明示し、必要に応じて別の名称・ロゴを使用してください。

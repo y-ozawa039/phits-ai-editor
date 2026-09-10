@@ -1,5 +1,7 @@
 # PHITS AI Editorのインストールと初期設定
 
+日本語 | [English](installation.en.md)
+
 この文書は、Windows 11 x64向け`0.0.1-alpha`配布物の利用者向けガイドです。
 PHITS AI Editorは個人開発のalpha版であり、重要な入力ファイルは事前にバックアップして
 ください。

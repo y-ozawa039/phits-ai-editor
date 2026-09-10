@@ -1,38 +1,36 @@
-# Security policy
+# セキュリティポリシー
 
-## Supported versions
+日本語 | [English](SECURITY.en.md)
 
-Until a stable release exists, security fixes are made only on the latest
-published alpha version and the current `main` branch. Older alpha builds are
-not supported.
+## サポート対象バージョン
 
-## Reporting a vulnerability
+安定版が公開されるまでは、最新の公開alpha版と現在の`main`ブランチだけを
+セキュリティ修正の対象とします。古いalphaビルドはサポートしません。
 
-Do not publish credentials, private PHITS inputs or outputs, unpublished
-research data, or vulnerability details in a public Issue.
+## 脆弱性の報告
 
-Use GitHub's **Security → Report a vulnerability** form for this repository.
-If private vulnerability reporting is not available, do not disclose the
-details publicly; open a minimal Issue asking the maintainer to enable a private
-reporting channel, without describing the vulnerability.
+認証情報、非公開のPHITS入力・出力、未公開研究データ、脆弱性の詳細を公開Issueへ
+投稿しないでください。
 
-Include only the information needed to reproduce and assess the problem:
+本リポジトリのGitHub **Security → Report a vulnerability**フォームを使用して
+ください。非公開の脆弱性報告が利用できない場合は、詳細を公開せず、非公開の報告経路を
+有効にするよう管理者へ依頼する最小限のIssueだけを作成してください。
 
-- PHITS AI Editor version and commit, if known
-- operating system
-- affected feature and expected security boundary
-- minimal reproduction steps
-- impact and whether data was modified or disclosed
-- a sanitized log or sample, when it can be shared safely
+再現と評価に必要な情報だけを含めてください。
 
-Receipt, response, fix, or publication deadlines are not guaranteed for this
-personal alpha project. Reports are assessed according to impact and available
-maintainer time. Please allow the maintainer an opportunity to investigate
-before public disclosure.
+- PHITS AI Editorのバージョンと、分かる場合はコミット
+- オペレーティングシステム
+- 影響を受ける機能と、本来維持されるべき安全境界
+- 最小限の再現手順
+- 影響、およびデータが変更・開示されたかどうか
+- 安全に共有できる場合だけ、機密情報を除去したログまたはサンプル
 
-## Security boundaries
+本プロジェクトは個人開発のalpha版であり、受領確認、回答、修正、公開の期限は
+保証しません。影響と管理者が確保できる時間に基づいて評価します。公開する前に、
+管理者が調査する機会を設けてください。
 
-The most important application boundaries are documented in
-[`docs/safety-boundaries.md`](docs/safety-boundaries.md). A report is especially
-useful when it demonstrates workspace escape, unapproved Codex changes,
-unintended PHITS execution, credential exposure, or input-file corruption.
+## 安全境界
+
+特に重要な境界は[安全境界](docs/safety-boundaries.md)に記載しています。
+ワークスペース外への逸脱、未承認のCodex変更、意図しないPHITS実行、認証情報の露出、
+入力ファイルの破損を示す報告は特に有用です。

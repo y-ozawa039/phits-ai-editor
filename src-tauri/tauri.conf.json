@@ -35,13 +35,31 @@
       "../LICENSE": "LICENSE",
       "../NOTICE": "NOTICE",
       "../README.md": "README.md",
+      "../README.en.md": "README.en.md",
+      "../ARCHITECTURE.md": "ARCHITECTURE.md",
+      "../ARCHITECTURE.en.md": "ARCHITECTURE.en.md",
+      "../AUTHORS.md": "AUTHORS.md",
+      "../AUTHORS.en.md": "AUTHORS.en.md",
+      "../CONTRIBUTING.md": "CONTRIBUTING.md",
+      "../CONTRIBUTING.en.md": "CONTRIBUTING.en.md",
       "../SECURITY.md": "SECURITY.md",
+      "../SECURITY.en.md": "SECURITY.en.md",
       "../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md",
       "../THIRD_PARTY_LICENSES.txt": "THIRD_PARTY_LICENSES.txt",
       "../TRADEMARKS.md": "TRADEMARKS.md",
+      "../TRADEMARKS.en.md": "TRADEMARKS.en.md",
       "../docs/installation.md": "docs/installation.md",
-      "../docs/known-issues-v0.0.1-alpha.md": "KNOWN_ISSUES.md",
-      "../docs/release-notes-v0.0.1-alpha.md": "RELEASE_NOTES.md"
+      "../docs/installation.en.md": "docs/installation.en.md",
+      "../docs/building.md": "docs/building.md",
+      "../docs/building.en.md": "docs/building.en.md",
+      "../docs/known-issues-v0.0.1-alpha.md": "docs/known-issues-v0.0.1-alpha.md",
+      "../docs/known-issues-v0.0.1-alpha.en.md": "docs/known-issues-v0.0.1-alpha.en.md",
+      "../docs/release-notes-v0.0.1-alpha.md": "docs/release-notes-v0.0.1-alpha.md",
+      "../docs/release-notes-v0.0.1-alpha.en.md": "docs/release-notes-v0.0.1-alpha.en.md",
+      "../docs/customizing-with-ai.md": "docs/customizing-with-ai.md",
+      "../docs/customizing-with-ai.en.md": "docs/customizing-with-ai.en.md",
+      "../docs/safety-boundaries.md": "docs/safety-boundaries.md",
+      "../docs/safety-boundaries.en.md": "docs/safety-boundaries.en.md"
     }
   }
 }

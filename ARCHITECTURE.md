@@ -1,104 +1,98 @@
-# Architecture
+# アーキテクチャ
 
-## Overview
+日本語 | [English](ARCHITECTURE.en.md)
 
-PHITS AI Editor is a Tauri 2 desktop application. A React frontend presents a
-Monaco-based editor; a Rust backend controls filesystem access, PHITS process
-launching, diagnostics, settings, and the Codex App Server subprocess.
+## 概要
+
+PHITS AI EditorはTauri 2デスクトップアプリケーションです。Reactフロントエンドが
+Monacoベースのエディタを表示し、Rustバックエンドがファイルシステムアクセス、PHITS
+プロセス起動、診断、設定、Codex App Server子プロセスを制御します。
 
 ```text
-React UI / Monaco models
+React UI / Monacoモデル
         |
-        | typed Tauri commands and events
+        | 型付きTauriコマンドとイベント
         v
-Rust boundary layer
+Rust境界層
   | documents | runner | diagnostics | settings | startup
-  | codex App Server client | Codex change history
+  | Codex App Serverクライアント | Codex変更履歴
         |
-        +--> user-selected workspace files
-        +--> local PHITS installation (not bundled)
-        +--> local Codex CLI / App Server (not bundled)
+        +--> 利用者が選択したワークスペースファイル
+        +--> ローカルPHITSインストール（非同梱）
+        +--> ローカルCodex CLI / App Server（非同梱）
 ```
 
-## Frontend
+## フロントエンド
 
-`src/App.tsx` currently coordinates workspace state, tabs, execution, Codex
-turns, conflicts, and settings. Supporting modules keep the more testable rules
-outside that component:
+現在、`src/App.tsx`がワークスペース状態、タブ、実行、Codexターン、競合、設定を
+調整します。テストしやすい規則は次の補助モジュールへ分離しています。
 
-- `src/api.ts`: typed wrappers for Tauri commands
-- `src/types.ts`: frontend contracts
-- `src/phitsLanguage.ts`: Monaco language registration and PHITS presentation
-- `src/codexContext.ts`: bounded `PHITS_EDITOR_CONTEXT_V1` construction
-- `src/codexApproval.ts`: approval normalization and identity
-- `src/codexRevision.ts`: revision-conflict decisions
-- `src/diffReview.ts`: Codex review models and multi-file grouping
-- `src/editorHistory.ts`: Monaco Undo/Redo availability integration
-- `src/uiPreferences.ts` and `src/workspaceSession.ts`: persisted UI/session state
-- `src/components/`: conversation, approval, diff, tabs, and dialogs
+- `src/api.ts`：Tauriコマンドの型付きwrapper
+- `src/types.ts`：フロントエンド契約
+- `src/phitsLanguage.ts`：Monaco言語登録とPHITS表示
+- `src/codexContext.ts`：上限付き`PHITS_EDITOR_CONTEXT_V1`の生成
+- `src/codexApproval.ts`：承認の正規化と識別
+- `src/codexRevision.ts`：リビジョン競合の判断
+- `src/diffReview.ts`：Codexレビューmodelと複数ファイルのgroup化
+- `src/editorHistory.ts`：Monaco Undo/Redo利用可否の統合
+- `src/uiPreferences.ts`と`src/workspaceSession.ts`：UI・session状態の永続化
+- `src/components/`：会話、承認、差分、タブ、dialog
 
-Monaco remains the source of truth for an unsaved buffer. Disk content is the
-source of truth for saved files and for completed Codex writes. Reconciliation
-must compare both rather than silently choosing one.
+未保存bufferの正本はMonacoです。保存済みファイルと完了したCodex書き込みの正本は
+ディスクです。整合処理では、どちらかを暗黙に選ばず両方を比較しなければなりません。
 
-## Rust backend
+## Rustバックエンド
 
-The Tauri command registration is in `src-tauri/src/lib.rs`:
+Tauriコマンドは`src-tauri/src/lib.rs`で登録します。
 
-- `workspace.rs`: workspace discovery and containment
-- `documents.rs`: decoding, encoding, save/save-as, atomic writes, and backups
-- `runner.rs`: PHITS and utility launch policy and run manifests
-- `diagnostics.rs`: PHITS/Codex discovery and App Server schema probe
-- `settings.rs`: application-wide PHITS path setting
-- `startup.rs`: command-line/direct-open requests and single-instance transfer
-- `codex.rs`: App Server lifecycle, threads, turns, events, and approvals
-- `codex_history.rs`: before/after snapshots, pending review groups, and revert
-- `contracts.rs`: serializable Rust boundary types
-- `state.rs`: synchronized application process state
+- `workspace.rs`：ワークスペース検出と境界確認
+- `documents.rs`：decode、encode、保存、名前を付けて保存、原子的書き込み、backup
+- `runner.rs`：PHITS・補助ツール起動方針とrun manifest
+- `diagnostics.rs`：PHITS／Codex検出とApp Server Schema probe
+- `settings.rs`：アプリ全体のPHITSパス設定
+- `startup.rs`：command line／直接起動要求と単一起動への転送
+- `codex.rs`：App Serverのlifecycle、thread、turn、event、approval
+- `codex_history.rs`：変更前後snapshot、保留review group、revert
+- `contracts.rs`：serialize可能なRust境界型
+- `state.rs`：同期されたアプリケーションprocess state
 
-The backend is the security boundary. UI validation improves usability but must
-not be treated as authorization.
+バックエンドがセキュリティ境界です。UI検証は使いやすさを改善しますが、権限付与として
+扱ってはいけません。
 
-## Document lifecycle
+## 文書のライフサイクル
 
-1. Rust resolves a workspace and returns relative file names.
-2. Rust reads bytes, detects the supported encoding and line ending, and returns
-   a `DocumentData` value.
-3. Monaco edits an in-memory model and marks it dirty relative to the last
-   loaded/saved document.
-4. Save normalizes only the selected line-ending convention, re-encodes to the
-   original encoding, records a one-generation backup, and atomically replaces
-   the target.
-5. External or Codex changes are re-read from disk. A dirty or revision-mismatched
-   buffer enters the conflict UI instead of being overwritten.
+1. Rustがワークスペースを解決し、相対ファイル名を返します。
+2. Rustがbyte列を読み、対応するencodingと改行を検出して`DocumentData`を返します。
+3. Monacoがmemory上のmodelを編集し、最後に読込・保存した文書との差から未保存状態を
+   管理します。
+4. 保存では選択した改行規則だけを正規化し、元のencodingへ再encodeし、1世代backupを
+   記録して対象を原子的に置換します。
+5. 外部またはCodexの変更はディスクから再読込します。未保存またはリビジョン不一致の
+   bufferは上書きせず、競合UIへ進めます。
 
-## Codex edit lifecycle
+## Codex編集のライフサイクル
 
-Each user turn may carry a separate `PHITS_EDITOR_CONTEXT_V1` item containing
-relative paths, cursor/selection, dirty state, open tabs, diagnostics metadata,
-and bounded selected or unsaved content. Context is not rendered as the user's
-chat message.
+各ユーザーturnには、相対パス、cursor／selection、未保存状態、開いているtab、診断
+metadata、上限内の選択・未保存内容を持つ独立した`PHITS_EDITOR_CONTEXT_V1`項目を添付
+できます。Contextは利用者のchat本文として表示しません。
 
-App Server `fileChange` and diff events identify real edits. Before a change,
-the backend validates paths and records before snapshots. After completion it
-records after snapshots and emits a reviewable multi-file history group. The UI
-re-reads disk content, detects conflicts, and shows an inline or side-by-side
-Monaco diff. Undo/Redo applies to Monaco editing; persistent Codex review history
-supports reopening and reverting completed changes.
+実際の編集はApp Serverの`fileChange`およびdiff eventで識別します。変更前に
+バックエンドがパスを検証し、before snapshotを記録します。完了後にafter snapshotを
+記録して、複数ファイルに対応するreview可能な履歴groupを通知します。UIはディスクを
+再読込し、競合を検出して、インラインまたは左右比較のMonaco diffを表示します。
+Undo/RedoはMonaco編集へ適用し、永続Codex review履歴から完了済み変更を再表示・復元
+できます。
 
-## PHITS execution lifecycle
+## PHITS実行のライフサイクル
 
-Only the input selected by the editor is run. The runner validates the relative
-path, resolves the installed PHITS environment, prevents unsafe duplicate runs,
-and writes a run manifest so state can be restored conservatively after an
-application restart. Normal and calculation-priority modes differ in how much
-of the editor/Codex environment remains active, but both preserve explicit input
-ownership.
+エディタで選択した入力だけを実行します。runnerは相対パスを検証し、インストール済み
+PHITS環境を解決し、安全でない重複実行を防止して、アプリ再起動後に状態を保守的に復元
+できるrun manifestを書き込みます。通常実行と計算優先モードでは、エディタ／Codex環境を
+維持する範囲が異なりますが、どちらも入力の明示的な帰属を維持します。
 
-## Compatibility strategy
+## 互換性方針
 
-Codex CLI 0.153.1 App Server schemas are the minimum pinned contract. Startup
-generates and probes the installed CLI schema, then exposes availability for
-chat, threads, file editing, and approvals separately. New fields are tolerated
-where safe; missing required methods or unknown approval decisions are not.
-The scheduled GitHub workflow repeats this probe against the latest CLI.
+Codex CLI 0.153.1 App Server Schemaを固定した最小契約とします。起動時にインストール
+済みCLIのSchemaを生成・検査し、chat、thread、file editing、approvalの利用可否を個別に
+公開します。安全な場合は新しいfieldを許容しますが、必須methodの欠落や未知のapproval
+decisionは許容しません。定期GitHub workflowでも最新版CLIに対して同じ検査を行います。

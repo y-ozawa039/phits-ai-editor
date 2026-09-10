@@ -1,5 +1,7 @@
 # PHITS AI Editor
 
+日本語 | [English](README.en.md)
+
 PHITS-Pad相当の編集・実行機能と、Codex App ServerによるAI支援を統合するTauriデスクトップアプリです。
 
 ## Windows版を利用する方へ
@@ -50,6 +52,12 @@ PHITS AI Editorは[Apache License 2.0](LICENSE)で公開します。著作権者
 名称・自作ロゴ・改変版の表示方針は[TRADEMARKS.md](TRADEMARKS.md)、脆弱性の
 非公開報告方法は[SECURITY.md](SECURITY.md)を参照してください。
 
+一般利用者向け文書は日本語版と英語版を用意し、各文書上部から切り替えられます。
+`LICENSE`、`NOTICE`、第三者ライセンス本文、自動生成一覧、`CITATION.cff`などの
+法的原文・機械可読ファイルは、意味や効力を変えないため翻訳対象外です。
+MVP設計書、公開監査記録、リリース担当者手順、試験証跡などの内部保守文書も、
+一般利用者向け文書とは区別し、作成時の言語を正本とします。
+
 引用は通常利用の条件ではありません。PHITS AI Editorが公開研究へ実質的に
 貢献した場合に限り、謝辞への記載または`CITATION.cff`を用いた任意の引用を
 歓迎します。
@@ -98,6 +106,7 @@ pnpm tauri build --bundles nsis
 
 ```powershell
 pnpm test
+pnpm docs:check
 pnpm test:licenses
 pnpm licenses:generate
 pnpm licenses:audit

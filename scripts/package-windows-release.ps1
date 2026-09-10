@@ -44,15 +44,33 @@ try {
   Copy-Item -LiteralPath $application -Destination (Join-Path $staging "phits-ai-editor.exe")
   $documents = @(
     @{ Source = "README.md"; Destination = "README.md" },
+    @{ Source = "README.en.md"; Destination = "README.en.md" },
+    @{ Source = "ARCHITECTURE.md"; Destination = "ARCHITECTURE.md" },
+    @{ Source = "ARCHITECTURE.en.md"; Destination = "ARCHITECTURE.en.md" },
+    @{ Source = "AUTHORS.md"; Destination = "AUTHORS.md" },
+    @{ Source = "AUTHORS.en.md"; Destination = "AUTHORS.en.md" },
+    @{ Source = "CONTRIBUTING.md"; Destination = "CONTRIBUTING.md" },
+    @{ Source = "CONTRIBUTING.en.md"; Destination = "CONTRIBUTING.en.md" },
     @{ Source = "LICENSE"; Destination = "LICENSE" },
     @{ Source = "NOTICE"; Destination = "NOTICE" },
     @{ Source = "THIRD_PARTY_NOTICES.md"; Destination = "THIRD_PARTY_NOTICES.md" },
     @{ Source = "THIRD_PARTY_LICENSES.txt"; Destination = "THIRD_PARTY_LICENSES.txt" },
     @{ Source = "TRADEMARKS.md"; Destination = "TRADEMARKS.md" },
+    @{ Source = "TRADEMARKS.en.md"; Destination = "TRADEMARKS.en.md" },
     @{ Source = "SECURITY.md"; Destination = "SECURITY.md" },
+    @{ Source = "SECURITY.en.md"; Destination = "SECURITY.en.md" },
     @{ Source = "docs\installation.md"; Destination = "docs\installation.md" },
-    @{ Source = "docs\known-issues-v$Version.md"; Destination = "KNOWN_ISSUES.md" },
-    @{ Source = "docs\release-notes-v$Version.md"; Destination = "RELEASE_NOTES.md" }
+    @{ Source = "docs\installation.en.md"; Destination = "docs\installation.en.md" },
+    @{ Source = "docs\building.md"; Destination = "docs\building.md" },
+    @{ Source = "docs\building.en.md"; Destination = "docs\building.en.md" },
+    @{ Source = "docs\known-issues-v$Version.md"; Destination = "docs\known-issues-v$Version.md" },
+    @{ Source = "docs\known-issues-v$Version.en.md"; Destination = "docs\known-issues-v$Version.en.md" },
+    @{ Source = "docs\release-notes-v$Version.md"; Destination = "docs\release-notes-v$Version.md" },
+    @{ Source = "docs\release-notes-v$Version.en.md"; Destination = "docs\release-notes-v$Version.en.md" },
+    @{ Source = "docs\customizing-with-ai.md"; Destination = "docs\customizing-with-ai.md" },
+    @{ Source = "docs\customizing-with-ai.en.md"; Destination = "docs\customizing-with-ai.en.md" },
+    @{ Source = "docs\safety-boundaries.md"; Destination = "docs\safety-boundaries.md" },
+    @{ Source = "docs\safety-boundaries.en.md"; Destination = "docs\safety-boundaries.en.md" }
   )
   foreach ($document in $documents) {
     $destination = Join-Path $staging $document.Destination

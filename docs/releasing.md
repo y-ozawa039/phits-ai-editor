@@ -20,6 +20,7 @@ Release publication require explicit maintainer approval.
 
 ```powershell
 pnpm install --frozen-lockfile
+pnpm docs:check
 pnpm licenses:generate
 pnpm licenses:audit
 pnpm check
@@ -49,10 +50,10 @@ Create these release assets without modifying their contents afterward:
 - `docs/installation.md`
 - release notes and known issues
 
-The portable archive includes the executable, README, LICENSE, NOTICE,
-THIRD_PARTY_NOTICES, THIRD_PARTY_LICENSES, the `docs/installation.md` user
-guide, TRADEMARKS, SECURITY, and known limitations. It must not include PHITS,
-Codex CLI, authentication data, workspaces, or build caches.
+The portable archive includes the executable, Japanese and English user
+documentation, LICENSE, NOTICE, THIRD_PARTY_NOTICES, and THIRD_PARTY_LICENSES.
+It must not include PHITS, Codex CLI, authentication data, workspaces, or build
+caches. Legal originals and generated third-party notices are not translated.
 
 ## 4. Clean Windows acceptance
 

@@ -1,4 +1,6 @@
-# Contributing to PHITS AI Editor
+# PHITS AI Editorへの貢献
+
+日本語 | [English](CONTRIBUTING.en.md)
 
 PHITS AI Editorは、PHITS入力ファイルの編集・実行とAI支援を統合する個人開発の
 alpha版ソフトウェアです。本プロジェクトは、完成した商用製品と同等のサポートを

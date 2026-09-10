@@ -1,22 +1,23 @@
-# Building PHITS AI Editor
+# PHITS AI Editorのビルド
 
-## Supported development environment
+日本語 | [English](building.en.md)
 
-The first binary distribution target is Windows 11 x64. CI also compiles and
-tests the source on Ubuntu, but an official Linux binary is not yet published.
+## 対応する開発環境
 
-Install:
+最初のバイナリ配布対象はWindows 11 x64です。CIではUbuntuでもsourceをcompile・test
+しますが、公式Linux binaryはまだ公開しません。
+
+必要なもの：
 
 - Node.js 24
 - pnpm 11.19.0
-- the current stable Rust toolchain
-- Microsoft C++ Build Tools and WebView2 requirements for Tauri on Windows
+- 現行のRust stable toolchain
+- WindowsではMicrosoft C++ Build ToolsとTauri用WebView2要件
 
-PHITS and Codex CLI are optional for compiling. They are needed only for their
-respective integration tests and must be installed separately under their own
-terms.
+compileにはPHITSとCodex CLIは必須ではありません。それぞれの連携試験を行う場合だけ、
+各提供条件に従って別途インストールしてください。
 
-## Development setup
+## 開発環境の準備
 
 ```powershell
 git clone https://github.com/y-ozawa039/phits-ai-editor.git
@@ -25,16 +26,17 @@ pnpm install --frozen-lockfile
 pnpm tauri:dev
 ```
 
-If Cargo is not already on `PATH` in the current shell:
+現在のshellでCargoが`PATH`にない場合：
 
 ```powershell
 $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
 ```
 
-## Checks
+## 検査
 
 ```powershell
 pnpm test
+pnpm docs:check
 pnpm test:licenses
 pnpm licenses:generate
 pnpm licenses:audit
@@ -46,38 +48,37 @@ cargo test --manifest-path src-tauri/Cargo.toml
 git diff --check
 ```
 
-The optional real App Server edit smoke test writes only to a disposable
-`.integration` workspace:
+任意の実App Server編集smoke testは、使い捨ての`.integration`ワークスペースだけへ
+書き込みます。
 
 ```powershell
 node scripts/app-server-edit-smoke.mjs (Get-Command codex).Source .integration
 ```
 
-Do not point this smoke test at research data.
+このsmoke testを研究データに対して実行しないでください。
 
-## Release build
+## リリースビルド
 
 ```powershell
 pnpm tauri build --bundles nsis
 ```
 
-The unpackaged executable is written under `src-tauri/target/release/` and the
-NSIS installer under `src-tauri/target/release/bundle/nsis/`. Both locations are
-ignored by Git. A local build is not an official release until it has passed the
-release checks and is attached to the matching Git tag.
+未梱包の実行ファイルは`src-tauri/target/release/`、NSISインストーラーは
+`src-tauri/target/release/bundle/nsis/`へ出力されます。両方ともGitの追跡対象外です。
+ローカルビルドは、リリース検査を通過して対応するGit tagへ添付されるまで公式
+リリースではありません。
 
-After a successful build, prepare the portable archive, normalized installer
-name, CycloneDX SBOM, and SHA-256 list with:
+ビルド成功後、ポータブルarchive、正規化したinstaller名、CycloneDX SBOM、SHA-256
+一覧を作成します。
 
 ```powershell
 pnpm release:package:windows
 ```
 
-Draft output is written below
-`src-tauri/target/release/release-candidate/v0.0.1-alpha/` and remains ignored.
+draftは`src-tauri/target/release/release-candidate/v0.0.1-alpha/`以下へ出力され、
+Gitの追跡対象外です。
 
-## PHITS detection
+## PHITSの検出
 
-At runtime the application can use its saved application setting, a workspace
-setting, `PHITSPATH`, or the standard installation location. The settings UI
-does not modify the operating system's `PATH` or `PHITSPATH`.
+実行時には、保存済みのアプリ設定、ワークスペース設定、`PHITSPATH`、標準
+インストール場所の順に利用できます。設定UIはOSの`PATH`や`PHITSPATH`を変更しません。

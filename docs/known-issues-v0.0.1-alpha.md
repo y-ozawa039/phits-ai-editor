@@ -1,27 +1,27 @@
-# Known issues and limitations for 0.0.1-alpha
+# 0.0.1-alphaの既知の問題と制限
 
-- Only Windows 11 x64 is targeted for the first binary release. Windows 10 and
-  Linux packages are not yet accepted as supported distributions.
-- Builds are unsigned, so Windows SmartScreen may display a warning.
-- PHITS, Codex CLI, MPI/OpenMP prerequisites, and their licenses remain the
-  user's responsibility and are not bundled. The portable build requires an
-  existing WebView2 runtime; the NSIS installer uses Tauri's default online
-  bootstrapper mode if WebView2 must be installed.
-- Codex App Server compatibility is pinned to a 0.153.1 baseline. Newer CLIs are
-  probed by feature and may run in a limited mode until their schema is reviewed.
-- Diagnostic Editor Context is reserved for future real diagnostics; an empty
-  diagnostic chip is intentionally not shown.
-- The alpha update channel is manual. A newer release must be downloaded and
-  installed explicitly.
-- Uninstalling does not remove PHITS, Codex CLI, workspaces, PHITS inputs or
-  outputs, or workspace `.phits-editor` metadata. Complete removal of saved UI,
-  PHITS-path, and WebView data from AppData is not guaranteed in this alpha.
-- Interface details and the provisional product name/logo may change during the
-  alpha period.
-- The project does not promise individual setup support, issue response times,
-  or backward compatibility for customized forks.
+日本語 | [English](known-issues-v0.0.1-alpha.en.md)
 
-Report reproducible problems through the appropriate GitHub Issue form after
-removing credentials, personal information, private research data, and PHITS
-material that cannot be redistributed. Report vulnerabilities privately as
-described in [`../SECURITY.md`](../SECURITY.md).
+- 初回バイナリ配布はWindows 11 x64だけを対象とします。Windows 10およびLinuxの
+  パッケージは、まだサポート対象の配布物として受入を完了していません。
+- ビルドは署名されていないため、Windows SmartScreenが警告を表示する場合があります。
+- PHITS、Codex CLI、MPI/OpenMPの前提環境とライセンスは利用者の責任で用意し、
+  本アプリへ同梱しません。ポータブル版には既存のWebView2ランタイムが必要です。
+  WebView2が必要な場合、NSISインストーラーはTauri既定のオンラインブートストラッパーを
+  使用します。
+- Codex App Server互換性の基準は0.153.1に固定しています。新しいCLIは機能単位で
+  検査し、Schemaを確認するまでは制限モードで動作する場合があります。
+- 診断Editor Contextは将来の実診断用に予約しています。空の診断チップは意図的に
+  表示しません。
+- alpha版に自動更新機能はありません。新しいリリースを明示的にダウンロードして
+  インストールする必要があります。
+- アンインストールしても、PHITS、Codex CLI、ワークスペース、PHITS入出力、
+  ワークスペースの`.phits-editor`メタデータは削除しません。AppDataに保存されたUI、
+  PHITSパス、WebViewデータの完全な削除は、このalpha版では保証しません。
+- alpha期間中にインターフェース、暫定的な製品名、ロゴを変更する場合があります。
+- 個別の環境構築支援、Issueへの回答期限、カスタマイズされたForkの後方互換性は
+  保証しません。
+
+再現可能な問題は、認証情報、個人情報、非公開研究データ、再配布できないPHITS資料を
+除去してから、適切なGitHub Issueフォームで報告してください。脆弱性は
+[セキュリティポリシー](../SECURITY.md)に従って非公開で報告してください。

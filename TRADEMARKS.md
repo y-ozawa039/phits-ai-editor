@@ -1,26 +1,27 @@
-# Name and logo policy
+# 名称とロゴの利用方針
 
-`PHITS AI Editor` is the provisional project and distribution name used for
-the `0.0.1-alpha` release. The green rounded-square `P` logo was created by
-Yohei Ozawa for this project and is not derived from a third-party logo.
+日本語 | [English](TRADEMARKS.en.md)
 
-The name and logo identify the distribution maintained by Yohei Ozawa. The
-Apache License 2.0 applies to the source code and other materials identified as
-licensed under it, but it does not grant permission to present a modified build
-as the original distribution. A fork may accurately say that it is based on
-PHITS AI Editor. When distributing a functionally modified build, use a
-distinct visible application name and logo, or otherwise make the modification
-and different maintainer unmistakable.
+`PHITS AI Editor`は、`0.0.1-alpha`で使用する暫定的なプロジェクト名および
+配布名です。緑色の角丸正方形に`P`を描いたロゴは、Yohei Ozawaが本プロジェクトの
+ために制作したもので、第三者のロゴを基にしていません。
 
-PHITS AI Editor is an independent personal project. It is not developed,
-approved, sponsored, endorsed, or supported by JAEA, the PHITS development
-team, OpenAI, or the author's affiliated institution.
+名称とロゴは、Yohei Ozawaが保守する配布物を識別するためのものです。Apache
+License 2.0は、その対象として明示されたソースコードその他の資料に適用されますが、
+改変したビルドを元の配布物であるかのように表示する許可を与えるものではありません。
+Forkは、PHITS AI Editorを基にしていると正確に説明できます。機能を変更したビルドを
+配布する場合は、視認できる別のアプリケーション名とロゴを使用するか、改変版であり
+保守者が異なることを明確にしてください。
 
-`PHITS` identifies third-party software and is used only to explain
-compatibility and purpose. `OpenAI` and `Codex` identify third-party products
-and services. This project claims no ownership of those names or their logos.
-PHITS and Codex CLI are not included in this repository or its distributions.
+PHITS AI Editorは個人による独立したプロジェクトです。JAEA、PHITS開発チーム、
+OpenAI、または著者の所属機関によって開発、承認、後援、推奨、支援されたものでは
+ありません。
 
-The project name and logo may change during the alpha period. This document is
-a project policy, not a statement that any name is a registered trademark and
-not legal advice.
+`PHITS`は第三者ソフトウェアを識別する名称であり、互換性と目的を説明するためだけに
+使用しています。`OpenAI`と`Codex`も第三者の製品・サービスを識別する名称です。
+本プロジェクトは、これらの名称やロゴに対する権利を主張しません。PHITSおよびCodex
+CLIは、本リポジトリや配布物に含まれません。
+
+プロジェクト名とロゴはalpha期間中に変更される場合があります。本書はプロジェクトの
+運用方針であり、いずれかの名称が登録商標であると主張するものでも、法的助言でも
+ありません。

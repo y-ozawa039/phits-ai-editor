@@ -10,6 +10,7 @@
     "build": "tsc -b && vite build",
     "test": "vitest run",
     "test:watch": "vitest",
+    "docs:check": "node scripts/check-documentation-languages.mjs",
     "test:licenses": "node --test scripts/license-compliance.test.mjs",
     "test:app-server-edit": "node scripts/app-server-edit-smoke.mjs",
     "test:codex-schema": "node scripts/validate-codex-schema.mjs schemas/codex/0.153.1",
@@ -20,7 +21,7 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "check": "pnpm test && pnpm test:licenses && pnpm licenses:audit && pnpm test:codex-schema && pnpm build"
+    "check": "pnpm test && pnpm docs:check && pnpm test:licenses && pnpm licenses:audit && pnpm test:codex-schema && pnpm build"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

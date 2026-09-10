@@ -1,62 +1,59 @@
-# Safety boundaries
+# 安全境界
 
-This document describes behavior that must remain true even when the UI, PHITS
-support, or Codex integration is customized.
+日本語 | [English](safety-boundaries.en.md)
 
-## Workspace filesystem
+この文書は、UI、PHITS対応、Codex連携をカスタマイズした場合でも維持しなければならない
+動作を説明します。
 
-- Frontend paths are hints only. Rust accepts workspace-relative paths,
-  normalizes them, canonicalizes existing targets, and rejects traversal or
-  escape outside the active workspace.
-- Symlinks, junctions, alternate path spellings, and Windows short names must
-  not bypass containment checks.
-- Saving uses atomic replacement. Existing content is copied to the existing
-  one-generation backup area before overwrite.
-- Supported encodings and line endings are preserved: UTF-8, UTF-8 BOM,
-  Windows-31J, CRLF, and LF.
-- Dirty Monaco content is not silently replaced by a disk, external, or Codex
-  change. Revision disagreement enters an explicit conflict flow.
+## ワークスペースのファイルシステム
 
-## PHITS and utility execution
+- フロントエンドから渡されるパスはヒントとしてのみ扱います。Rust側はワークスペース
+  相対パスだけを受理し、正規化し、既存の対象をcanonicalizeして、現在の
+  ワークスペース外への走査・逸脱を拒否します。
+- シンボリックリンク、junction、別表記のパス、Windows短縮名で境界検査を回避できては
+  いけません。
+- 保存には原子的置換を使用し、上書き前の内容を既存の1世代バックアップ領域へコピー
+  します。
+- UTF-8、UTF-8 BOM、Windows-31J、CRLF、LFを保持します。
+- 未保存のMonaco内容を、ディスク、外部プログラム、Codexの変更で暗黙に置き換えません。
+  リビジョンが一致しない場合は明示的な競合解決へ進みます。
 
-- The user or editor explicitly selects one `.inp` or `.pht` input. File-system
-  enumeration order must never select a different input implicitly.
-- Concurrent runs in the same working folder are blocked because PHITS uses
-  fixed output and temporary names.
-- Normal execution uses the validated local PHITS wrapper/environment. ANGEL,
-  DCHAIN, and PHIG-3D use fixed validated application paths.
-- Codex turns cannot directly start PHITS or its utilities.
-- PHITS, its manuals and assets, and user input/output are not redistributed
-  under this project's Apache license.
+## PHITSと補助ツールの実行
+
+- 利用者またはエディタが`.inp`／`.pht`を1件明示的に選びます。ファイルシステムの列挙順で
+  別の入力を暗黙に選択してはいけません。
+- PHITSは固定された出力名・一時名を使うため、同じ作業フォルダーでの同時実行を禁止
+  します。
+- 通常実行は検証済みのローカルPHITSラッパー・環境を使用します。ANGEL、DCHAIN、
+  PHIG-3Dは検証済みの固定アプリケーションパスを使用します。
+- CodexのターンからPHITSまたは補助ツールを直接起動できません。
+- PHITS本体、マニュアル、資産、利用者の入出力を、本プロジェクトのApacheライセンスで
+  再配布しません。
 
 ## Codex
 
-- Codex CLI runs locally and is not bundled. Its authentication data must never
-  enter logs, Editor Context, Git, or release archives.
-- The exposed modes are confirm-first, consultation-only, and on-request.
-  Unrestricted filesystem access and unconditional approval are not exposed.
-- Network access and writes outside the workspace remain unavailable in every
-  mode.
-- An approval response must be one of the decisions offered by App Server.
-  Unknown decisions are rejected. Consultation-only file or permission requests
-  are rejected by Rust.
-- Session approvals expire when the App Server connection ends.
-- Only App Server file-change/diff events establish that Codex edited a file.
-  A Markdown patch in chat is display text.
-- Before/after snapshots and document revisions connect each edit to a review
-  group. Automatic or session-approved edits use the same history and conflict
-  path as manually approved edits.
+- Codex CLIはローカルで動作し、本アプリへ同梱しません。認証情報をログ、Editor
+  Context、Git、Releaseアーカイブへ入れてはいけません。
+- 公開するモードは「確認優先」「相談のみ」「必要時のみ確認」です。無制限の
+  ファイルシステムアクセスと無条件承認は公開しません。
+- すべてのモードで、Codexコマンドからのネットワークアクセスとワークスペース外への
+  書き込みを許可しません。
+- 承認応答はApp Serverが提示した判断のいずれかでなければなりません。未知の判断は
+  拒否し、「相談のみ」でのファイル変更・権限要求はRust側で拒否します。
+- セッション承認はApp Server接続終了時に失効します。
+- Codexがファイルを編集したと確定できるのはApp Serverのfile-change／diffイベント
+  だけです。チャット内のMarkdownパッチは表示用テキストです。
+- 変更前後のスナップショットと文書リビジョンで、各編集をレビューグループへ結びます。
+  自動変更やセッション承認済み変更も、手動承認と同じ履歴・競合経路を使用します。
 
-## Release and privacy
+## リリースとプライバシー
 
-- Never package `.integration`, `.phits-editor`, user settings, logs, credentials,
-  PHITS files, or research data.
-- A release executable and installer must be built from the commit carrying the
-  matching version/tag. Publish hashes and do not replace assets under an
-  existing tag.
-- Unsigned alpha builds may trigger Windows SmartScreen. Do not instruct users
-  to disable platform security globally.
+- `.integration`、`.phits-editor`、利用者設定、ログ、認証情報、PHITSファイル、研究データを
+  配布物へ含めません。
+- 実行ファイルとインストーラーは、同じバージョン・タグを持つコミットからビルドします。
+  ハッシュを公開し、既存タグの資産を差し替えません。
+- 署名なしalphaビルドではWindows SmartScreenが警告する場合があります。利用者へ
+  プラットフォームのセキュリティを全体的に無効化するよう案内してはいけません。
 
-Changes that weaken these boundaries require an explicit design decision,
-tests, documentation, and a clear warning. They must not be introduced as a
-minor customization.
+これらの境界を弱める変更には、明示的な設計判断、テスト、文書、明確な警告が必要です。
+軽微なカスタマイズとして導入してはいけません。
