@@ -30,10 +30,11 @@ use crate::{
     },
     contracts::{
         ApprovalMode, CodexCompatibilityReport, CodexConnectResult, CodexFeatureId,
-        CodexFeatureState, CodexModel, CodexThreadLink, EditorContextV1,
+        CodexFeatureState, CodexModel, CodexThreadLink, EditorContextV1, PhitsAgentSetupStatus,
     },
-    diagnostics::{codex_compatibility_probe, resolve_codex_executable},
+    diagnostics::{codex_compatibility_probe, resolve_codex_executable, resolve_phits_root},
     error::{AppError, AppResult},
+    settings::app_phits_root,
     workspace::{path_to_string, resolve_existing_path, resolve_save_path, validate_relative_path},
 };
 
@@ -1062,6 +1063,123 @@ fn parse_models(result: &Value) -> Vec<CodexModel> {
         .collect()
 }
 
+fn codex_home_path() -> Option<PathBuf> {
+    std::env::var_os("CODEX_HOME")
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| {
+            #[cfg(windows)]
+            let home = std::env::var_os("USERPROFILE");
+            #[cfg(not(windows))]
+            let home = std::env::var_os("HOME");
+            home.map(|value| PathBuf::from(value).join(".codex"))
+        })
+}
+
+fn active_agents_file(directory: &Path) -> Option<PathBuf> {
+    let override_path = directory.join("AGENTS.override.md");
+    if override_path.is_file() {
+        match std::fs::read_to_string(&override_path) {
+            Ok(content) if !content.trim().is_empty() => return Some(override_path),
+            Err(_) => return Some(override_path),
+            Ok(_) => {}
+        }
+    }
+    let agents_path = directory.join("AGENTS.md");
+    agents_path.is_file().then_some(agents_path)
+}
+
+fn instruction_points_to_policy(path: &Path, policy_path: &Path) -> bool {
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return false;
+    };
+    let normalized_content = content.replace('\\', "/").to_lowercase();
+    let normalized_policy = policy_path
+        .to_string_lossy()
+        .replace('\\', "/")
+        .to_lowercase();
+    normalized_content.contains(&normalized_policy)
+}
+
+fn inspect_phits_agent_setup_paths(
+    phits_root: Option<&Path>,
+    workspace_root: &Path,
+    codex_home: Option<&Path>,
+) -> PhitsAgentSetupStatus {
+    let Some(phits_root) = phits_root else {
+        return PhitsAgentSetupStatus {
+            configured: false,
+            source_path: None,
+            message: "PHITSインストール先を検出できないため、PHITS用Codex設定を確認できません。先に設定の「PHITS実行環境」でインストール先を指定してください。".into(),
+        };
+    };
+    let policy_path = phits_root.join("workbench/AI/reference_policy.md");
+    if !policy_path.is_file() {
+        return PhitsAgentSetupStatus {
+            configured: false,
+            source_path: None,
+            message: format!(
+                "PHITS公式のAI参照ポリシーが見つかりません: {}",
+                policy_path.display()
+            ),
+        };
+    }
+
+    let mut candidates = Vec::new();
+    if let Some(codex_home) = codex_home
+        && let Some(path) = active_agents_file(codex_home)
+    {
+        candidates.push(path);
+    }
+    if let Some(path) = active_agents_file(workspace_root) {
+        candidates.push(path);
+    }
+    if workspace_root.starts_with(phits_root)
+        && workspace_root != phits_root
+        && let Some(path) = active_agents_file(phits_root)
+    {
+        candidates.push(path);
+    }
+    candidates.sort();
+    candidates.dedup();
+
+    if let Some(source) = candidates
+        .iter()
+        .find(|path| instruction_points_to_policy(path, &policy_path))
+    {
+        return PhitsAgentSetupStatus {
+            configured: true,
+            source_path: Some(source.to_string_lossy().into_owned()),
+            message: "PHITS用Codex設定を確認しました。".into(),
+        };
+    }
+
+    PhitsAgentSetupStatus {
+        configured: false,
+        source_path: None,
+        message: format!(
+            "PHITS用Codex設定が見つかりません。PHITS公式の {} を確認し、Codexに workbench/execution_setup_for_agent.md に従ったセットアップを依頼してください。",
+            phits_root.join("workbench/README-jp.docx").display()
+        ),
+    }
+}
+
+fn inspect_phits_agent_setup(app: &AppHandle, workspace_root: &Path) -> PhitsAgentSetupStatus {
+    let mut messages = Vec::new();
+    let configured_root = app_phits_root(app).ok().flatten();
+    let phits_root = resolve_phits_root(
+        Some(workspace_root),
+        configured_root.as_deref(),
+        &mut messages,
+    )
+    .map(|value| value.root);
+    inspect_phits_agent_setup_paths(
+        phits_root.as_deref(),
+        workspace_root,
+        codex_home_path().as_deref(),
+    )
+}
+
 async fn start_connection(
     app: AppHandle,
     workspace_root: PathBuf,
@@ -1117,6 +1235,7 @@ pub async fn codex_connect(
     workspace_root: String,
 ) -> AppResult<CodexConnectResult> {
     let workspace = canonical_workspace(&workspace_root)?;
+    let phits_agent_setup = inspect_phits_agent_setup(&app, &workspace);
     let compatibility = codex_compatibility_probe(false).await?;
     require_codex_feature(&compatibility, CodexFeatureId::Chat, "chat")?;
     let connection = if let Some(connection) = connection_slot().lock().await.clone() {
@@ -1151,6 +1270,7 @@ pub async fn codex_connect(
             })
             .collect(),
         compatibility: connection.compatibility.clone(),
+        phits_agent_setup,
     })
 }
 
@@ -1673,6 +1793,71 @@ mod tests {
         assert!(APP_SERVER_INSTRUCTIONS.contains("App Server emits a fileChange item"));
         assert!(APP_SERVER_INSTRUCTIONS.contains("Do not merely print a unified diff"));
         assert!(APP_SERVER_INSTRUCTIONS.contains("activeDocumentPath"));
+    }
+
+    #[test]
+    fn detects_the_global_phits_codex_pointer() {
+        let directory = tempfile::tempdir().unwrap();
+        let phits_root = directory.path().join("phits");
+        let workspace = directory.path().join("external-workspace");
+        let codex_home = directory.path().join("codex-home");
+        let policy = phits_root.join("workbench/AI/reference_policy.md");
+        std::fs::create_dir_all(policy.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(&workspace).unwrap();
+        std::fs::create_dir_all(&codex_home).unwrap();
+        std::fs::write(&policy, "policy").unwrap();
+        std::fs::write(
+            codex_home.join("AGENTS.md"),
+            format!("Before PHITS work read `{}`.", policy.display()),
+        )
+        .unwrap();
+
+        let status =
+            inspect_phits_agent_setup_paths(Some(&phits_root), &workspace, Some(&codex_home));
+        assert!(status.configured);
+        assert!(status.source_path.unwrap().ends_with("AGENTS.md"));
+    }
+
+    #[test]
+    fn a_nonempty_global_override_must_contain_the_phits_pointer() {
+        let directory = tempfile::tempdir().unwrap();
+        let phits_root = directory.path().join("phits");
+        let workspace = directory.path().join("external-workspace");
+        let codex_home = directory.path().join("codex-home");
+        let policy = phits_root.join("workbench/AI/reference_policy.md");
+        std::fs::create_dir_all(policy.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(&workspace).unwrap();
+        std::fs::create_dir_all(&codex_home).unwrap();
+        std::fs::write(&policy, "policy").unwrap();
+        std::fs::write(
+            codex_home.join("AGENTS.md"),
+            format!("Read `{}`.", policy.display()),
+        )
+        .unwrap();
+        std::fs::write(codex_home.join("AGENTS.override.md"), "other instructions").unwrap();
+
+        let status =
+            inspect_phits_agent_setup_paths(Some(&phits_root), &workspace, Some(&codex_home));
+        assert!(!status.configured);
+    }
+
+    #[test]
+    fn detects_a_phits_pointer_in_the_workspace_ancestor_chain() {
+        let directory = tempfile::tempdir().unwrap();
+        let phits_root = directory.path().join("phits");
+        let workspace = phits_root.join("user/project");
+        let policy = phits_root.join("workbench/AI/reference_policy.md");
+        std::fs::create_dir_all(policy.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(&workspace).unwrap();
+        std::fs::write(&policy, "policy").unwrap();
+        std::fs::write(
+            phits_root.join("AGENTS.md"),
+            format!("Read `{}`.", policy.display()),
+        )
+        .unwrap();
+
+        let status = inspect_phits_agent_setup_paths(Some(&phits_root), &workspace, None);
+        assert!(status.configured);
     }
 
     #[test]

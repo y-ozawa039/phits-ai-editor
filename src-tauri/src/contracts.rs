@@ -189,6 +189,15 @@ pub struct CodexConnectResult {
     pub active_thread_id: Option<String>,
     pub threads: Vec<CodexThreadLink>,
     pub compatibility: CodexCompatibilityReport,
+    pub phits_agent_setup: PhitsAgentSetupStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PhitsAgentSetupStatus {
+    pub configured: bool,
+    pub source_path: Option<String>,
+    pub message: String,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

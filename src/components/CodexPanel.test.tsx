@@ -175,6 +175,25 @@ describe("CodexPanel", () => {
     expect(screen.getByText(/相談のみに制限します/)).toBeInTheDocument();
   });
 
+  it("shows the official PHITS setup guidance when the Codex pointer is missing", () => {
+    render(<CodexPanel {...baseProps} phitsAgentSetup={{
+      configured: false,
+      sourcePath: null,
+      message: "PHITS公式の workbench/README-jp.docx を確認してください。",
+    }} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("PHITS用Codex設定を確認してください");
+    expect(screen.getByRole("alert")).toHaveTextContent("workbench/README-jp.docx");
+  });
+
+  it("does not show setup guidance after the PHITS Codex pointer is verified", () => {
+    render(<CodexPanel {...baseProps} phitsAgentSetup={{
+      configured: true,
+      sourcePath: "C:\\Users\\user\\.codex\\AGENTS.md",
+      message: "PHITS用Codex設定を確認しました。",
+    }} />);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("follows streaming messages while the transcript is at the latest position", () => {
     const first = [{ id: "assistant-stream", role: "assistant" as const, text: "確認中", streaming: true }];
     const { container, rerender } = render(<CodexPanel {...baseProps} messages={first} busy />);

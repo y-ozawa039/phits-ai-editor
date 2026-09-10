@@ -20,6 +20,21 @@ SHA-256確認の詳細は[利用者向けインストールガイド](docs/insta
 PHITS本体とCodex CLIは同梱されません。PHITSは編集だけなら未設定でも起動でき、
 Codex CLIはAI支援を使う場合だけ必要です。
 
+## AI支援を使う前の準備
+
+CodexからPHITSのローカルマニュアルと注意事項を参照できるようにするため、
+初回利用前にPHITS公式の`<PHITSPATH>\workbench\README-jp.docx`を確認し、
+Codex CLIへ次のように依頼してください。
+
+> PHITSを実行する環境を整えてください。環境変数PHITSPATHが指すフォルダーの
+> workbench/execution_setup_for_agent.mdを読み、その内容に従ってください。
+
+セットアップが完了し、`Setup AI agent environment to PHITS is successfully finished.`
+と表示されたことを確認してから、PHITS AI EditorでCodexへ接続してください。
+この処理はCodexの`AGENTS.md`へPHITS参照ポリシーの入口を登録します。
+Editorは初回接続時にこの設定を検査し、見つからない場合はCodexパネルに
+公式セットアップの案内を表示します。
+
 ## 開発環境
 
 - Windows 11 x64（`0.0.1-alpha`の公式バイナリ対象）

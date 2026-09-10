@@ -76,6 +76,11 @@ Tauriコマンドは`src-tauri/src/lib.rs`で登録します。
 metadata、上限内の選択・未保存内容を持つ独立した`PHITS_EDITOR_CONTEXT_V1`項目を添付
 できます。Contextは利用者のchat本文として表示しません。
 
+Codex接続時には、解決したPHITSインストールの`workbench/AI/reference_policy.md`が、
+有効なグローバルまたはワークスペースの`AGENTS.md`から参照されているかをRust側で
+検査します。結果は接続応答の型付き状態としてUIへ返し、未設定の場合だけ公式の
+AIエージェントセットアップを案内します。この検査は設定を自動変更しません。
+
 実際の編集はApp Serverの`fileChange`およびdiff eventで識別します。変更前に
 バックエンドがパスを検証し、before snapshotを記録します。完了後にafter snapshotを
 記録して、複数ファイルに対応するreview可能な履歴groupを通知します。UIはディスクを

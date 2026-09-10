@@ -22,6 +22,23 @@ setup, updates, uninstalling, SmartScreen, and SHA-256 verification.
 PHITS and Codex CLI are not bundled. You can launch the editor without a PHITS
 configuration when editing only. Codex CLI is required only for AI assistance.
 
+## Before using AI assistance
+
+Before first use, follow the official PHITS AI-agent setup in
+`<PHITSPATH>\workbench\README-jp.docx` so Codex can find the local PHITS manuals
+and safety notes. After installing and signing in to Codex CLI, ask Codex:
+
+> Prepare your environment to run PHITS. Read
+> workbench/execution_setup_for_agent.md under the directory identified by the
+> PHITSPATH environment variable, and follow its instructions.
+
+Confirm that the setup finishes with
+`Setup AI agent environment to PHITS is successfully finished.` before
+connecting from PHITS AI Editor. The setup registers a pointer to the PHITS
+reference policy in Codex's `AGENTS.md`. On the first connection, the editor
+checks this configuration and displays the official setup guidance in the
+Codex panel when it is missing.
+
 ## Development environment
 
 - Windows 11 x64 (official binary target for `0.0.1-alpha`)

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import type { ApprovalDecision, ApprovalMode, ApprovalRequest, CodexModel, CodexThreadLink } from "../types";
+import type { ApprovalDecision, ApprovalMode, ApprovalRequest, CodexModel, CodexThreadLink, PhitsAgentSetupStatus } from "../types";
 import { ApprovalCard } from "./ApprovalCard";
 import { Icon } from "./Icons";
 import { MessageMarkdown } from "./MessageMarkdown";
@@ -13,6 +13,7 @@ interface CodexPanelProps {
   models: CodexModel[]; model: string; reasoning: string; approvalMode: ApprovalMode;
   sessionApprovalActive?: boolean; threadId: string | null; threads?: CodexThreadLink[];
   chatAvailable?: boolean; threadsAvailable?: boolean; writableAvailable?: boolean;
+  phitsAgentSetup?: PhitsAgentSetupStatus | null;
   messages: ChatMessage[]; approval: ApprovalRequest | null; approvalCount?: number;
   contextChips?: CodexContextChip[]; draftRequest?: ComposerDraftRequest | null;
   onToggle: () => void; onResizeStart: (event: React.PointerEvent) => void; onConnect: () => void;
@@ -72,6 +73,7 @@ export function CodexPanel(props: CodexPanelProps) {
     <div className="vertical-resizer" onPointerDown={props.onResizeStart} onDoubleClick={props.onResizeReset} title="ドラッグで幅を変更・ダブルクリックで既定幅" />
     <header className="codex-titlebar"><div className="panel-title codex-brand"><span className="brand-mark"><Icon name="spark" /></span>Codex</div><div className={`connection-state ${props.connected ? "online" : ""}`}><span />{props.connected ? "接続済み" : "未接続"}</div><button className="icon-button" onClick={props.onToggle} aria-label="Codexパネルを閉じる"><Icon name="panel" /></button></header>
     <div className="codex-controls">{!props.connected ? <><button className="primary-button wide" onClick={props.onConnect} disabled={props.busy || !chatAvailable}>Codexに接続</button>{!chatAvailable && <div className="codex-compatibility-note">App Serverの会話機能に互換性がありません。実行環境の診断を確認してください。</div>}</> : <>
+      {props.phitsAgentSetup && !props.phitsAgentSetup.configured && <div className="codex-compatibility-note codex-agent-setup-note" role="alert"><strong>PHITS用Codex設定を確認してください</strong><span>{props.phitsAgentSetup.message}</span></div>}
       <div className="select-row"><label>モデル<select value={props.model} onChange={(e) => props.onModelChange(e.target.value)}>{props.models.map((entry) => <option value={entry.id} key={entry.id}>{entry.displayName}</option>)}</select></label><label>思考<select value={props.reasoning} onChange={(e) => props.onReasoningChange(e.target.value)} disabled={!efforts.length}>{efforts.map((effort) => <option value={effort} key={effort}>{effort}</option>)}</select></label></div>
       <label className="approval-mode-label">アクションの承認<select value={writableAvailable ? props.approvalMode : "consultationOnly"} disabled={!writableAvailable} onChange={(e) => props.onApprovalModeChange(e.target.value as ApprovalMode)}><option value="confirmFirst">確認優先</option><option value="consultationOnly">相談のみ</option><option value="onRequest">必要時のみ確認</option></select></label>
       {!writableAvailable && <div className="codex-compatibility-note">編集または承認Schemaに互換性がないため、この接続では相談のみに制限します。</div>}

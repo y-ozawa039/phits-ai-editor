@@ -77,6 +77,13 @@ export interface CodexConnectResult {
   activeThreadId: string | null;
   threads: CodexThreadLink[];
   compatibility: CodexCompatibilityReport;
+  phitsAgentSetup: PhitsAgentSetupStatus;
+}
+
+export interface PhitsAgentSetupStatus {
+  configured: boolean;
+  sourcePath: string | null;
+  message: string;
 }
 
 export type CodexCompatibilityState = "compatible" | "limited" | "incompatible" | "checking";

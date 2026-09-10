@@ -81,6 +81,12 @@ relative paths, cursor/selection, dirty state, open tabs, diagnostics metadata,
 and bounded selected or unsaved content. Context is not rendered as the user's
 chat message.
 
+When Codex connects, Rust checks whether the resolved PHITS installation's
+`workbench/AI/reference_policy.md` is referenced by the effective global or
+workspace `AGENTS.md`. The typed connection result exposes this status to the
+UI, which shows the official AI-agent setup guidance only when the pointer is
+missing. The check never changes the user's configuration automatically.
+
 App Server `fileChange` and diff events identify real edits. Before a change,
 the backend validates paths and records before snapshots. After completion it
 records after snapshots and emits a reviewable multi-file history group. The UI
