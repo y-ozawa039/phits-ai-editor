@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 function normalizeLicense(pkg) {
   if (typeof pkg.license === "string" && pkg.license.trim()) return pkg.license.trim();
@@ -13,6 +13,15 @@ function normalizeLicense(pkg) {
   return "UNKNOWN — review required";
 }
 
+function normalizeRepository(repository) {
+  const value = typeof repository === "string" ? repository : repository?.url;
+  if (!value) return undefined;
+  return value
+    .replace(/^git\+/, "")
+    .replace(/^git@github\.com:/, "https://github.com/")
+    .replace(/\.git$/, "");
+}
+
 function readPackage(packageDirectory, packages) {
   try {
     const pkg = JSON.parse(readFileSync(join(packageDirectory, "package.json"), "utf8"));
@@ -22,6 +31,11 @@ function readPackage(packageDirectory, packages) {
         name: pkg.name,
         version: pkg.version,
         license: normalizeLicense(pkg),
+        packageDirectory,
+        sourceUrl:
+          normalizeRepository(pkg.repository) ||
+          pkg.homepage ||
+          `https://www.npmjs.com/package/${pkg.name}/v/${pkg.version}`,
       });
     }
   } catch {
@@ -90,6 +104,9 @@ export function collectRustPackages(projectRoot) {
         license:
           pkg.license ||
           (pkg.license_file ? `SEE LICENSE FILE: ${pkg.license_file}` : "UNKNOWN — review required"),
+        packageDirectory: dirname(pkg.manifest_path),
+        licenseFile: pkg.license_file || undefined,
+        sourceUrl: pkg.repository || pkg.homepage || `https://crates.io/crates/${pkg.name}/${pkg.version}`,
       }))
       .sort(
         (left, right) => left.name.localeCompare(right.name) || left.version.localeCompare(right.version),
@@ -117,19 +134,35 @@ export function collectRustPackages(projectRoot) {
     if (!name || !version || !source?.startsWith("registry+")) continue;
 
     let license = "UNKNOWN — review required";
+    let packageDirectory;
+    let licenseFile;
+    let sourceUrl = `https://crates.io/crates/${name}/${version}`;
     for (const registry of registries) {
       try {
-        const manifest = readFileSync(join(registry, `${name}-${version}`, "Cargo.toml"), "utf8");
+        packageDirectory = join(registry, `${name}-${version}`);
+        const manifest = readFileSync(join(packageDirectory, "Cargo.toml"), "utf8");
         const declaredLicense = manifest.match(/^license\s*=\s*"([^"]+)"/m)?.[1];
-        const licenseFile = manifest.match(/^license-file\s*=\s*"([^"]+)"/m)?.[1];
-        license = declaredLicense || (licenseFile ? `SEE LICENSE FILE: ${licenseFile}` : license);
+        const declaredLicenseFile = manifest.match(/^license-file\s*=\s*"([^"]+)"/m)?.[1];
+        const repository = manifest.match(/^repository\s*=\s*"([^"]+)"/m)?.[1];
+        const homepage = manifest.match(/^homepage\s*=\s*"([^"]+)"/m)?.[1];
+        licenseFile = declaredLicenseFile ? join(packageDirectory, declaredLicenseFile) : undefined;
+        sourceUrl = repository || homepage || sourceUrl;
+        license = declaredLicense || (declaredLicenseFile ? `SEE LICENSE FILE: ${declaredLicenseFile}` : license);
         break;
       } catch {
         // Try the next configured registry source directory.
       }
     }
 
-    packages.push({ ecosystem: "cargo", name, version, license });
+    packages.push({
+      ecosystem: "cargo",
+      name,
+      version,
+      license,
+      packageDirectory,
+      licenseFile,
+      sourceUrl,
+    });
   }
 
   return packages.sort(

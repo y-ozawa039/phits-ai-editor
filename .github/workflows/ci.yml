@@ -32,3 +32,10 @@ jobs:
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
       - run: cargo test --manifest-path src-tauri/Cargo.toml
+      - name: Audit third-party licenses
+        if: runner.os == 'Windows'
+        run: |
+          pnpm test:licenses
+          pnpm licenses:generate
+          pnpm licenses:audit
+          git diff --exit-code -- THIRD_PARTY_NOTICES.md THIRD_PARTY_LICENSES.txt

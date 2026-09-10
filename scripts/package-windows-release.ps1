@@ -47,6 +47,7 @@ try {
     @{ Source = "LICENSE"; Destination = "LICENSE" },
     @{ Source = "NOTICE"; Destination = "NOTICE" },
     @{ Source = "THIRD_PARTY_NOTICES.md"; Destination = "THIRD_PARTY_NOTICES.md" },
+    @{ Source = "THIRD_PARTY_LICENSES.txt"; Destination = "THIRD_PARTY_LICENSES.txt" },
     @{ Source = "TRADEMARKS.md"; Destination = "TRADEMARKS.md" },
     @{ Source = "SECURITY.md"; Destination = "SECURITY.md" },
     @{ Source = "docs\known-issues-v$Version.md"; Destination = "KNOWN_ISSUES.md" },

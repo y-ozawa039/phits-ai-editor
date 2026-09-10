@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "packages": {
+    "cargo:alloc-stdlib@0.2.4": {
+      "reviewedLicense": "BSD-3-Clause",
+      "reason": "The published crate omits the repository-level license file; alloc-no-stdlib is from the same upstream repository and release family.",
+      "documents": [
+        {
+          "package": "cargo:alloc-no-stdlib@2.0.4",
+          "file": "LICENSE"
+        }
+      ]
+    },
+    "cargo:defmt-parser@1.0.0": {
+      "reviewedLicense": "MIT selected from MIT OR Apache-2.0",
+      "reason": "The published crate omits the workspace-level license files; defmt is from the same upstream repository and release family.",
+      "documents": [
+        {
+          "package": "cargo:defmt@1.1.1",
+          "file": "LICENSE-MIT"
+        }
+      ]
+    },
+    "cargo:selectors@0.36.1": {
+      "reviewedLicense": "MPL-2.0",
+      "reason": "The published crate omits the standard MPL-2.0 text; cssparser supplies the same unmodified license text used by the Servo style-system dependency family.",
+      "documents": [
+        {
+          "package": "cargo:cssparser@0.36.0",
+          "file": "LICENSE"
+        }
+      ]
+    },
+    "cargo:tauri-plugin@2.6.3": {
+      "reviewedLicense": "MIT selected from Apache-2.0 OR MIT",
+      "reason": "The published crate omits the workspace-level license files; tauri is from the same upstream repository.",
+      "documents": [
+        {
+          "package": "cargo:tauri@2.11.5",
+          "file": "LICENSE_MIT"
+        }
+      ]
+    },
+    "cargo:unic-char-property@0.9.0": {
+      "reviewedLicense": "MIT selected from MIT/Apache-2.0",
+      "reason": "The published crate omits the rust-unic repository-level license files.",
+      "documents": [
+        {
+          "file": "third_party/license-overrides/rust-unic-LICENSE-MIT.txt",
+          "source": "https://raw.githubusercontent.com/open-i18n/rust-unic/master/LICENSE-MIT",
+          "sha256": "30fefc3a7d6a0041541858293bcbea2dde4caa4c0a5802f996a7f7e8c0085652"
+        }
+      ]
+    },
+    "cargo:unic-char-range@0.9.0": {
+      "reviewedLicense": "MIT selected from MIT/Apache-2.0",
+      "reason": "The published crate omits the rust-unic repository-level license files.",
+      "documents": [
+        {
+          "file": "third_party/license-overrides/rust-unic-LICENSE-MIT.txt",
+          "source": "https://raw.githubusercontent.com/open-i18n/rust-unic/master/LICENSE-MIT",
+          "sha256": "30fefc3a7d6a0041541858293bcbea2dde4caa4c0a5802f996a7f7e8c0085652"
+        }
+      ]
+    },
+    "cargo:unic-common@0.9.0": {
+      "reviewedLicense": "MIT selected from MIT/Apache-2.0",
+      "reason": "The published crate omits the rust-unic repository-level license files.",
+      "documents": [
+        {
+          "file": "third_party/license-overrides/rust-unic-LICENSE-MIT.txt",
+          "source": "https://raw.githubusercontent.com/open-i18n/rust-unic/master/LICENSE-MIT",
+          "sha256": "30fefc3a7d6a0041541858293bcbea2dde4caa4c0a5802f996a7f7e8c0085652"
+        }
+      ]
+    },
+    "cargo:unic-ucd-ident@0.9.0": {
+      "reviewedLicense": "MIT selected from MIT/Apache-2.0",
+      "reason": "The published crate omits the rust-unic repository-level license files.",
+      "documents": [
+        {
+          "file": "third_party/license-overrides/rust-unic-LICENSE-MIT.txt",
+          "source": "https://raw.githubusercontent.com/open-i18n/rust-unic/master/LICENSE-MIT",
+          "sha256": "30fefc3a7d6a0041541858293bcbea2dde4caa4c0a5802f996a7f7e8c0085652"
+        }
+      ]
+    },
+    "cargo:unic-ucd-version@0.9.0": {
+      "reviewedLicense": "MIT selected from MIT/Apache-2.0",
+      "reason": "The published crate omits the rust-unic repository-level license files.",
+      "documents": [
+        {
+          "file": "third_party/license-overrides/rust-unic-LICENSE-MIT.txt",
+          "source": "https://raw.githubusercontent.com/open-i18n/rust-unic/master/LICENSE-MIT",
+          "sha256": "30fefc3a7d6a0041541858293bcbea2dde4caa4c0a5802f996a7f7e8c0085652"
+        }
+      ]
+    },
+    "cargo:webview2-com@0.38.2": {
+      "reviewedLicense": "MIT",
+      "reason": "The published crate omits the webview2-rs repository-level license file.",
+      "documents": [
+        {
+          "file": "third_party/license-overrides/webview2-rs-LICENSE.txt",
+          "source": "https://raw.githubusercontent.com/wravery/webview2-rs/main/LICENSE",
+          "sha256": "008f1b11c6d18763126e46b92fe95de75dc318df884a0aaa795a54ea53ad7aa7"
+        }
+      ]
+    },
+    "cargo:webview2-com-macros@0.8.1": {
+      "reviewedLicense": "MIT",
+      "reason": "The published crate omits the webview2-rs repository-level license file.",
+      "documents": [
+        {
+          "file": "third_party/license-overrides/webview2-rs-LICENSE.txt",
+          "source": "https://raw.githubusercontent.com/wravery/webview2-rs/main/LICENSE",
+          "sha256": "008f1b11c6d18763126e46b92fe95de75dc318df884a0aaa795a54ea53ad7aa7"
+        }
+      ]
+    },
+    "cargo:webview2-com-sys@0.38.2": {
+      "reviewedLicense": "MIT",
+      "reason": "The published crate omits the webview2-rs repository-level license file.",
+      "documents": [
+        {
+          "file": "third_party/license-overrides/webview2-rs-LICENSE.txt",
+          "source": "https://raw.githubusercontent.com/wravery/webview2-rs/main/LICENSE",
+          "sha256": "008f1b11c6d18763126e46b92fe95de75dc318df884a0aaa795a54ea53ad7aa7"
+        }
+      ]
+    }
+  }
+}

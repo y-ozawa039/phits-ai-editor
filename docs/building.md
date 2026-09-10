@@ -35,6 +35,9 @@ $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
 
 ```powershell
 pnpm test
+pnpm test:licenses
+pnpm licenses:generate
+pnpm licenses:audit
 pnpm test:codex-schema
 pnpm build
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check

@@ -27,7 +27,9 @@ PHITS本体、Codex CLI、認証情報、PHITS言語資産はアプリへ同梱�
 PHITS AI Editorは[Apache License 2.0](LICENSE)で公開します。著作権者と
 研究者識別情報は[AUTHORS.md](AUTHORS.md)、ソフトウェアを研究成果として
 引用するための機械可読な情報は[CITATION.cff](CITATION.cff)を参照してください。
-第三者依存関係のライセンス一覧は[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)です。
+第三者依存関係の一覧は[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)、
+配布対象のライセンス・著作権・NOTICE本文は
+[THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt)です。
 名称・自作ロゴ・改変版の表示方針は[TRADEMARKS.md](TRADEMARKS.md)、脆弱性の
 非公開報告方法は[SECURITY.md](SECURITY.md)を参照してください。
 
@@ -79,6 +81,9 @@ pnpm tauri build --bundles nsis
 
 ```powershell
 pnpm test
+pnpm test:licenses
+pnpm licenses:generate
+pnpm licenses:audit
 pnpm test:codex-schema
 pnpm build
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check

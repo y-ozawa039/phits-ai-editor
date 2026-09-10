@@ -12,7 +12,8 @@ Release publication require explicit maintainer approval.
 2. Require a clean worktree and record the release commit.
 3. Review tracked files and Git history for credentials, user paths, private
    PHITS/research data, third-party material, executables, archives, and logs.
-4. Regenerate `THIRD_PARTY_NOTICES.md` and inspect its diff.
+4. Regenerate `THIRD_PARTY_NOTICES.md` and `THIRD_PARTY_LICENSES.txt`, run the
+   license audit, and inspect their diff.
 5. Confirm the name/logo policy and source asset in `assets/branding/`.
 
 ## 2. Automated checks
@@ -20,6 +21,7 @@ Release publication require explicit maintainer approval.
 ```powershell
 pnpm install --frozen-lockfile
 pnpm licenses:generate
+pnpm licenses:audit
 pnpm check
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
@@ -43,11 +45,13 @@ Create these release assets without modifying their contents afterward:
 - `PHITS-AI-Editor-v0.0.1-alpha-windows-x64-setup.exe`
 - `SHA256SUMS.txt`
 - `SBOM.spdx.json` or an equivalent SBOM
+- `THIRD_PARTY_NOTICES.md` and `THIRD_PARTY_LICENSES.txt`
 - release notes and known issues
 
 The portable archive includes the executable, README, LICENSE, NOTICE,
-THIRD_PARTY_NOTICES, TRADEMARKS, SECURITY, and known limitations. It must not
-include PHITS, Codex CLI, authentication data, workspaces, or build caches.
+THIRD_PARTY_NOTICES, THIRD_PARTY_LICENSES, TRADEMARKS, SECURITY, and known
+limitations. It must not include PHITS, Codex CLI, authentication data,
+workspaces, or build caches.
 
 ## 4. Clean Windows acceptance
 
