@@ -1,14 +1,14 @@
 # Publication audit
 
-Audit date: 2026-09-08 (JST)
-Scope: local Git working tree and all five existing commits
-Product name status: provisional (`PHITS AI Editor`)
+Audit date: 2026-09-10 (JST)
+Scope: local Git working tree and existing Git history
+Product name status: provisional alpha name (`PHITS AI Editor`)
 
 ## Result
 
-The current source tree can be organized into local commits without waiting for
-the final product name. No release, tag, remote push, or public repository was
-created by this audit.
+The current source tree is organized into reviewable commits without waiting
+for a permanent product name. A private GitHub repository and remote exist; no
+public repository, release, or release tag has been created.
 
 No immediately blocking secret or research-data file was found in the current
 publication candidates or existing Git history. This is a technical pattern and
@@ -57,16 +57,17 @@ reviewed again before a repository is made public.
 - Decide the final product/repository name and the official-versus-fork naming
   and logo policy.
 - Verify ownership and redistribution permission for the selected logo source.
-- Add `SECURITY.md`, `TRADEMARKS.md`, architecture/build/customization/release
-  documentation, and GitHub Issue/Pull Request templates.
+- Review `SECURITY.md`, `TRADEMARKS.md`, architecture/build/customization/release
+  documentation, and GitHub Issue/Pull Request templates after they are committed.
 - Perform a human review for PHITS-distributed material and unpublished research
   content immediately before the first public push.
 - Include required third-party license texts in the actual portable and installer
   distributions and generate an SBOM.
 - Test install, update, uninstall, file association, settings retention, and data
   preservation in a clean Windows environment.
-- Create the repository as private first, run all GitHub Actions there, configure
-  failed-workflow notifications, and review the exact public diff.
+- Keep the repository private while reviewing the exact public diff. Normal CI
+  has passed on Windows and Ubuntu; run the latest-Codex workflow manually once
+  before the release candidate is tagged.
 - Confirm that source, tag, executable, installer, and SHA-256 files all refer to
   the same release candidate.
 

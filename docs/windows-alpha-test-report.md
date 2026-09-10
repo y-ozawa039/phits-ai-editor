@@ -49,8 +49,8 @@ Test date: 2026-09-08 (JST)
 | Full-editor five-run calculation-priority timing | PASS | The official standalone path and the real Editor production button were each run five times with the same input and working directory. Official wall times were 6,314.9, 6,183.1, 6,165.9, 6,176.1, and 6,181.2 ms (median 6,181.2 ms). Editor wall times from `RunManifestV1.requestedAt` through the observed normal-completion write were 6,198.8, 6,170.8, 6,246.1, 6,188.6, and 6,176.0 ms (median 6,188.6 ms), a +0.12% difference. Official PHITS CPU times were 5.59, 5.59, 5.59, 5.62, and 5.60 s (median 5.59 s); Editor PHITS CPU times were 5.67, 5.64, 5.71, 5.66, and 5.64 s (median 5.66 s), a +1.25% difference. Both medians satisfy the provisional 2% target. All ten calculations finished normally. All five Editor manifests restored to `completed`, and no Editor, PHITS, wrapper, or Codex App Server process remained after the final run. |
 | Final release executable startup | PASS | The final rebuilt executable opened to the Japanese start screen and exited normally. No `phits-ai-editor.exe` process remained. |
 | Current-PC Windows acceptance | PASS | All rows above were completed on the current Windows 11 x64 PC. Runner and utility code did not change during the approval-UI pass; its earlier same-day execution evidence therefore remains applicable to the final source state. |
-| Clean-profile/VM installer test | BLOCKED | No Hyper-V cmdlets or WSL environment were available, and the Windows Sandbox feature state could not be queried without administrator privileges. No isolated clean Windows environment was therefore available. The updated NSIS artifact exists (3,027,440 bytes; SHA-256 `954D879FD829E82D49A1B45141E45F39C38F01A769C2E0C44CD2244149BFFB37`). |
-| Rust unit tests | PASS | 62 tests passed, including startup-target resolution, multiple-input selection, approval-mode mapping, Codex feature-schema compatibility, schema fixture decisions, title fallback, raw-byte disk revision hashing, relative and absolute file-path validation, network rejection, PHITS-family command rejection, the Editor Context envelope, grouped Codex-change history, and the requirement to use App Server file-change events for edit requests. |
+| Clean-profile/VM installer test | BLOCKED | No Hyper-V cmdlets or WSL environment were available, and the Windows Sandbox feature state could not be queried without administrator privileges. No isolated clean Windows environment was therefore available. A newer local packaging rehearsal is recorded below, but it does not replace this clean-environment test. |
+| Rust unit tests | PASS | 63 tests passed, including startup-target resolution, multiple-input selection, approval-mode mapping, Codex feature-schema compatibility, schema fixture decisions, title fallback, raw-byte disk revision hashing, relative and absolute file-path validation, network rejection, PHITS-family command rejection, the Editor Context envelope, grouped Codex-change history, and the requirement to use App Server file-change events for edit requests. |
 | Rust formatting and Clippy | PASS | `cargo fmt -- --check` and Clippy with warnings denied passed. |
 | Frontend unit tests | PASS | 86 tests passed, including workspace-session normalization, Editor Context size/history rules, document-revision conflict detection, 3-mode global preference persistence, feature-specific Codex availability display and safe degradation, thread menu behavior, context-chip removal, approval decisions, transcript auto-follow and manual-scroll suspension, full-document diff reconstruction/rejection, stale/truncated proposal blocking, main Editor review controls, Undo/Redo history, unsaved-change dialogs, responsive panel width, Markdown formatting, safe links, font controls, and menu behavior. |
 
@@ -99,7 +99,16 @@ The official baseline launched a fresh `powershell.exe` with the same `-NoLogo`,
 
 Each Editor measurement used the release executable and the visible UI: launch the Editor, select `.integration/benchmark-full`, press the production-run button, allow the Editor to exit, and wait for PHITS normal completion. A `FileSystemWatcher` observed file changes without leaving an Editor-side supervisor or polling process. The comparison wall interval starts at the persisted `RunManifestV1.requestedAt` timestamp and ends when the changed `phits.out` contains the PHITS 3.37 normal-completion record. PHITS CPU time comes from the corresponding `total cpu time` field. Runs were sequential, never concurrent, and used the same input hash `edf0f1ff7f1dd88aab1c53014d513265e3024d8bdfa647c5e0245ce220acb9e1`.
 
-## Final artifacts
+## Local packaging rehearsal (2026-09-10)
 
-- Release executable: `src-tauri/target/release/phits-ai-editor.exe` (13,373,440 bytes; SHA-256 `8BBD8F5B37254EC3E1C4D85AE16A8C97B95AE2DF59828B25A5F01EF1DEBF9AB5`)
-- NSIS installer: `src-tauri/target/release/bundle/nsis/PHITS AI Editor_0.0.1-alpha_x64-setup.exe` (3,027,440 bytes; SHA-256 `954D879FD829E82D49A1B45141E45F39C38F01A769C2E0C44CD2244149BFFB37`)
+The following ignored artifacts were regenerated after adding bundled public
+documentation, portable packaging, a 502-component CycloneDX SBOM, and a
+SHA-256 list. The embedded `BUILD_INFO.txt` intentionally records a dirty
+working tree because the publication documentation had not yet been committed.
+These are verification artifacts, not the final public release; rebuild them
+from the clean release commit before tagging.
+
+- Release executable: `src-tauri/target/release/phits-ai-editor.exe` (13,363,200 bytes; SHA-256 `0DF574C9BD0B4CFCCE4BC8DD66A0024C6448DA056D3DA75A3DE9CBC57E63418A`)
+- NSIS installer: `PHITS-AI-Editor-v0.0.1-alpha-windows-x64-setup.exe` (3,041,432 bytes; SHA-256 `85D45CCAA08C225F59349845148117069EAF2CEB04D709FB29C367F59885E375`)
+- Portable ZIP: `PHITS-AI-Editor-v0.0.1-alpha-windows-x64-portable.zip` (4,217,427 bytes; SHA-256 `BF0B98286EFF5696ED279073FECC4EE0B19291886FF02601E5A023D3E7A88667`)
+- CycloneDX SBOM: `SBOM.cdx.json` (192,670 bytes; SHA-256 `8386BEAB857D632D810A461BD118A1F560AD8729673FE7D0AB041D82190EEE29`)

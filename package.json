@@ -13,6 +13,8 @@
     "test:app-server-edit": "node scripts/app-server-edit-smoke.mjs",
     "test:codex-schema": "node scripts/validate-codex-schema.mjs schemas/codex/0.153.1",
     "licenses:generate": "node scripts/generate-third-party-notices.mjs",
+    "sbom:generate": "node scripts/generate-sbom.mjs",
+    "release:package:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-windows-release.ps1",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",

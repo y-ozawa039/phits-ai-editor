@@ -18,7 +18,9 @@ pnpm tauri:dev
 
 PHITS本体、Codex CLI、認証情報、PHITS言語資産はアプリへ同梱しません。
 
-詳細は [MVP仕様](docs/mvp-specification.md) と [alpha版公開計画](docs/public-release-plan.md) を参照してください。
+詳細は [MVP仕様](docs/mvp-specification.md)、[構成](ARCHITECTURE.md)、
+[ビルド手順](docs/building.md)、[生成AIを使ったカスタマイズ](docs/customizing-with-ai.md)、
+[安全境界](docs/safety-boundaries.md)を参照してください。
 
 ## ライセンスと引用
 
@@ -26,6 +28,8 @@ PHITS AI Editorは[Apache License 2.0](LICENSE)で公開します。著作権者
 研究者識別情報は[AUTHORS.md](AUTHORS.md)、ソフトウェアを研究成果として
 引用するための機械可読な情報は[CITATION.cff](CITATION.cff)を参照してください。
 第三者依存関係のライセンス一覧は[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)です。
+名称・自作ロゴ・改変版の表示方針は[TRADEMARKS.md](TRADEMARKS.md)、脆弱性の
+非公開報告方法は[SECURITY.md](SECURITY.md)を参照してください。
 
 引用は通常利用の条件ではありません。PHITS AI Editorが公開研究へ実質的に
 貢献した場合に限り、謝辞への記載または`CITATION.cff`を用いた任意の引用を
@@ -40,6 +44,10 @@ PHITS AI Editorは[Apache License 2.0](LICENSE)で公開します。著作権者
 個人開発のalpha版です。問題発生時にログやソースコードを調べ、自力で調査・回避・
 復旧を進められる方を主な対象としており、個別サポートや回答期限は保証しません。
 IssueおよびPull Requestの方針は[CONTRIBUTING.md](CONTRIBUTING.md)を参照してください。
+
+`PHITS AI Editor`と緑色のPロゴはalpha版の暫定名称・ロゴです。本プロジェクトは
+JAEA、PHITS開発チーム、OpenAIまたは著者の所属機関による開発・承認・後援・
+保証を受けた公式製品ではありません。
 
 ## Windows alpha版（0.0.1-alpha）
 
@@ -82,3 +90,7 @@ node scripts/app-server-edit-smoke.mjs (Get-Command codex).Source .integration
 `.github/workflows/codex-cli-compatibility.yml`は毎週、最新版Codex CLIからApp Server Schemaを生成し、Editorが利用する4機能の契約を検査します。通常のCLI更新だけではEditorを再配布せず、この検査が失敗した場合にだけ互換対応を判断します。
 
 現在のWindows 11 x64 PCでは、実App Server承認試験、PHITS／補助ツール実行、公式ラッパーとの5回比較ベンチマークを含むalpha版受入を完了しています。クリーンWindows環境でのインストーラー試験、およびUbuntu 24.04/26.04実機またはVM検証と`.deb`生成は配布前の未実施項目です。詳細は [Windows alpha試験報告](docs/windows-alpha-test-report.md) を参照してください。
+
+初回alpha候補の概要は[リリースノート](docs/release-notes-v0.0.1-alpha.md)、
+制限事項は[既知の問題](docs/known-issues-v0.0.1-alpha.md)、配布物を作る手順は
+[リリース手順](docs/releasing.md)を参照してください。

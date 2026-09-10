@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/y-ozawa039/phits-ai-editor/security/advisories/new
+    about: Report security-sensitive details privately. Do not publish them in an Issue.

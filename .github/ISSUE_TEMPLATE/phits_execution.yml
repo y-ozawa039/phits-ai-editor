@@ -1,0 +1,44 @@
+name: PHITS execution problem
+description: Report input selection, launch, stop, or output ownership problems
+title: "[PHITS]: "
+labels: ["phits-integration"]
+body:
+  - type: input
+    id: versions
+    attributes:
+      label: Editor, Windows, and PHITS versions
+      placeholder: Editor 0.0.1-alpha; Windows 11 24H2; PHITS 3.370
+    validations:
+      required: true
+  - type: dropdown
+    id: path_source
+    attributes:
+      label: PHITS detection method
+      options:
+        - Application setting
+        - Workspace setting
+        - PHITSPATH environment variable
+        - Standard location
+        - Unknown
+    validations:
+      required: true
+  - type: textarea
+    id: inputs
+    attributes:
+      label: Workspace and selected-input description
+      description: List names only or use a minimal redistributable sample. Do not attach private inputs.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps and sanitized output
+    validations:
+      required: true
+  - type: checkboxes
+    id: data
+    attributes:
+      label: Data safety
+      options:
+        - label: I removed private research data and PHITS material that I cannot redistribute.
+          required: true

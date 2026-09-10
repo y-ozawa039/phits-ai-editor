@@ -30,6 +30,16 @@
         "name": "PHITS input file",
         "role": "Editor"
       }
-    ]
+    ],
+    "resources": {
+      "../LICENSE": "LICENSE",
+      "../NOTICE": "NOTICE",
+      "../README.md": "README.md",
+      "../SECURITY.md": "SECURITY.md",
+      "../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md",
+      "../TRADEMARKS.md": "TRADEMARKS.md",
+      "../docs/known-issues-v0.0.1-alpha.md": "KNOWN_ISSUES.md",
+      "../docs/release-notes-v0.0.1-alpha.md": "RELEASE_NOTES.md"
+    }
   }
 }

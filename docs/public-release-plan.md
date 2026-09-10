@@ -86,11 +86,9 @@ Apache License 2.0の本文は改変せず、リポジトリ直下の`LICENSE`�
 関与しておらず、著作権者として表示しない。研究成果としての同一性確認には
 GitHubアカウント`@y-ozawa039`とORCID `0009-0004-7814-2778`を用いる。
 
-引き続き公開前に確定する事項:
-
-- PHITS AI Editorという名称を公開リポジトリと配布物へ使用できること
-- 現在のロゴを再配布できること
-- 改変版による名称・ロゴ使用をどこまで認めるか
+`0.0.1-alpha`では`PHITS AI Editor`を暫定名称とし、Yohei Ozawaが自作した
+緑色のPロゴを暫定ロゴとして使用する。公式配布物と改変版の表示方針、第三者との
+非提携表示は`TRADEMARKS.md`に定める。名称とロゴはalpha期間中に変更し得る。
 
 所属機関が権利を持つ可能性がある場合は、公開前に知財・法務・情報公開手続を確認する。
 
@@ -134,12 +132,14 @@ OpenAI Codexのライセンス:
 
 ### 5.1 現在の状態
 
-- GitHub remoteはまだ設定されていない。
+- GitHub remoteは`y-ozawa039/phits-ai-editor`へ設定済みで、リポジトリはprivateである。
 - `LICENSE`、`NOTICE`、`AUTHORS.md`、`CITATION.cff`を作成済みである。
 - `package.json`と`Cargo.toml`へ著者およびSPDXライセンス識別子を反映済みである。
 - `THIRD_PARTY_NOTICES.md`は生成済みで、現行の依存メタデータにライセンス不明項目はない。バイナリへ同梱する正式ライセンス本文・帰属表示はリリース前に最終監査する。
-- `CONTRIBUTING.md`は作成済みである。セキュリティ・商標文書は未作成である。
-- これまでの実装変更と新規ファイルが多数未コミットである。
+- `CONTRIBUTING.md`、`SECURITY.md`、`TRADEMARKS.md`、AIカスタマイズ向け文書、
+  Issue/PRテンプレートを作成済みである。
+- これまでの実装変更は意味のあるコミットへ整理済みである。公開文書と配布候補の
+  最終変更は、再試験後に別コミットとして確定する。
 - Windows release実行ファイルとNSISインストーラーはローカルで生成できている。
 - WindowsのクリーンユーザープロファイルまたはVMでのインストール・アンインストール試験は未完了である。
 
@@ -412,15 +412,16 @@ Release notesには次を明記する。
 
 ### Milestone A: 公開基盤（仕様変更と並行して実施）
 
-- [ ] 著作権者・ロゴ・名称の権利確認（著作権者は確定、名称・ロゴ方針は未確定）
+- [x] 著作権者・暫定ロゴ・暫定名称の方針確定
 - [x] Apache-2.0適用
 - [ ] NOTICE・第三者ライセンス（一覧生成済み、バイナリ同梱物の最終監査は未完了）
 - [x] README再構成
-- [ ] AGENTS・ARCHITECTURE・カスタマイズガイド
+- [x] AGENTS・ARCHITECTURE・カスタマイズガイド
 - [x] `.gitignore`と初回公開対象監査（公開直前に再監査する）
 - [x] 機密情報・PHITS資産の機械的監査（公開直前に人手で再監査する）
-- [x] CI定義構築（GitHub上での初回実行は未実施）
-- [ ] Issue・Pull Request・Security template（`CONTRIBUTING.md`は作成済み）
+- [x] CI定義構築とGitHub上のWindows/Ubuntu初回成功
+- [x] Issue・Pull Request・Security template
+- [x] Dependabot設定（npm・Cargo・GitHub Actions、週次、手動レビュー前提）
 
 ### Milestone B: alpha版機能凍結
 

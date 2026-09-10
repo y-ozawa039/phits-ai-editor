@@ -1,0 +1,46 @@
+name: Codex integration problem
+description: Report connection, context, approval, editing, diff, or compatibility problems
+title: "[Codex]: "
+labels: ["codex-integration"]
+body:
+  - type: input
+    id: versions
+    attributes:
+      label: Editor, Windows, and Codex CLI versions
+      placeholder: Editor 0.0.1-alpha; Windows 11 24H2; codex-cli 0.153.4
+    validations:
+      required: true
+  - type: dropdown
+    id: feature
+    attributes:
+      label: Affected feature
+      options:
+        - Connection or authentication
+        - Compatibility probe
+        - Conversation or thread
+        - Editor Context
+        - Approval
+        - File editing or conflict
+        - Diff review or Undo/Redo
+    validations:
+      required: true
+  - type: textarea
+    id: status
+    attributes:
+      label: Compatibility status and approval mode
+      description: Copy only sanitized status text; never include tokens or credentials.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps, expected result, and actual result
+    validations:
+      required: true
+  - type: checkboxes
+    id: data
+    attributes:
+      label: Data safety
+      options:
+        - label: I removed authentication data, personal information, private research data, and non-redistributable PHITS material.
+          required: true
