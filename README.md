@@ -2,6 +2,22 @@
 
 PHITS-Pad相当の編集・実行機能と、Codex App ServerによるAI支援を統合するTauriデスクトップアプリです。
 
+## Windows版を利用する方へ
+
+初回alpha版はWindows 11 x64専用です。通常利用には、Windowsへの登録、
+`.inp`／`.pht`関連付け、アンインストーラーを備えた
+`PHITS-AI-Editor-v0.0.1-alpha-windows-x64-setup.exe`を推奨します。
+試用、複数版の比較、開発・調査には
+`PHITS-AI-Editor-v0.0.1-alpha-windows-x64-portable.zip`を利用できます。
+
+GitHubが自動表示する`Source code (zip)`はポータブル実行版ではありません。
+裸のEXE単体ではなく、インストーラーまたは必要文書を含むポータブルZIPを
+ダウンロードしてください。導入、初期設定、更新、アンインストール、SmartScreen、
+SHA-256確認の詳細は[利用者向けインストールガイド](docs/installation.md)を参照してください。
+
+PHITS本体とCodex CLIは同梱されません。PHITSは編集だけなら未設定でも起動でき、
+Codex CLIはAI支援を使う場合だけ必要です。
+
 ## 開発環境
 
 - Windows 11 x64（`0.0.1-alpha`の公式バイナリ対象）
@@ -20,7 +36,8 @@ PHITS本体、Codex CLI、認証情報、PHITS言語資産はアプリへ同梱�
 
 詳細は [MVP仕様](docs/mvp-specification.md)、[構成](ARCHITECTURE.md)、
 [ビルド手順](docs/building.md)、[生成AIを使ったカスタマイズ](docs/customizing-with-ai.md)、
-[安全境界](docs/safety-boundaries.md)を参照してください。
+[安全境界](docs/safety-boundaries.md)を参照してください。アプリを利用する方は、まず
+[インストールと初期設定](docs/installation.md)を確認してください。
 
 ## ライセンスと引用
 

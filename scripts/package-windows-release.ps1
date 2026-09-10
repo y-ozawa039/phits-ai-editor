@@ -50,11 +50,17 @@ try {
     @{ Source = "THIRD_PARTY_LICENSES.txt"; Destination = "THIRD_PARTY_LICENSES.txt" },
     @{ Source = "TRADEMARKS.md"; Destination = "TRADEMARKS.md" },
     @{ Source = "SECURITY.md"; Destination = "SECURITY.md" },
+    @{ Source = "docs\installation.md"; Destination = "docs\installation.md" },
     @{ Source = "docs\known-issues-v$Version.md"; Destination = "KNOWN_ISSUES.md" },
     @{ Source = "docs\release-notes-v$Version.md"; Destination = "RELEASE_NOTES.md" }
   )
   foreach ($document in $documents) {
-    Copy-Item -LiteralPath (Join-Path $projectRoot $document.Source) -Destination (Join-Path $staging $document.Destination)
+    $destination = Join-Path $staging $document.Destination
+    $destinationDirectory = Split-Path -Parent $destination
+    if (-not (Test-Path -LiteralPath $destinationDirectory)) {
+      New-Item -ItemType Directory -Path $destinationDirectory -Force | Out-Null
+    }
+    Copy-Item -LiteralPath (Join-Path $projectRoot $document.Source) -Destination $destination
   }
 
   $commit = (git -C $projectRoot rev-parse HEAD).Trim()

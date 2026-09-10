@@ -39,6 +39,7 @@
       "../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md",
       "../THIRD_PARTY_LICENSES.txt": "THIRD_PARTY_LICENSES.txt",
       "../TRADEMARKS.md": "TRADEMARKS.md",
+      "../docs/installation.md": "docs/installation.md",
       "../docs/known-issues-v0.0.1-alpha.md": "KNOWN_ISSUES.md",
       "../docs/release-notes-v0.0.1-alpha.md": "RELEASE_NOTES.md"
     }

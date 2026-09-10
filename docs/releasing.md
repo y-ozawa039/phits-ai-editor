@@ -46,12 +46,13 @@ Create these release assets without modifying their contents afterward:
 - `SHA256SUMS.txt`
 - `SBOM.spdx.json` or an equivalent SBOM
 - `THIRD_PARTY_NOTICES.md` and `THIRD_PARTY_LICENSES.txt`
+- `docs/installation.md`
 - release notes and known issues
 
 The portable archive includes the executable, README, LICENSE, NOTICE,
-THIRD_PARTY_NOTICES, THIRD_PARTY_LICENSES, TRADEMARKS, SECURITY, and known
-limitations. It must not include PHITS, Codex CLI, authentication data,
-workspaces, or build caches.
+THIRD_PARTY_NOTICES, THIRD_PARTY_LICENSES, the `docs/installation.md` user
+guide, TRADEMARKS, SECURITY, and known limitations. It must not include PHITS,
+Codex CLI, authentication data, workspaces, or build caches.
 
 ## 4. Clean Windows acceptance
 
