@@ -1,6 +1,6 @@
 # Windows alpha test report
 
-Test date: 2026-09-08 (JST)
+Test dates: 2026-09-08 through 2026-09-10 (JST)
 
 ## Environment
 
@@ -16,7 +16,8 @@ Test date: 2026-09-08 (JST)
 | --- | --- | --- |
 | Release executable startup | PASS | The Tauri window opened and rendered the Japanese UI. |
 | Workspace open and input display | PASS | `lec01.inp` opened in Monaco with PHITS syntax highlighting. |
-| Direct file launch and single-instance routing | PASS | The release executable was started with `C:\phits\user\ide_setup_check\lec01.inp`, then invoked again with `C:\phits\user\lec01\lec01.inp`. The second process exited after forwarding its argument and exactly one Editor process remained. Startup-target unit tests also cover relative paths, mixed-case `.inp`, `.pht`, missing targets, and unsupported extensions. The NSIS configuration registers `.inp`/`.pht` as supported Editor file types without forcing the Windows default application. |
+| Direct file launch and single-instance routing | PASS | The release executable was started with `C:\phits\user\ide_setup_check\lec01.inp`, then invoked again with `C:\phits\user\lec01\lec01.inp`. The second process exited after forwarding its argument and exactly one Editor process remained. The 2026-09-10 installed-build retest opened an isolated `.inp` directly, kept one process after a second invocation, returned exit code 0 from the forwarding process, and left the input byte-for-byte unchanged. Startup-target unit tests also cover relative paths, mixed-case `.inp`, `.pht`, missing targets, and unsupported extensions. |
+| NSIS current-user install and uninstall | PASS | The unsigned NSIS candidate installed silently into an isolated directory with exit code 0. The application, uninstaller, all required Japanese/English documents, LICENSE, NOTICE, and third-party notices were present. During installation the HKCU `.inp`/`.pht` classes changed to the Editor and retained `PHITS-INP`/`PHITS-PHT` as backups. Uninstall returned exit code 0, removed the install directory, uninstall entry, application file class, desktop shortcut, and Start-menu shortcut, then restored both prior phitspad classes. A post-uninstall hook was added after the first rehearsal exposed two harmless backup registry values left by Tauri's standard macro; the rebuilt installer removed those values as well, with no association residue. |
 | Runtime diagnosis | PASS | PHITS 3.370 and Codex CLI 0.153.4 were detected. |
 | Codex startup compatibility probe | PASS | 起動時にインストール済みCLI 0.153.4からApp Server JSON Schemaを一時生成し、会話、スレッド、ファイル編集、承認の4機能を個別判定した。全機能が固定基準0.153.1と互換だった。固定Schemaに対するローカル検査と、最新版CLIを毎週検査するGitHub Actions workflowも追加した。 |
 | Normal PHITS run | PASS | The output panel streamed initialization and both batches, then reported successful completion. |
@@ -48,6 +49,7 @@ Test date: 2026-09-08 (JST)
 | Responsive Codex panel width | PASS | The application-wide default is one third of the current window, clamped to a 360 px minimum and one-half maximum. In the rebuilt release GUI at 1444 px window width, the panel opened at approximately 481 px, stopped at approximately 722 px when dragged wider, and returned to approximately 481 px when the divider was double-clicked. The stored value is a ratio and follows window resize. Component and preference tests cover the clamp and reset behavior. |
 | Full-editor five-run calculation-priority timing | PASS | The official standalone path and the real Editor production button were each run five times with the same input and working directory. Official wall times were 6,314.9, 6,183.1, 6,165.9, 6,176.1, and 6,181.2 ms (median 6,181.2 ms). Editor wall times from `RunManifestV1.requestedAt` through the observed normal-completion write were 6,198.8, 6,170.8, 6,246.1, 6,188.6, and 6,176.0 ms (median 6,188.6 ms), a +0.12% difference. Official PHITS CPU times were 5.59, 5.59, 5.59, 5.62, and 5.60 s (median 5.59 s); Editor PHITS CPU times were 5.67, 5.64, 5.71, 5.66, and 5.64 s (median 5.66 s), a +1.25% difference. Both medians satisfy the provisional 2% target. All ten calculations finished normally. All five Editor manifests restored to `completed`, and no Editor, PHITS, wrapper, or Codex App Server process remained after the final run. |
 | Final release executable startup | PASS | The final rebuilt executable opened to the Japanese start screen and exited normally. No `phits-ai-editor.exe` process remained. |
+| Norton malware scan | PASS (candidate commit `8817fec`) | After Norton LiveUpdate, the maintainer manually scanned `C:\phits\user\phits-ai-editor`; Norton reported no threats. This covered the clean `8817fec` release candidate. The final candidate rebuilt after the NSIS cleanup hook must be scanned again before publication. |
 | Current-PC Windows acceptance | PASS | All rows above were completed on the current Windows 11 x64 PC. Runner and utility code did not change during the approval-UI pass; its earlier same-day execution evidence therefore remains applicable to the final source state. |
 | Clean-profile/VM installer test | BLOCKED | No Hyper-V cmdlets or WSL environment were available, and the Windows Sandbox feature state could not be queried without administrator privileges. No isolated clean Windows environment was therefore available. A newer local packaging rehearsal is recorded below, but it does not replace this clean-environment test. |
 | Rust unit tests | PASS | 63 tests passed, including startup-target resolution, multiple-input selection, approval-mode mapping, Codex feature-schema compatibility, schema fixture decisions, title fallback, raw-byte disk revision hashing, relative and absolute file-path validation, network rejection, PHITS-family command rejection, the Editor Context envelope, grouped Codex-change history, and the requirement to use App Server file-change events for edit requests. |
@@ -85,6 +87,16 @@ The release WebView did not reliably present the browser-native confirmation use
 ### App Server edit-smoke process cleanup
 
 The live edit smoke test passed its file-change approval and byte-preservation assertions but remained alive because a completed `Promise.race` left its 120-second timeout registered. The harness now clears every timeout after settlement and bounds best-effort thread deletion and App Server shutdown. The final rerun observed the file-change approval, declined it, preserved the fixture byte-for-byte, and exited with code 0.
+
+### NSIS file-association backup cleanup
+
+Tauri's standard NSIS file-association macro correctly backed up the existing
+`PHITS-INP` and `PHITS-PHT` classes and restored them during uninstall, but it
+left the two temporary `PHITS input file_backup` values under the extension
+keys. A Tauri-supported `NSIS_HOOK_POSTUNINSTALL` now deletes only those backup
+values after the original classes have been restored. A second isolated
+install/uninstall rehearsal verified complete application removal, restored
+phitspad associations, no backup values, and no remaining shortcuts.
 
 ## Remaining work outside current-PC acceptance
 
