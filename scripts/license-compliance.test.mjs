@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { collectNodePackages, packageSupportsTarget } from "./dependency-inventory.mjs";
 import {
   auditLicensePolicy,
   collectLicenseDocuments,
@@ -10,6 +11,53 @@ import {
   renderLicenseBundle,
   selectDistributedPackages,
 } from "./license-compliance.mjs";
+
+test("node inventory targets the official Windows x64 distribution deterministically", () => {
+  assert.equal(packageSupportsTarget({ os: ["win32"], cpu: ["x64"] }), true);
+  assert.equal(packageSupportsTarget({ os: ["linux"], cpu: ["x64"] }), false);
+  assert.equal(packageSupportsTarget({ os: ["!win32"] }), false);
+  assert.equal(packageSupportsTarget({ os: ["darwin", "win32"], cpu: ["x64"] }), true);
+  assert.equal(packageSupportsTarget({ os: ["win32"], cpu: ["arm64"] }), false);
+  assert.equal(packageSupportsTarget({}), true);
+});
+
+test("node inventory ignores stale pnpm store entries and other target platforms", () => {
+  const root = mkdtempSync(join(tmpdir(), "phits-node-inventory-test-"));
+  try {
+    writeFileSync(
+      join(root, "pnpm-lock.yaml"),
+      "lockfileVersion: '9.0'\n\npackages:\n\n  locked@1:\n    resolution: {}\n\n  linux-only@1:\n    resolution: {}\n\nsnapshots:\n",
+      "utf8",
+    );
+    const writePackage = (storeName, pkg) => {
+      const packageDirectory = join(
+        root,
+        "node_modules",
+        ".pnpm",
+        storeName,
+        "node_modules",
+        pkg.name,
+      );
+      mkdirSync(packageDirectory, { recursive: true });
+      writeFileSync(join(packageDirectory, "package.json"), JSON.stringify(pkg), "utf8");
+    };
+    writePackage("locked@1", { name: "locked", version: "1", license: "MIT", os: ["win32"] });
+    writePackage("linux-only@1", {
+      name: "linux-only",
+      version: "1",
+      license: "MIT",
+      os: ["linux"],
+    });
+    writePackage("stale@1", { name: "stale", version: "1", license: "MIT", os: ["win32"] });
+
+    assert.deepEqual(
+      collectNodePackages(root).map((pkg) => pkg.name),
+      ["locked"],
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test("license policy rejects unknown and denied licenses but permits MPL-2.0", () => {
   const packages = [

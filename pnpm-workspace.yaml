@@ -1,5 +1,15 @@
 packages:
   - "."
 
+# Keep the official Windows x64 optional packages available when license
+# documents are regenerated on a non-Windows development or CI host.
+supportedArchitectures:
+  os:
+    - current
+    - win32
+  cpu:
+    - current
+    - x64
+
 allowBuilds:
   esbuild: true

@@ -85,13 +85,15 @@ PHITS AI Editor depends on third-party open-source software. Each dependency
 remains subject to its own license; the project's Apache-2.0 license does not
 replace or override those terms.
 
-This inventory is generated from the installed pnpm graph and Cargo metadata by
+This inventory is generated from the pinned pnpm lockfile, installed package
+metadata filtered for the official Windows x64 target, and Cargo metadata by
 running \`pnpm licenses:generate\`. It includes development dependencies as well
 as runtime dependencies so that source and binary release reviews use one
-conservative list. Packages used only to build or test the application are
-marked separately from npm runtime dependencies. The corresponding upstream
-license, copyright, and notice texts for packages included in the Windows
-binary review are collected in \`THIRD_PARTY_LICENSES.txt\`.
+conservative list without depending on stale or host-specific pnpm store
+entries. Packages used only to build or test the application are marked
+separately from npm runtime dependencies. The corresponding upstream license,
+copyright, and notice texts for packages included in the Windows binary review
+are collected in \`THIRD_PARTY_LICENSES.txt\`.
 
 Published packages that omit a repository-level license file are handled only
 through the version-pinned, reviewed mappings in

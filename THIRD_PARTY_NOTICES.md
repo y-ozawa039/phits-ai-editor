@@ -4,13 +4,15 @@ PHITS AI Editor depends on third-party open-source software. Each dependency
 remains subject to its own license; the project's Apache-2.0 license does not
 replace or override those terms.
 
-This inventory is generated from the installed pnpm graph and Cargo metadata by
+This inventory is generated from the pinned pnpm lockfile, installed package
+metadata filtered for the official Windows x64 target, and Cargo metadata by
 running `pnpm licenses:generate`. It includes development dependencies as well
 as runtime dependencies so that source and binary release reviews use one
-conservative list. Packages used only to build or test the application are
-marked separately from npm runtime dependencies. The corresponding upstream
-license, copyright, and notice texts for packages included in the Windows
-binary review are collected in `THIRD_PARTY_LICENSES.txt`.
+conservative list without depending on stale or host-specific pnpm store
+entries. Packages used only to build or test the application are marked
+separately from npm runtime dependencies. The corresponding upstream license,
+copyright, and notice texts for packages included in the Windows binary review
+are collected in `THIRD_PARTY_LICENSES.txt`.
 
 Published packages that omit a repository-level license file are handled only
 through the version-pinned, reviewed mappings in
@@ -41,7 +43,7 @@ Editor's independently written source remains licensed under Apache-2.0.
 
 `caniuse-lite@1.0.30001810` is present only through the frontend build/test toolchain. It is not a production npm dependency and is not shipped as a standalone runtime package. Its CC-BY-4.0 declaration remains recorded in the complete inventory below.
 
-## JavaScript and TypeScript packages (230)
+## JavaScript and TypeScript packages (170)
 
 | Package | Version | Declared license | Distribution scope |
 | --- | --- | --- | --- |
@@ -72,31 +74,6 @@ Editor's independently written source remains licensed under Apache-2.0.
 | [@csstools/css-color-parser](https://www.npmjs.com/package/@csstools/css-color-parser/v/3.1.0) | 3.1.0 | MIT | Build/test only |
 | [@csstools/css-parser-algorithms](https://www.npmjs.com/package/@csstools/css-parser-algorithms/v/3.0.5) | 3.0.5 | MIT | Build/test only |
 | [@csstools/css-tokenizer](https://www.npmjs.com/package/@csstools/css-tokenizer/v/3.0.4) | 3.0.4 | MIT | Build/test only |
-| [@esbuild/aix-ppc64](https://www.npmjs.com/package/@esbuild/aix-ppc64/v/0.28.2) | 0.28.2 | MIT | Build/test only |
-| [@esbuild/android-arm](https://www.npmjs.com/package/@esbuild/android-arm/v/0.28.2) | 0.28.2 | MIT | Build/test only |
-| [@esbuild/android-arm64](https://www.npmjs.com/package/@esbuild/android-arm64/v/0.28.2) | 0.28.2 | MIT | Build/test only |
-| [@esbuild/android-x64](https://www.npmjs.com/package/@esbuild/android-x64/v/0.28.2) | 0.28.2 | MIT | Build/test only |
-| [@esbuild/darwin-arm64](https://www.npmjs.com/package/@esbuild/darwin-arm64/v/0.28.2) | 0.28.2 | MIT | Build/test only |
-| [@esbuild/darwin-x64](https://www.npmjs.com/package/@esbuild/darwin-x64/v/0.28.2) | 0.28.2 | MIT | Build/test only |
-| [@esbuild/freebsd-arm64](https://www.npmjs.com/package/@esbuild/freebsd-arm64/v/0.28.2) | 0.28.2 | MIT | Build/test only |
-| [@esbuild/freebsd-x64](https://www.npmjs.com/package/@esbuild/freebsd-x64/v/0.28.2) | 0.28.2 | MIT | Build/test only |
-| [@esbuild/linux-arm](https://www.npmjs.com/package/@esbuild/linux-arm/v/0.28.2) | 0.28.2 | MIT | Build/test only |
-| [@esbuild/linux-arm64](https://www.npmjs.com/package/@esbuild/linux-arm64/v/0.28.2) | 0.28.2 | MIT | Build/test only |
-| [@esbuild/linux-ia32](https://www.npmjs.com/package/@esbuild/linux-ia32/v/0.28.2) | 0.28.2 | MIT | Build/test only |
-| [@esbuild/linux-loong64](https://www.npmjs.com/package/@esbuild/linux-loong64/v/0.28.2) | 0.28.2 | MIT | Build/test only |
-| [@esbuild/linux-mips64el](https://www.npmjs.com/package/@esbuild/linux-mips64el/v/0.28.2) | 0.28.2 | MIT | Build/test only |
-| [@esbuild/linux-ppc64](https://www.npmjs.com/package/@esbuild/linux-ppc64/v/0.28.2) | 0.28.2 | MIT | Build/test only |
-| [@esbuild/linux-riscv64](https://www.npmjs.com/package/@esbuild/linux-riscv64/v/0.28.2) | 0.28.2 | MIT | Build/test only |
-| [@esbuild/linux-s390x](https://www.npmjs.com/package/@esbuild/linux-s390x/v/0.28.2) | 0.28.2 | MIT | Build/test only |
-| [@esbuild/linux-x64](https://www.npmjs.com/package/@esbuild/linux-x64/v/0.28.2) | 0.28.2 | MIT | Build/test only |
-| [@esbuild/netbsd-arm64](https://www.npmjs.com/package/@esbuild/netbsd-arm64/v/0.28.2) | 0.28.2 | MIT | Build/test only |
-| [@esbuild/netbsd-x64](https://www.npmjs.com/package/@esbuild/netbsd-x64/v/0.28.2) | 0.28.2 | MIT | Build/test only |
-| [@esbuild/openbsd-arm64](https://www.npmjs.com/package/@esbuild/openbsd-arm64/v/0.28.2) | 0.28.2 | MIT | Build/test only |
-| [@esbuild/openbsd-x64](https://www.npmjs.com/package/@esbuild/openbsd-x64/v/0.28.2) | 0.28.2 | MIT | Build/test only |
-| [@esbuild/openharmony-arm64](https://www.npmjs.com/package/@esbuild/openharmony-arm64/v/0.28.2) | 0.28.2 | MIT | Build/test only |
-| [@esbuild/sunos-x64](https://www.npmjs.com/package/@esbuild/sunos-x64/v/0.28.2) | 0.28.2 | MIT | Build/test only |
-| [@esbuild/win32-arm64](https://www.npmjs.com/package/@esbuild/win32-arm64/v/0.28.2) | 0.28.2 | MIT | Build/test only |
-| [@esbuild/win32-ia32](https://www.npmjs.com/package/@esbuild/win32-ia32/v/0.28.2) | 0.28.2 | MIT | Build/test only |
 | [@esbuild/win32-x64](https://www.npmjs.com/package/@esbuild/win32-x64/v/0.28.2) | 0.28.2 | MIT | Build/test only |
 | [@jridgewell/gen-mapping](https://www.npmjs.com/package/@jridgewell/gen-mapping/v/0.3.13) | 0.3.13 | MIT | Build/test only |
 | [@jridgewell/remapping](https://www.npmjs.com/package/@jridgewell/remapping/v/2.3.5) | 2.3.5 | MIT | Build/test only |
@@ -105,45 +82,11 @@ Editor's independently written source remains licensed under Apache-2.0.
 | [@jridgewell/trace-mapping](https://www.npmjs.com/package/@jridgewell/trace-mapping/v/0.3.31) | 0.3.31 | MIT | Build/test only |
 | [@monaco-editor/loader](https://www.npmjs.com/package/@monaco-editor/loader/v/1.7.0) | 1.7.0 | MIT | Runtime |
 | [@monaco-editor/react](https://www.npmjs.com/package/@monaco-editor/react/v/4.7.0) | 4.7.0 | MIT | Runtime |
-| [@napi-rs/lzma-linux-x64-gnu](https://www.npmjs.com/package/@napi-rs/lzma-linux-x64-gnu/v/1.5.1) | 1.5.1 | MIT | Build/test only |
 | [@rolldown/pluginutils](https://www.npmjs.com/package/@rolldown/pluginutils/v/1.0.0-rc.3) | 1.0.0-rc.3 | MIT | Build/test only |
-| [@rollup/rollup-android-arm-eabi](https://www.npmjs.com/package/@rollup/rollup-android-arm-eabi/v/4.63.1) | 4.63.1 | MIT | Build/test only |
-| [@rollup/rollup-android-arm64](https://www.npmjs.com/package/@rollup/rollup-android-arm64/v/4.63.1) | 4.63.1 | MIT | Build/test only |
-| [@rollup/rollup-darwin-arm64](https://www.npmjs.com/package/@rollup/rollup-darwin-arm64/v/4.63.1) | 4.63.1 | MIT | Build/test only |
-| [@rollup/rollup-darwin-x64](https://www.npmjs.com/package/@rollup/rollup-darwin-x64/v/4.63.1) | 4.63.1 | MIT | Build/test only |
-| [@rollup/rollup-freebsd-arm64](https://www.npmjs.com/package/@rollup/rollup-freebsd-arm64/v/4.63.1) | 4.63.1 | MIT | Build/test only |
-| [@rollup/rollup-freebsd-x64](https://www.npmjs.com/package/@rollup/rollup-freebsd-x64/v/4.63.1) | 4.63.1 | MIT | Build/test only |
-| [@rollup/rollup-linux-arm-gnueabihf](https://www.npmjs.com/package/@rollup/rollup-linux-arm-gnueabihf/v/4.63.1) | 4.63.1 | MIT | Build/test only |
-| [@rollup/rollup-linux-arm-musleabihf](https://www.npmjs.com/package/@rollup/rollup-linux-arm-musleabihf/v/4.63.1) | 4.63.1 | MIT | Build/test only |
-| [@rollup/rollup-linux-arm64-gnu](https://www.npmjs.com/package/@rollup/rollup-linux-arm64-gnu/v/4.63.1) | 4.63.1 | MIT | Build/test only |
-| [@rollup/rollup-linux-arm64-musl](https://www.npmjs.com/package/@rollup/rollup-linux-arm64-musl/v/4.63.1) | 4.63.1 | MIT | Build/test only |
-| [@rollup/rollup-linux-loong64-gnu](https://www.npmjs.com/package/@rollup/rollup-linux-loong64-gnu/v/4.63.1) | 4.63.1 | MIT | Build/test only |
-| [@rollup/rollup-linux-loong64-musl](https://www.npmjs.com/package/@rollup/rollup-linux-loong64-musl/v/4.63.1) | 4.63.1 | MIT | Build/test only |
-| [@rollup/rollup-linux-ppc64-gnu](https://www.npmjs.com/package/@rollup/rollup-linux-ppc64-gnu/v/4.63.1) | 4.63.1 | MIT | Build/test only |
-| [@rollup/rollup-linux-ppc64-musl](https://www.npmjs.com/package/@rollup/rollup-linux-ppc64-musl/v/4.63.1) | 4.63.1 | MIT | Build/test only |
-| [@rollup/rollup-linux-riscv64-gnu](https://www.npmjs.com/package/@rollup/rollup-linux-riscv64-gnu/v/4.63.1) | 4.63.1 | MIT | Build/test only |
-| [@rollup/rollup-linux-riscv64-musl](https://www.npmjs.com/package/@rollup/rollup-linux-riscv64-musl/v/4.63.1) | 4.63.1 | MIT | Build/test only |
-| [@rollup/rollup-linux-s390x-gnu](https://www.npmjs.com/package/@rollup/rollup-linux-s390x-gnu/v/4.63.1) | 4.63.1 | MIT | Build/test only |
-| [@rollup/rollup-linux-x64-gnu](https://www.npmjs.com/package/@rollup/rollup-linux-x64-gnu/v/4.63.1) | 4.63.1 | MIT | Build/test only |
-| [@rollup/rollup-linux-x64-musl](https://www.npmjs.com/package/@rollup/rollup-linux-x64-musl/v/4.63.1) | 4.63.1 | MIT | Build/test only |
-| [@rollup/rollup-openbsd-x64](https://www.npmjs.com/package/@rollup/rollup-openbsd-x64/v/4.63.1) | 4.63.1 | MIT | Build/test only |
-| [@rollup/rollup-openharmony-arm64](https://www.npmjs.com/package/@rollup/rollup-openharmony-arm64/v/4.63.1) | 4.63.1 | MIT | Build/test only |
-| [@rollup/rollup-win32-arm64-msvc](https://www.npmjs.com/package/@rollup/rollup-win32-arm64-msvc/v/4.63.1) | 4.63.1 | MIT | Build/test only |
-| [@rollup/rollup-win32-ia32-msvc](https://www.npmjs.com/package/@rollup/rollup-win32-ia32-msvc/v/4.63.1) | 4.63.1 | MIT | Build/test only |
 | [@rollup/rollup-win32-x64-gnu](https://www.npmjs.com/package/@rollup/rollup-win32-x64-gnu/v/4.63.1) | 4.63.1 | MIT | Build/test only |
 | [@rollup/rollup-win32-x64-msvc](https://www.npmjs.com/package/@rollup/rollup-win32-x64-msvc/v/4.63.1) | 4.63.1 | MIT | Build/test only |
 | [@tauri-apps/api](https://www.npmjs.com/package/@tauri-apps/api/v/2.11.1) | 2.11.1 | Apache-2.0 OR MIT | Runtime |
 | [@tauri-apps/cli](https://www.npmjs.com/package/@tauri-apps/cli/v/2.11.4) | 2.11.4 | Apache-2.0 OR MIT | Build/test only |
-| [@tauri-apps/cli-darwin-arm64](https://www.npmjs.com/package/@tauri-apps/cli-darwin-arm64/v/2.11.4) | 2.11.4 | Apache-2.0 OR MIT | Build/test only |
-| [@tauri-apps/cli-darwin-x64](https://www.npmjs.com/package/@tauri-apps/cli-darwin-x64/v/2.11.4) | 2.11.4 | Apache-2.0 OR MIT | Build/test only |
-| [@tauri-apps/cli-linux-arm-gnueabihf](https://www.npmjs.com/package/@tauri-apps/cli-linux-arm-gnueabihf/v/2.11.4) | 2.11.4 | Apache-2.0 OR MIT | Build/test only |
-| [@tauri-apps/cli-linux-arm64-gnu](https://www.npmjs.com/package/@tauri-apps/cli-linux-arm64-gnu/v/2.11.4) | 2.11.4 | Apache-2.0 OR MIT | Build/test only |
-| [@tauri-apps/cli-linux-arm64-musl](https://www.npmjs.com/package/@tauri-apps/cli-linux-arm64-musl/v/2.11.4) | 2.11.4 | Apache-2.0 OR MIT | Build/test only |
-| [@tauri-apps/cli-linux-riscv64-gnu](https://www.npmjs.com/package/@tauri-apps/cli-linux-riscv64-gnu/v/2.11.4) | 2.11.4 | Apache-2.0 OR MIT | Build/test only |
-| [@tauri-apps/cli-linux-x64-gnu](https://www.npmjs.com/package/@tauri-apps/cli-linux-x64-gnu/v/2.11.4) | 2.11.4 | Apache-2.0 OR MIT | Build/test only |
-| [@tauri-apps/cli-linux-x64-musl](https://www.npmjs.com/package/@tauri-apps/cli-linux-x64-musl/v/2.11.4) | 2.11.4 | Apache-2.0 OR MIT | Build/test only |
-| [@tauri-apps/cli-win32-arm64-msvc](https://www.npmjs.com/package/@tauri-apps/cli-win32-arm64-msvc/v/2.11.4) | 2.11.4 | Apache-2.0 OR MIT | Build/test only |
-| [@tauri-apps/cli-win32-ia32-msvc](https://www.npmjs.com/package/@tauri-apps/cli-win32-ia32-msvc/v/2.11.4) | 2.11.4 | Apache-2.0 OR MIT | Build/test only |
 | [@tauri-apps/cli-win32-x64-msvc](https://www.npmjs.com/package/@tauri-apps/cli-win32-x64-msvc/v/2.11.4) | 2.11.4 | Apache-2.0 OR MIT | Build/test only |
 | [@tauri-apps/plugin-dialog](https://www.npmjs.com/package/@tauri-apps/plugin-dialog/v/2.7.3) | 2.7.3 | MIT OR Apache-2.0 | Runtime |
 | [@tauri-apps/plugin-opener](https://www.npmjs.com/package/@tauri-apps/plugin-opener/v/2.5.5) | 2.5.5 | MIT OR Apache-2.0 | Runtime |
@@ -199,7 +142,6 @@ Editor's independently written source remains licensed under Apache-2.0.
 | [estree-walker](https://www.npmjs.com/package/estree-walker/v/3.0.3) | 3.0.3 | MIT | Build/test only |
 | [expect-type](https://www.npmjs.com/package/expect-type/v/1.4.0) | 1.4.0 | Apache-2.0 | Build/test only |
 | [fdir](https://www.npmjs.com/package/fdir/v/6.5.0) | 6.5.0 | MIT | Build/test only |
-| [fsevents](https://www.npmjs.com/package/fsevents/v/2.3.3) | 2.3.3 | MIT | Build/test only |
 | [gensync](https://www.npmjs.com/package/gensync/v/1.0.0-beta.2) | 1.0.0-beta.2 | MIT | Build/test only |
 | [html-encoding-sniffer](https://www.npmjs.com/package/html-encoding-sniffer/v/4.0.0) | 4.0.0 | MIT | Build/test only |
 | [http-proxy-agent](https://www.npmjs.com/package/http-proxy-agent/v/7.0.2) | 7.0.2 | MIT | Build/test only |

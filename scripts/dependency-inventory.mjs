@@ -2,6 +2,44 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 
+const WINDOWS_X64_TARGET = Object.freeze({ os: "win32", cpu: "x64" });
+
+function targetFieldAllows(value, target) {
+  if (value == null) return true;
+  const entries = (Array.isArray(value) ? value : [value]).filter(
+    (entry) => typeof entry === "string" && entry.length > 0,
+  );
+  if (entries.some((entry) => entry === `!${target}`)) return false;
+  const allowed = entries.filter((entry) => !entry.startsWith("!"));
+  return allowed.length === 0 || allowed.includes("any") || allowed.includes(target);
+}
+
+export function packageSupportsTarget(pkg, target = WINDOWS_X64_TARGET) {
+  return targetFieldAllows(pkg.os, target.os) && targetFieldAllows(pkg.cpu, target.cpu);
+}
+
+function collectLockedNodePackageKeys(projectRoot) {
+  const lockText = readFileSync(join(projectRoot, "pnpm-lock.yaml"), "utf8");
+  const packagesStart = lockText.search(/^packages:\s*$/m);
+  const snapshotsStart = lockText.search(/^snapshots:\s*$/m);
+  if (packagesStart < 0 || snapshotsStart < 0 || snapshotsStart <= packagesStart) {
+    throw new Error("pnpm-lock.yaml does not contain packages and snapshots sections");
+  }
+  const packageSection = lockText.slice(packagesStart, snapshotsStart);
+  const keys = new Set();
+  for (const match of packageSection.matchAll(/^  (.+):\s*$/gm)) {
+    let key = match[1].trim();
+    if (
+      (key.startsWith("'") && key.endsWith("'")) ||
+      (key.startsWith('"') && key.endsWith('"'))
+    ) {
+      key = key.slice(1, -1);
+    }
+    keys.add(key);
+  }
+  return keys;
+}
+
 function normalizeLicense(pkg) {
   if (typeof pkg.license === "string" && pkg.license.trim()) return pkg.license.trim();
   if (Array.isArray(pkg.licenses)) {
@@ -22,10 +60,11 @@ function normalizeRepository(repository) {
     .replace(/\.git$/, "");
 }
 
-function readPackage(packageDirectory, packages) {
+function readPackage(packageDirectory, packages, lockedKeys, target) {
   try {
     const pkg = JSON.parse(readFileSync(join(packageDirectory, "package.json"), "utf8"));
-    if (pkg.name && pkg.version) {
+    const identity = pkg.name && pkg.version ? `${pkg.name}@${pkg.version}` : undefined;
+    if (identity && lockedKeys.has(identity) && packageSupportsTarget(pkg, target)) {
       packages.set(`${pkg.name}@${pkg.version}`, {
         ecosystem: "npm",
         name: pkg.name,
@@ -43,9 +82,10 @@ function readPackage(packageDirectory, packages) {
   }
 }
 
-export function collectNodePackages(projectRoot) {
+export function collectNodePackages(projectRoot, target = WINDOWS_X64_TARGET) {
   const storeRoot = join(projectRoot, "node_modules", ".pnpm");
   const packages = new Map();
+  const lockedKeys = collectLockedNodePackageKeys(projectRoot);
 
   for (const storeEntry of readdirSync(storeRoot, { withFileTypes: true })) {
     if (!storeEntry.isDirectory()) continue;
@@ -62,13 +102,13 @@ export function collectNodePackages(projectRoot) {
       if (moduleEntry.name.startsWith("@")) {
         try {
           for (const scopedEntry of readdirSync(modulePath, { withFileTypes: true })) {
-            readPackage(join(modulePath, scopedEntry.name), packages);
+            readPackage(join(modulePath, scopedEntry.name), packages, lockedKeys, target);
           }
         } catch {
           // Ignore broken optional dependency links.
         }
       } else {
-        readPackage(modulePath, packages);
+        readPackage(modulePath, packages, lockedKeys, target);
       }
     }
   }
