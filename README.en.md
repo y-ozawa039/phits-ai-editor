@@ -140,6 +140,8 @@ Implemented features include:
 - integration with ANGEL, DCHAIN, and PHIG-3D
 - Codex chat, thread resume/rename/delete, model selection, and compatibility
   status for available features
+- diagnostics for the PHITS Codex setup, details of checked files and reasons,
+  and generation or copying of an AI troubleshooting prompt based on the results
 - Codex editing assistance using the current file, selection, and unsaved text,
   with configurable approval behavior
 - full diff review of Codex changes, change navigation, inline/side-by-side
