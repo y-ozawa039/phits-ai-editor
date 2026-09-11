@@ -2,7 +2,7 @@
 
 日本語 | [English](README.en.md)
 
-PHITS-Pad相当の編集・実行機能と、Codex App ServerによるAI支援を統合するTauriデスクトップアプリです。
+PHITS-Padに近い編集・実行機能と、CodexによるAI編集支援を一つの画面に統合したWindows向けエディタです。
 
 ## Windows版をダウンロード
 
@@ -55,39 +55,29 @@ Codex CLIへ次のように依頼してください。
 
 セットアップが完了し、`Setup AI agent environment to PHITS is successfully finished.`
 と表示されたことを確認してから、PHITS AI EditorでCodexへ接続してください。
-この処理はCodexの`AGENTS.md`へPHITS参照ポリシーの入口を登録します。
-Editorはワークスペースを開いた時点で設定を静的検査します。`0.0.2-alpha`以降は、設定画面の
-「PHITS実行環境」で解決したルートを基準として、PHITS側のAI設定資源、PHITSルート、
-Codexグローバル、現在のワークスペースにある有効な`AGENTS.md`または
-`AGENTS.override.md`、および参照先ルートの整合性を分けて確認します。
-公式の`<PHITSPATH>`などの変数表記と絶対パスのどちらも認識します。この検査は
-App Serverが実際に指示を読み込んだことを証明するものではなく、設定ファイルを
-自動変更したり、Codexへの接続・会話を妨げたりもしません。問題がある場合は、検査結果から
-生成した相談文を確認・編集し、Editor内のCodex入力欄へ挿入またはコピーできます。
-EditorがCodexへ接続できない場合は、コピーした文章をChatGPTデスクトップ版のローカル
-Codexタスクへ貼り付けて調査できます。CloudタスクはPC内ファイルへアクセスできない場合が
-あります。相談文の自動送信と設定ファイルの自動修正は行いません。
 
-## 開発環境
+エディタは、設定されたPHITSルートを基準に、PHITS用AI設定とCodexが参照する
+`AGENTS.md`／`AGENTS.override.md`の状態を検査します。問題がある場合は、画面で
+「検査したファイルと理由」を確認でき、診断結果を含む「生成AIへの相談文」を作成・
+コピーできます。エディタからCodexへ接続できない場合は、その文章をChatGPT
+デスクトップ版のローカルCodexタスクへ貼り付けて調査できます。検査はCodexへの接続や
+会話を妨げず、設定の自動変更や相談文の自動送信も行いません。詳しい検査内容と対処方法は
+[インストールと初期設定](docs/installation.md)を参照してください。
 
-- Windows 11 x64（`0.0.2-alpha`の公式バイナリ対象）
-- Node.js 24 / pnpm 11
-- Rust stable / MSVC
-- PHITS 3.37（`PHITSPATH`から自動検出、または「設定 → PHITS実行環境」で指定）
-- Codex CLI 0.153.1以降（AI機能を使う場合）
+## 動作環境
 
-```powershell
-pnpm install
-$env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
-pnpm tauri:dev
-```
+- Windows 11 x64（`0.0.2-alpha`の配布対象）
+- PHITS実行環境（入力ファイルを実行する場合。`PHITSPATH`からの自動検出または設定画面で指定）
+- Codex CLI 0.153.1以降（AI支援を使う場合）
 
 PHITS本体、Codex CLI、認証情報、PHITS言語資産はアプリへ同梱しません。
 
-詳細は [MVP仕様](docs/mvp-specification.md)、[構成](ARCHITECTURE.md)、
-[ビルド手順](docs/building.md)、[生成AIを使ったカスタマイズ](docs/customizing-with-ai.md)、
-[安全境界](docs/safety-boundaries.md)を参照してください。アプリを利用する方は、まず
-[インストールと初期設定](docs/installation.md)を確認してください。
+## ソースから開発する場合
+
+ソースからのビルド、検証、配布物の生成については[ビルド手順](docs/building.md)と
+[リリース手順](docs/releasing.md)を参照してください。生成AIを使って用途に合わせて改造する
+場合は、[生成AIを使ったカスタマイズ](docs/customizing-with-ai.md)、
+[構成](ARCHITECTURE.md)、[安全境界](docs/safety-boundaries.md)も確認してください。
 
 ## ライセンスと引用
 
@@ -99,12 +89,6 @@ PHITS AI Editorは[Apache License 2.0](LICENSE)で公開します。著作権者
 [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt)です。
 名称・自作ロゴ・改変版の表示方針は[TRADEMARKS.md](TRADEMARKS.md)、脆弱性の
 非公開報告方法は[SECURITY.md](SECURITY.md)を参照してください。
-
-一般利用者向け文書は日本語版と英語版を用意し、各文書上部から切り替えられます。
-`LICENSE`、`NOTICE`、第三者ライセンス本文、自動生成一覧、`CITATION.cff`などの
-法的原文・機械可読ファイルは、意味や効力を変えないため翻訳対象外です。
-MVP設計書、公開監査記録、リリース担当者手順、試験証跡などの内部保守文書も、
-一般利用者向け文書とは区別し、作成時の言語を正本とします。
 
 引用は通常利用の条件ではありません。PHITS AI Editorが公開研究へ実質的に
 貢献した場合に限り、謝辞への記載または`CITATION.cff`を用いた任意の引用を
@@ -128,48 +112,28 @@ JAEA、PHITS開発チーム、OpenAIまたは著者の所属機関による開�
 
 実装済みの主な機能:
 
-- Monacoによる複数タブ編集、検索・置換、Undo/Redo、新規作成、保存、名前を付けて保存
-- Explorerの「プログラムから開く」や実行ファイルへのドラッグ＆ドロップで`.inp`/`.pht`を直接開き、親フォルダーをワークスペース、対象ファイルを実行対象として自動選択。二重起動は既存ウィンドウへ転送し、通常起動では前回のワークスペースと保存済みタブを復元
-- 表示メニューのチェック状態と同期したエクスプローラー／Codex／出力パネル切替、およびエクスプローラー・エディター・Codexの個別文字サイズ設定（12～28px、初期設定14px、直接入力／候補一覧／A↑・A↓、アプリ全体のユーザー既定値を保存可能）。縮小側のAは拡大側より小さく表示する。アプリケーションの背景と外枠はニュートラルなグレー系とし、PHITS構文強調や正常・警告・異常を示す意味色は維持する。上部メニュー、ツールバー、タブ、ファイル一覧など主要操作部の文字は`#000000`、行番号はグレー、PロゴとCodexの主要操作は青系アクセントで表示する
+- 複数タブでの編集、検索・置換、Undo／Redo、新規作成、保存、名前を付けて保存
+- Explorerの「プログラムから開く」やドラッグ＆ドロップによる`.inp`／`.pht`ファイルの直接起動、起動中のウィンドウへの受け渡し、および前回開いていたワークスペースとタブの復元
+- エクスプローラー／Codex／出力パネルの表示切替と、エクスプローラー・エディター・Codexの個別文字サイズおよびCodexパネル幅の調整・保存
 - UTF-8／BOM付きUTF-8／Windows-31Jと改行形式（CRLF／LF）の保持、一時ファイルを介した安全な上書き保存、直前1世代のバックアップ
-- 外部`phits-spec.json`による構文強調、補完、日英ホバー
+- PHITS入力の構文強調、入力補完、および対応する項目の説明表示
 - PHITSの通常実行と、エディタおよびCodexを終了して計算用リソースを確保する計算優先実行
-- ANGEL、DCHAIN、PHIG-3Dの固定公式経路からの起動
-- Codex App Server 0.153.1を最低基準とする遅延起動、起動時Schema互換性プローブ、会話・スレッド・ファイル編集・承認の機能別可否表示と安全な縮退、タイトル付きスレッドの再開・名前変更・恒久削除、モデル選択、Markdown会話表示、安全なHTTP/HTTPSリンク
-- 現在のファイル・選択・未保存状態を128 KiB上限で渡すEditor Context、3つの承認モード、セッション許可、中央Monacoの全文差分レビュー（インライン／左右比較、変更箇所移動、変更後の「変更を保持／元に戻す」）、ターン単位チェックポイント、Codex変更後の再読込と競合保護。診断Contextの型は将来互換用に保持するが、実診断がない空の「診断」チップは表示・送信しない
-- Codexパネルはウィンドウ幅の1/3を既定とし、ドラッグで最小360pxから最大1/2まで変更可能。幅は比率でアプリ全体へ保存し、仕切りのダブルクリックで1/3へ戻せる
-- 「現在のファイル」への編集依頼をApp Server組み込み`fileChange`へ明示的に誘導し、チャットへ差分を書くだけでは編集完了としないAgent指示
-- Codexのストリーミング応答を最新位置まで自動追従し、過去ログを読むためにスクロールした場合だけ追従を一時停止する会話表示
-- 複数の`.inp`/`.pht`が同じワークスペースにあっても、Editorで選択した1件だけを実行対象とする方式。前回本番実行の保守的な状態復元と、状態不明時の重複実行防止
+- 複数の入力ファイルがある場合でも、選択した1件だけを実行する安全な実行対象管理と重複実行の防止
+- ANGEL、DCHAIN、PHIG-3Dとの連携
+- Codexとの会話、スレッドの再開・名前変更・削除、モデル選択、および利用可能な機能の互換性表示
+- 現在のファイル・選択範囲・未保存内容をCodexへ渡す編集支援と、操作内容に応じた承認設定
+- Codexによる変更の全文差分表示、変更箇所間の移動、インライン／左右比較表示、変更の保持・復元
+- Codexによる変更後の再読み込み、競合防止、およびUndo／Redo
 
-署名なしNSISインストーラーは次のコマンドで生成します。
+## 制限事項と確認状況
 
-```powershell
-pnpm tauri build --bundles nsis
-```
+配布物はコード署名されていないため、インストール時にWindows SmartScreenの警告が
+表示される場合があります。
 
-個人利用alpha版はコード署名を行わないため、インストール時にWindows SmartScreenの警告が表示される場合があります。PHITS、Codex、言語資産、認証情報はインストーラーへ含まれません。
-
-## 検証
-
-```powershell
-pnpm test
-pnpm docs:check
-pnpm test:licenses
-pnpm licenses:generate
-pnpm licenses:audit
-pnpm test:codex-schema
-pnpm build
-cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
-cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
-cargo test --manifest-path src-tauri/Cargo.toml --all-targets
-node scripts/app-server-edit-smoke.mjs (Get-Command codex).Source .integration
-```
-
-`.github/workflows/codex-cli-compatibility.yml`は毎週、最新版Codex CLIからApp Server Schemaを生成し、Editorが利用する4機能の契約を検査します。通常のCLI更新だけではEditorを再配布せず、この検査が失敗した場合にだけ互換対応を判断します。
-
-現在のWindows 11 x64開発PCでは、実App Server承認試験、PHITS／補助ツール実行、公式ラッパーとの5回比較ベンチマークを含むalpha版受入を完了しています。さらに、別のWindows 11 x64端末で、インストーラーによる導入、右クリックの「プログラムから開く」による`.inp`直接起動、編集内容の上書き保存、アンインストールを確認しました。同端末ではCodex接続、開いた`.inp`への編集、差分表示と採用、Ctrl+Zによる復元、および「直前のCodex変更を確認」も動作確認済みです。PHIG-3D連携は開発PCで確認済みですが、別端末ではPHIG-3D自体を起動できなかったため、その端末での連携結果は未判定です。Ubuntu対応とLinux配布物の生成・受入は初回alphaの公開条件には含めず、将来の移植作業として扱います。詳細は [Windows alpha試験報告](docs/windows-alpha-test-report.md) を参照してください。
+Windows 11 x64の開発環境および別端末で、インストール、ファイル編集・実行、Codex編集支援、
+差分確認、Undo／Redo、アンインストールを確認しています。PHIG-3D連携は開発環境のみで
+確認済みです。詳細は[Windows alpha試験報告](docs/windows-alpha-test-report.md)を参照してください。
+Ubuntu対応とLinux配布物は今後の移植候補であり、現在は提供していません。
 
 現在のalpha版の概要は[リリースノート](docs/release-notes-v0.0.2-alpha.md)、
-制限事項は[既知の問題](docs/known-issues-v0.0.2-alpha.md)、配布物を作る手順は
-[リリース手順](docs/releasing.md)を参照してください。
+制限事項は[既知の問題](docs/known-issues-v0.0.2-alpha.md)を参照してください。

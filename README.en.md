@@ -2,8 +2,8 @@
 
 [日本語](README.md) | English
 
-A Tauri desktop application that combines PHITS-Pad-style editing and
-execution with AI assistance through Codex App Server.
+A Windows editor that combines PHITS-Pad-style editing and execution with
+Codex-assisted input editing in one interface.
 
 ## Download for Windows
 
@@ -58,43 +58,34 @@ and safety notes. After installing and signing in to Codex CLI, ask Codex:
 
 Confirm that the setup finishes with
 `Setup AI agent environment to PHITS is successfully finished.` before
-connecting from PHITS AI Editor. The setup registers a pointer to the PHITS
-reference policy in Codex's `AGENTS.md`. Starting with `0.0.2-alpha`, the editor
-performs a static check when a workspace opens. Relative to the PHITS root resolved
-by **PHITS runtime** settings, it separately reports the PHITS AI resource, the
-effective `AGENTS.md` or `AGENTS.override.md` at the PHITS root, Codex global
-home, and current workspace, plus consistency with the current PHITS root. Both
-official variable forms such as `<PHITSPATH>` and absolute paths are accepted.
-This check does not prove that App Server loaded an instruction file, change
-the user's files, or block Codex connection and chat. For a problem result, the
-user can review and edit a generated troubleshooting prompt, insert it into the
-in-editor Codex composer, or copy it. If the Editor cannot connect to Codex, the
-prompt can be pasted into a local Codex task in ChatGPT desktop; a Cloud task may
-not be able to inspect files on the PC. Prompts are never sent automatically and
-configuration is never repaired automatically.
+connecting from PHITS AI Editor.
 
-## Development environment
+Using the configured PHITS root, the editor checks the PHITS AI setup and the
+`AGENTS.md` or `AGENTS.override.md` files used by Codex. If it finds a problem,
+you can expand **Files checked and reasons** and generate or copy an **AI
+troubleshooting prompt** containing the diagnostic result. If the editor cannot
+connect to Codex, paste that prompt into a local Codex task in ChatGPT desktop.
+The check does not block Codex connection or chat, modify configuration files,
+or send the prompt automatically. See [installation and first-run setup](docs/installation.en.md)
+for the detailed checks and troubleshooting steps.
 
-- Windows 11 x64 (official binary target for `0.0.2-alpha`)
-- Node.js 24 / pnpm 11
-- Rust stable / MSVC
-- PHITS 3.37 (automatically detected from `PHITSPATH`, or selected under
-  **Settings → PHITS runtime**)
-- Codex CLI 0.153.1 or later (only when using AI features)
+## System requirements
 
-```powershell
-pnpm install
-$env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
-pnpm tauri:dev
-```
+- Windows 11 x64 (distribution target for `0.0.2-alpha`)
+- A PHITS runtime environment when running input files (automatically detected
+  from `PHITSPATH` or selected in Settings)
+- Codex CLI 0.153.1 or later when using AI assistance
 
 PHITS, Codex CLI, credentials, and PHITS language assets are not included.
 
-See the [MVP specification](docs/mvp-specification.md),
-[architecture](ARCHITECTURE.en.md), [build instructions](docs/building.en.md),
-[AI customization guide](docs/customizing-with-ai.en.md), and
-[safety boundaries](docs/safety-boundaries.en.md). Application users should
-start with [installation and first-run setup](docs/installation.en.md).
+## Developing from source
+
+See the [build instructions](docs/building.en.md) and
+[release procedure](docs/releasing.md) for source builds, verification, and
+distribution packaging. Before adapting the editor with generative AI, also
+review the [AI customization guide](docs/customizing-with-ai.en.md),
+[architecture](ARCHITECTURE.en.md), and
+[safety boundaries](docs/safety-boundaries.en.md).
 
 ## License and citation
 
@@ -107,15 +98,6 @@ are in [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt). See
 [TRADEMARKS.md](TRADEMARKS.en.md) for name, original-logo, and modified-build
 display policies, and [SECURITY.md](SECURITY.en.md) for private vulnerability
 reporting.
-
-General user documentation is provided in Japanese and English, with a language
-switch at the top of each document. Legal originals and machine-readable files,
-including `LICENSE`, `NOTICE`, third-party license texts, generated inventories,
-and `CITATION.cff`, are not translated so that their meaning and effect are not
-altered.
-Internal maintainer records—such as the MVP design specification, publication
-audit, release-maintainer procedure, and test evidence—are distinct from user
-documentation and retain their source language as the authoritative version.
 
 Citation is not a condition of ordinary use. If PHITS AI Editor makes a
 substantial contribution to published research, an optional acknowledgment or
@@ -143,82 +125,39 @@ affiliated institution.
 
 Implemented features include:
 
-- Monaco multi-tab editing, search and replace, Undo/Redo, new file, save, and
-  Save As
-- direct `.inp`/`.pht` opening from Explorer or drag-and-drop onto the
-  executable; the parent folder becomes the workspace and the file becomes the
-  selected run target; second launches are forwarded to the existing window,
-  while normal startup restores the previous workspace and saved tabs
-- View-menu toggles for Explorer, Codex, and Output panels; individual 12–28 px
-  font settings for Explorer, Editor, and Codex, with application-wide saved
-  defaults
-- preservation of UTF-8, UTF-8 BOM, Windows-31J, CRLF, and LF; atomic saving
-  and a one-generation backup
-- syntax highlighting, completion, and Japanese/English hover documentation
-  from external redistributable `phits-spec.json`
-- normal PHITS execution through the official wrapper and a
-  calculation-priority mode that closes Editor/Codex processes
-- ANGEL, DCHAIN, and PHIG-3D launching through fixed official paths
-- lazy Codex App Server startup with a 0.153.1 minimum schema baseline,
-  per-feature compatibility display and safe degradation, named thread resume,
-  rename and permanent delete, model selection, Markdown conversation display,
-  and safe HTTP/HTTPS links
-- bounded 128 KiB Editor Context for the current file, selection, and unsaved
-  state; three approval modes, session approvals, full Monaco diff review,
-  per-turn checkpoints, post-Codex reload, and conflict protection
-- a Codex panel that defaults to one third of the window and can be resized
-  between 360 px and one half of the window
-- explicit instructions requiring App Server `fileChange` events for edits;
-  a patch shown only in chat is not treated as an applied edit
-- automatic conversation scrolling unless the user scrolls back to read older
-  content
-- explicit selection of exactly one `.inp`/`.pht` run target even when the
-  workspace contains several, plus conservative production-run recovery and
-  duplicate-run prevention when state is uncertain
+- multi-tab editing, search and replace, Undo/Redo, new file, Save, and Save As
+- direct `.inp`/`.pht` opening from Explorer or drag-and-drop, forwarding to an
+  already-open window, and restoration of the previous workspace and tabs
+- show/hide controls for Explorer, Codex, and Output panels, with saved font
+  sizes and Codex panel width
+- preservation of UTF-8, UTF-8 BOM, Windows-31J, CRLF, and LF; safe replacement
+  of saved files and a backup of the previous version
+- PHITS syntax highlighting, completion, and descriptions for supported fields
+- normal PHITS execution and a calculation-priority mode that closes the editor
+  and Codex to free resources for the calculation
+- safe selection of exactly one run target and prevention of duplicate runs
+  when a workspace contains multiple input files
+- integration with ANGEL, DCHAIN, and PHIG-3D
+- Codex chat, thread resume/rename/delete, model selection, and compatibility
+  status for available features
+- Codex editing assistance using the current file, selection, and unsaved text,
+  with configurable approval behavior
+- full diff review of Codex changes, change navigation, inline/side-by-side
+  views, and controls to keep or revert changes
+- reload and conflict protection after Codex edits, with Undo/Redo support
 
-Generate the unsigned NSIS installer with:
+## Limitations and verification status
 
-```powershell
-pnpm tauri build --bundles nsis
-```
+The distribution is not code-signed, so Windows SmartScreen may show a warning
+during installation.
 
-The personal alpha release is not code-signed, so Windows SmartScreen may show
-a warning. PHITS, Codex, language assets, and credentials are not included.
+Installation, file editing and execution, Codex editing assistance, diff review,
+Undo/Redo, and uninstallation were tested on the Windows 11 x64 development
+environment and a separate PC. PHIG-3D integration was verified only on the
+development environment. See the
+[Windows alpha test report](docs/windows-alpha-test-report.md) for details.
+Ubuntu support and Linux packages are possible future ports and are not
+currently available.
 
-## Verification
-
-```powershell
-pnpm test
-pnpm docs:check
-pnpm test:licenses
-pnpm licenses:generate
-pnpm licenses:audit
-pnpm test:codex-schema
-pnpm build
-cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
-cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
-cargo test --manifest-path src-tauri/Cargo.toml --all-targets
-node scripts/app-server-edit-smoke.mjs (Get-Command codex).Source .integration
-```
-
-`.github/workflows/codex-cli-compatibility.yml` generates the App Server schema
-from the latest Codex CLI each week and checks the four contracts used by the
-editor. An ordinary CLI update does not require a new editor release; a failed
-check triggers a compatibility review.
-
-Acceptance on the Windows 11 x64 development PC includes real App Server
-approvals, PHITS and utility execution, and a five-run comparison with the
-official wrapper. A separate Windows 11 x64 PC was also used to verify
-installation, opening an `.inp` file through **Open with**, overwriting edited
-content, and uninstallation. On that PC, Codex connected successfully, edited
-the opened `.inp` file, displayed and accepted its diff, reverted the change
-with Ctrl+Z, and reopened the latest Codex change from the Edit menu. PHIG-3D
-integration is verified on the development PC; the result on the separate PC
-is inconclusive because PHIG-3D itself could not start there. Ubuntu support
-and Linux packages are future portability work and are not release
-requirements for the first alpha. See the
-[Windows alpha test report](docs/windows-alpha-test-report.md).
-
-See the [release notes](docs/release-notes-v0.0.2-alpha.en.md),
-[known issues](docs/known-issues-v0.0.2-alpha.en.md), and
-[release procedure](docs/releasing.md).
+See the [release notes](docs/release-notes-v0.0.2-alpha.en.md) and
+[known issues](docs/known-issues-v0.0.2-alpha.en.md).
