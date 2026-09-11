@@ -7,5 +7,5 @@ authors:
     given-names: "Yohei"
     alias: "y-ozawa039"
     orcid: "https://orcid.org/0009-0004-7814-2778"
-version: "0.0.1-alpha"
+version: "0.0.2-alpha"
 license: "Apache-2.0"
