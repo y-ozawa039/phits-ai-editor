@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { ApprovalDecision, ApprovalMode, ApprovalRequest, CodexChangeGroupV1, CodexChangeHistoryEntryV1, CodexCompatibilityReport, CodexConnectResult, CodexHistoryChangeInput, CodexHistoryPreview, DocumentData, EditorContextV1, PhitsAppSettings, RuntimeDiagnostics, StartupOpenRequest, UtilityKind, WorkspaceInfo } from "./types";
+import type { ApprovalDecision, ApprovalMode, ApprovalRequest, CodexChangeGroupV1, CodexChangeHistoryEntryV1, CodexCompatibilityReport, CodexConnectResult, CodexHistoryChangeInput, CodexHistoryPreview, DocumentData, EditorContextV1, PhitsAgentSetupStatus, PhitsAppSettings, RuntimeDiagnostics, StartupOpenRequest, UtilityKind, WorkspaceInfo } from "./types";
 
 export const api = {
   openWorkspace: (path: string, restoreRunState = true, preferredInput?: string) => invoke<WorkspaceInfo>("workspace_open", { path, restoreRunState, preferredInput }),
@@ -17,6 +17,7 @@ export const api = {
   runProduction: (workspaceRoot: string, inputRelativePath?: string, overrideUnresolved = false) => invoke("run_phits_production", { workspaceRoot, inputRelativePath, overrideUnresolved }),
   stopGracefully: (workspaceRoot: string, inputRelativePath?: string) => invoke("run_phits_stop_graceful", { workspaceRoot, inputRelativePath }),
   runUtility: (workspaceRoot: string, kind: UtilityKind, relativePath: string) => invoke("run_utility", { workspaceRoot, kind, relativePath }),
+  inspectPhitsAgentSetup: (workspaceRoot: string) => invoke<PhitsAgentSetupStatus>("phits_agent_setup_inspect", { workspaceRoot }),
   codexConnect: (workspaceRoot: string) => invoke<CodexConnectResult>("codex_connect", { workspaceRoot }),
   codexDisconnect: () => invoke("codex_disconnect"),
   codexThreadStart: (workspaceRoot: string, model?: string, reasoningEffort?: string) => invoke<string>("codex_thread_start", { workspaceRoot, model, reasoningEffort }),

@@ -9,11 +9,11 @@ PHITS-Pad相当の編集・実行機能と、Codex App ServerによるAI支援�
 初回alpha版はWindows 11 x64専用です。
 
 - **通常利用（推奨）:**
-  [インストーラー版をダウンロード](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.1-alpha/PHITS-AI-Editor-v0.0.1-alpha-windows-x64-setup.exe)
+  [インストーラー版をダウンロード](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.2-alpha/PHITS-AI-Editor-v0.0.2-alpha-windows-x64-setup.exe)
 - **試用・持ち運び・複数版の比較:**
-  [ポータブル版をダウンロード](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.1-alpha/PHITS-AI-Editor-v0.0.1-alpha-windows-x64-portable.zip)
+  [ポータブル版をダウンロード](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.2-alpha/PHITS-AI-Editor-v0.0.2-alpha-windows-x64-portable.zip)
 - **ダウンロード後の確認:**
-  [SHA-256一覧](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.1-alpha/SHA256SUMS.txt)
+  [SHA-256一覧](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.2-alpha/SHA256SUMS.txt)
 
 | 目的 | 選ぶファイル | 選択理由 |
 |---|---|---|
@@ -56,12 +56,21 @@ Codex CLIへ次のように依頼してください。
 セットアップが完了し、`Setup AI agent environment to PHITS is successfully finished.`
 と表示されたことを確認してから、PHITS AI EditorでCodexへ接続してください。
 この処理はCodexの`AGENTS.md`へPHITS参照ポリシーの入口を登録します。
-Editorは初回接続時にこの設定を検査し、見つからない場合はCodexパネルに
-公式セットアップの案内を表示します。
+Editorはワークスペースを開いた時点で設定を静的検査します。`0.0.2-alpha`以降は、設定画面の
+「PHITS実行環境」で解決したルートを基準として、PHITS側のAI設定資源、PHITSルート、
+Codexグローバル、現在のワークスペースにある有効な`AGENTS.md`または
+`AGENTS.override.md`、および参照先ルートの整合性を分けて確認します。
+公式の`<PHITSPATH>`などの変数表記と絶対パスのどちらも認識します。この検査は
+App Serverが実際に指示を読み込んだことを証明するものではなく、設定ファイルを
+自動変更したり、Codexへの接続・会話を妨げたりもしません。問題がある場合は、検査結果から
+生成した相談文を確認・編集し、Editor内のCodex入力欄へ挿入またはコピーできます。
+EditorがCodexへ接続できない場合は、コピーした文章をChatGPTデスクトップ版のローカル
+Codexタスクへ貼り付けて調査できます。CloudタスクはPC内ファイルへアクセスできない場合が
+あります。相談文の自動送信と設定ファイルの自動修正は行いません。
 
 ## 開発環境
 
-- Windows 11 x64（`0.0.1-alpha`の公式バイナリ対象）
+- Windows 11 x64（`0.0.2-alpha`の公式バイナリ対象）
 - Node.js 24 / pnpm 11
 - Rust stable / MSVC
 - PHITS 3.37（`PHITSPATH`から自動検出、または「設定 → PHITS実行環境」で指定）
@@ -115,7 +124,7 @@ IssueおよびPull Requestの方針は[CONTRIBUTING.md](CONTRIBUTING.md)を参�
 JAEA、PHITS開発チーム、OpenAIまたは著者の所属機関による開発・承認・後援・
 保証を受けた公式製品ではありません。
 
-## Windows alpha版（0.0.1-alpha）
+## Windows alpha版（0.0.2-alpha）
 
 実装済みの主な機能:
 
@@ -161,6 +170,6 @@ node scripts/app-server-edit-smoke.mjs (Get-Command codex).Source .integration
 
 現在のWindows 11 x64開発PCでは、実App Server承認試験、PHITS／補助ツール実行、公式ラッパーとの5回比較ベンチマークを含むalpha版受入を完了しています。さらに、別のWindows 11 x64端末で、インストーラーによる導入、右クリックの「プログラムから開く」による`.inp`直接起動、編集内容の上書き保存、アンインストールを確認しました。同端末ではCodex接続、開いた`.inp`への編集、差分表示と採用、Ctrl+Zによる復元、および「直前のCodex変更を確認」も動作確認済みです。PHIG-3D連携は開発PCで確認済みですが、別端末ではPHIG-3D自体を起動できなかったため、その端末での連携結果は未判定です。Ubuntu対応とLinux配布物の生成・受入は初回alphaの公開条件には含めず、将来の移植作業として扱います。詳細は [Windows alpha試験報告](docs/windows-alpha-test-report.md) を参照してください。
 
-初回alpha候補の概要は[リリースノート](docs/release-notes-v0.0.1-alpha.md)、
-制限事項は[既知の問題](docs/known-issues-v0.0.1-alpha.md)、配布物を作る手順は
+現在のalpha版の概要は[リリースノート](docs/release-notes-v0.0.2-alpha.md)、
+制限事項は[既知の問題](docs/known-issues-v0.0.2-alpha.md)、配布物を作る手順は
 [リリース手順](docs/releasing.md)を参照してください。

@@ -2,7 +2,7 @@
 
 [日本語](installation.md) | English
 
-This guide covers the `0.0.1-alpha` distribution for Windows 11 x64. PHITS AI
+This guide covers the `0.0.2-alpha` distribution for Windows 11 x64. PHITS AI
 Editor is an independently developed alpha application. Back up important
 input files before use.
 
@@ -10,8 +10,8 @@ input files before use.
 
 | Artifact | Recommended for | Windows integration |
 | --- | --- | --- |
-| `PHITS-AI-Editor-v0.0.1-alpha-windows-x64-setup.exe` | Normal use | Yes |
-| `PHITS-AI-Editor-v0.0.1-alpha-windows-x64-portable.zip` | Evaluation, side-by-side versions, development, and investigation | No |
+| `PHITS-AI-Editor-v0.0.2-alpha-windows-x64-setup.exe` | Normal use | Yes |
+| `PHITS-AI-Editor-v0.0.2-alpha-windows-x64-portable.zip` | Evaluation, side-by-side versions, development, and investigation | No |
 
 We recommend the installer for normal use. GitHub's automatically generated
 `Source code (zip)` is not the portable Windows application. Although a bare
@@ -85,6 +85,19 @@ At startup, the editor checks App Server compatibility and reports availability
 for conversations, threads, file editing, and approvals. PHITS editing and
 execution remain available without Codex.
 
+When a workspace opens, the editor performs a static check relative to the PHITS
+root resolved by the settings screen. It separately checks the PHITS AI
+resource, the effective `AGENTS.md` or `AGENTS.override.md` at the PHITS root,
+Codex global home, and current workspace, and consistency of the referenced
+root. For partial, mismatched, missing, or unreadable results, expand **Files
+checked and reasons** in the Codex panel. This does not guarantee that App
+Server actually loaded an instruction file. Codex connection and chat remain
+available for every result, and the editor never modifies these files. For a
+problem result, review and edit the generated troubleshooting prompt, then
+insert it into the in-editor Codex composer or copy it. If Codex cannot connect,
+open a local Codex task in ChatGPT desktop on this PC and paste the prompt there.
+A Cloud task may be unable to inspect local files.
+
 ## 6. Open `.inp` and `.pht` files directly
 
 With the installer edition, double-click a file in Explorer or select PHITS AI
@@ -99,7 +112,7 @@ With the portable edition, you can:
 
 ## 7. SmartScreen warning
 
-`0.0.1-alpha` is not code-signed, so Windows SmartScreen may show a warning.
+`0.0.2-alpha` is not code-signed, so Windows SmartScreen may show a warning.
 Do not run a file obtained outside the official GitHub Release or a file whose
 SHA-256 does not match. Continue only after verifying the source and hash and
 reading the warning yourself.
@@ -107,7 +120,7 @@ reading the warning yourself.
 Use PowerShell to verify an artifact:
 
 ```powershell
-Get-FileHash .\PHITS-AI-Editor-v0.0.1-alpha-windows-x64-setup.exe -Algorithm SHA256
+Get-FileHash .\PHITS-AI-Editor-v0.0.2-alpha-windows-x64-setup.exe -Algorithm SHA256
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -138,7 +151,7 @@ release.
 
 ## 10. Before reporting a problem
 
-- Review the [known issues](known-issues-v0.0.1-alpha.en.md).
+- Review the [known issues](known-issues-v0.0.2-alpha.en.md).
 - Record the application version, Windows version, reproduction steps,
   expected result, and actual result.
 - Do not post credentials, personal information, unpublished research data, or

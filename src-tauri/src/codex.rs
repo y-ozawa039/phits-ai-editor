@@ -30,7 +30,8 @@ use crate::{
     },
     contracts::{
         ApprovalMode, CodexCompatibilityReport, CodexConnectResult, CodexFeatureId,
-        CodexFeatureState, CodexModel, CodexThreadLink, EditorContextV1, PhitsAgentSetupStatus,
+        CodexFeatureState, CodexModel, CodexThreadLink, EditorContextV1, PhitsAgentSetupCheck,
+        PhitsAgentSetupState, PhitsAgentSetupStatus,
     },
     diagnostics::{codex_compatibility_probe, resolve_codex_executable, resolve_phits_root},
     error::{AppError, AppResult},
@@ -1063,17 +1064,29 @@ fn parse_models(result: &Value) -> Vec<CodexModel> {
         .collect()
 }
 
+fn codex_home_path_from(
+    configured_codex_home: Option<PathBuf>,
+    user_home: Option<PathBuf>,
+) -> Option<PathBuf> {
+    configured_codex_home.or_else(|| user_home.map(|value| value.join(".codex")))
+}
+
 fn codex_home_path() -> Option<PathBuf> {
-    std::env::var_os("CODEX_HOME")
+    #[cfg(debug_assertions)]
+    if let Some(preview_home) = std::env::var_os("PHITS_AI_EDITOR_TEST_CODEX_HOME")
         .filter(|value| !value.is_empty())
         .map(PathBuf::from)
-        .or_else(|| {
-            #[cfg(windows)]
-            let home = std::env::var_os("USERPROFILE");
-            #[cfg(not(windows))]
-            let home = std::env::var_os("HOME");
-            home.map(|value| PathBuf::from(value).join(".codex"))
-        })
+    {
+        return Some(preview_home);
+    }
+    let configured_codex_home = std::env::var_os("CODEX_HOME")
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from);
+    #[cfg(windows)]
+    let user_home = std::env::var_os("USERPROFILE").map(PathBuf::from);
+    #[cfg(not(windows))]
+    let user_home = std::env::var_os("HOME").map(PathBuf::from);
+    codex_home_path_from(configured_codex_home, user_home)
 }
 
 fn active_agents_file(directory: &Path) -> Option<PathBuf> {
@@ -1089,16 +1102,136 @@ fn active_agents_file(directory: &Path) -> Option<PathBuf> {
     agents_path.is_file().then_some(agents_path)
 }
 
-fn instruction_points_to_policy(path: &Path, policy_path: &Path) -> bool {
-    let Ok(content) = std::fs::read_to_string(path) else {
-        return false;
+const PHITS_POLICY_RELATIVE_PATH: &str = "workbench/ai/reference_policy.md";
+
+fn normalized_path_text(value: &str) -> String {
+    value.replace('\\', "/").to_lowercase()
+}
+
+fn paths_refer_to_same_file(left: &Path, right: &Path) -> bool {
+    match (dunce::canonicalize(left), dunce::canonicalize(right)) {
+        (Ok(left), Ok(right)) => {
+            normalized_path_text(&left.to_string_lossy())
+                == normalized_path_text(&right.to_string_lossy())
+        }
+        _ => {
+            normalized_path_text(&left.to_string_lossy())
+                == normalized_path_text(&right.to_string_lossy())
+        }
+    }
+}
+
+fn absolute_policy_references(content: &str) -> Vec<PathBuf> {
+    static WINDOWS_POLICY_PATH: OnceLock<regex::Regex> = OnceLock::new();
+    static UNIX_POLICY_PATH: OnceLock<regex::Regex> = OnceLock::new();
+    let windows = WINDOWS_POLICY_PATH.get_or_init(|| {
+        regex::Regex::new(
+            r#"(?i)([a-z]:[\\/][^`\"'<>|\r\n]*?workbench[\\/]ai[\\/]reference_policy\.md)"#,
+        )
+        .expect("valid Windows PHITS policy regex")
+    });
+    let unix = UNIX_POLICY_PATH.get_or_init(|| {
+        regex::Regex::new(r#"(?i)(/[^`\"'<>|\r\n]*?workbench[\\/]ai[\\/]reference_policy\.md)"#)
+            .expect("valid Unix PHITS policy regex")
+    });
+    windows
+        .captures_iter(content)
+        .chain(unix.captures_iter(content))
+        .filter_map(|capture| capture.get(1))
+        .map(|value| PathBuf::from(value.as_str().trim()))
+        .collect()
+}
+
+fn instruction_reference_state(path: &Path, policy_path: &Path) -> (PhitsAgentSetupState, String) {
+    let content = match std::fs::read_to_string(path) {
+        Ok(content) => content,
+        Err(error) => {
+            return (
+                PhitsAgentSetupState::Unreadable,
+                format!("有効な指示ファイルを読み取れません: {error}"),
+            );
+        }
     };
-    let normalized_content = content.replace('\\', "/").to_lowercase();
-    let normalized_policy = policy_path
-        .to_string_lossy()
-        .replace('\\', "/")
-        .to_lowercase();
-    normalized_content.contains(&normalized_policy)
+    let normalized_content = normalized_path_text(&content);
+    let normalized_policy = normalized_path_text(&policy_path.to_string_lossy());
+    let variable_references = [
+        format!("<phitspath>/{PHITS_POLICY_RELATIVE_PATH}"),
+        format!("%phitspath%/{PHITS_POLICY_RELATIVE_PATH}"),
+        format!("$phitspath/{PHITS_POLICY_RELATIVE_PATH}"),
+        format!("${{phitspath}}/{PHITS_POLICY_RELATIVE_PATH}"),
+    ];
+
+    if normalized_content.contains(&normalized_policy)
+        || variable_references
+            .iter()
+            .any(|reference| normalized_content.contains(reference))
+        || absolute_policy_references(&content)
+            .iter()
+            .any(|reference| paths_refer_to_same_file(reference, policy_path))
+    {
+        return (
+            PhitsAgentSetupState::Confirmed,
+            "現在のPHITSルートに対応する参照を確認しました。".into(),
+        );
+    }
+
+    if normalized_content.contains(PHITS_POLICY_RELATIVE_PATH)
+        || absolute_policy_references(&content)
+            .iter()
+            .any(|reference| {
+                normalized_path_text(&reference.to_string_lossy())
+                    .ends_with(PHITS_POLICY_RELATIVE_PATH)
+            })
+    {
+        return (
+            PhitsAgentSetupState::Mismatch,
+            "PHITSポリシーへの参照はありますが、現在のPHITSルートと一致しません。".into(),
+        );
+    }
+
+    (
+        PhitsAgentSetupState::Missing,
+        "有効な指示ファイルにPHITSポリシーへの参照がありません。".into(),
+    )
+}
+
+fn setup_check(
+    id: &str,
+    state: PhitsAgentSetupState,
+    path: Option<&Path>,
+    message: impl Into<String>,
+) -> PhitsAgentSetupCheck {
+    PhitsAgentSetupCheck {
+        id: id.into(),
+        state,
+        path: path.map(|value| value.to_string_lossy().into_owned()),
+        message: message.into(),
+    }
+}
+
+fn inspect_agents_directory(
+    id: &str,
+    directory: Option<&Path>,
+    policy_path: &Path,
+) -> PhitsAgentSetupCheck {
+    let Some(directory) = directory else {
+        return setup_check(
+            id,
+            PhitsAgentSetupState::Missing,
+            None,
+            "検査対象のディレクトリを特定できません。",
+        );
+    };
+    let Some(path) = active_agents_file(directory) else {
+        return setup_check(
+            id,
+            PhitsAgentSetupState::Missing,
+            Some(&directory.join("AGENTS.md")),
+            "有効なAGENTS.mdまたはAGENTS.override.mdがありません。",
+        );
+    };
+    let (state, message) = instruction_reference_state(&path, policy_path);
+    setup_check(id, state, Some(&path), message)
 }
 
 fn inspect_phits_agent_setup_paths(
@@ -1109,58 +1242,133 @@ fn inspect_phits_agent_setup_paths(
     let Some(phits_root) = phits_root else {
         return PhitsAgentSetupStatus {
             configured: false,
+            state: PhitsAgentSetupState::Missing,
             source_path: None,
             message: "PHITSインストール先を検出できないため、PHITS用Codex設定を確認できません。先に設定の「PHITS実行環境」でインストール先を指定してください。".into(),
+            checks: vec![
+                setup_check("resource", PhitsAgentSetupState::Missing, None, "PHITSルートを特定できません。"),
+                setup_check("phitsRoot", PhitsAgentSetupState::Missing, None, "PHITSルートを特定できません。"),
+                inspect_agents_directory("codexGlobal", codex_home, Path::new("reference_policy.md")),
+                setup_check("workspace", PhitsAgentSetupState::Missing, Some(&workspace_root.join("AGENTS.md")), "PHITSルートを特定できないため参照を照合できません。"),
+                setup_check("rootConsistency", PhitsAgentSetupState::Missing, None, "PHITSルートを特定できません。"),
+            ],
         };
     };
     let policy_path = phits_root.join("workbench/AI/reference_policy.md");
-    if !policy_path.is_file() {
-        return PhitsAgentSetupStatus {
-            configured: false,
-            source_path: None,
-            message: format!(
-                "PHITS公式のAI参照ポリシーが見つかりません: {}",
-                policy_path.display()
-            ),
-        };
-    }
-
-    let mut candidates = Vec::new();
-    if let Some(codex_home) = codex_home
-        && let Some(path) = active_agents_file(codex_home)
-    {
-        candidates.push(path);
-    }
-    if let Some(path) = active_agents_file(workspace_root) {
-        candidates.push(path);
-    }
-    if workspace_root.starts_with(phits_root)
-        && workspace_root != phits_root
-        && let Some(path) = active_agents_file(phits_root)
-    {
-        candidates.push(path);
-    }
-    candidates.sort();
-    candidates.dedup();
-
-    if let Some(source) = candidates
+    let resource = if policy_path.is_file() {
+        setup_check(
+            "resource",
+            PhitsAgentSetupState::Confirmed,
+            Some(&policy_path),
+            "PHITS側のAI設定資源を確認しました。",
+        )
+    } else {
+        setup_check(
+            "resource",
+            PhitsAgentSetupState::Missing,
+            Some(&policy_path),
+            "PHITS公式のAI参照ポリシーが見つかりません。",
+        )
+    };
+    let phits_root_check = inspect_agents_directory("phitsRoot", Some(phits_root), &policy_path);
+    let codex_global_check = inspect_agents_directory("codexGlobal", codex_home, &policy_path);
+    let workspace_check = inspect_agents_directory("workspace", Some(workspace_root), &policy_path);
+    let workspace_uses_phits_root = paths_refer_to_same_file(workspace_root, phits_root)
+        || dunce::canonicalize(workspace_root)
+            .ok()
+            .zip(dunce::canonicalize(phits_root).ok())
+            .is_some_and(|(workspace, phits)| workspace.starts_with(phits));
+    let phits_root_is_effective =
+        workspace_uses_phits_root && phits_root_check.state == PhitsAgentSetupState::Confirmed;
+    let effective_checks = [&codex_global_check, &workspace_check];
+    let effective_confirmed = effective_checks
         .iter()
-        .find(|path| instruction_points_to_policy(path, &policy_path))
-    {
-        return PhitsAgentSetupStatus {
-            configured: true,
-            source_path: Some(source.to_string_lossy().into_owned()),
-            message: "PHITS用Codex設定を確認しました。".into(),
-        };
-    }
+        .any(|check| check.state == PhitsAgentSetupState::Confirmed)
+        || phits_root_is_effective;
+    let all_instruction_checks = [&phits_root_check, &codex_global_check, &workspace_check];
+    let any_confirmed = all_instruction_checks
+        .iter()
+        .any(|check| check.state == PhitsAgentSetupState::Confirmed);
+    let any_mismatch = all_instruction_checks
+        .iter()
+        .any(|check| check.state == PhitsAgentSetupState::Mismatch);
+    let any_unreadable = all_instruction_checks
+        .iter()
+        .any(|check| check.state == PhitsAgentSetupState::Unreadable);
+    let root_consistency = if any_confirmed {
+        setup_check(
+            "rootConsistency",
+            PhitsAgentSetupState::Confirmed,
+            Some(phits_root),
+            "少なくとも1つの参照先が現在のPHITSルートと一致します。",
+        )
+    } else if any_mismatch {
+        setup_check(
+            "rootConsistency",
+            PhitsAgentSetupState::Mismatch,
+            Some(phits_root),
+            "検出した参照先が現在のPHITSルートと一致しません。",
+        )
+    } else if any_unreadable {
+        setup_check(
+            "rootConsistency",
+            PhitsAgentSetupState::Unreadable,
+            Some(phits_root),
+            "指示ファイルを読み取れないため参照先を照合できません。",
+        )
+    } else {
+        setup_check(
+            "rootConsistency",
+            PhitsAgentSetupState::Missing,
+            Some(phits_root),
+            "照合できるPHITSポリシー参照がありません。",
+        )
+    };
+
+    let resource_present = resource.state == PhitsAgentSetupState::Confirmed;
+    let state = if resource_present && effective_confirmed && !any_mismatch && !any_unreadable {
+        PhitsAgentSetupState::Confirmed
+    } else if !resource_present {
+        PhitsAgentSetupState::Missing
+    } else if !effective_confirmed && any_mismatch {
+        PhitsAgentSetupState::Mismatch
+    } else if !effective_confirmed && any_unreadable {
+        PhitsAgentSetupState::Unreadable
+    } else {
+        PhitsAgentSetupState::Partial
+    };
+    let message = match state {
+        PhitsAgentSetupState::Confirmed => {
+            "静的検査で、現在のPHITSルートに対応するCodex指示を確認しました。".into()
+        }
+        PhitsAgentSetupState::Partial => "PHITS側のAI設定は確認しましたが、Codexが現在のワークスペースで利用する指示までは確認できませんでした。接続と会話は引き続き利用できます。".into(),
+        PhitsAgentSetupState::Mismatch => "Codex指示が別のPHITSルートを参照している可能性があります。検査結果のパスを確認してください。接続と会話は引き続き利用できます。".into(),
+        PhitsAgentSetupState::Missing => format!("PHITS用Codex設定の一部が見つかりません。PHITS公式の {} にある案内を確認してください。接続と会話は引き続き利用できます。", phits_root.join("workbench/README-jp.docx").display()),
+        PhitsAgentSetupState::Unreadable => "Codex指示ファイルの一部を読み取れませんでした。検査結果のパスとアクセス権を確認してください。接続と会話は引き続き利用できます。".into(),
+    };
+    let source_path = if effective_confirmed {
+        effective_checks
+            .iter()
+            .copied()
+            .find(|check| check.state == PhitsAgentSetupState::Confirmed)
+            .or_else(|| phits_root_is_effective.then_some(&phits_root_check))
+            .and_then(|check| check.path.clone())
+    } else {
+        None
+    };
 
     PhitsAgentSetupStatus {
-        configured: false,
-        source_path: None,
-        message: format!(
-            "PHITS用Codex設定が見つかりません。PHITS公式の {} を確認し、Codexに workbench/execution_setup_for_agent.md に従ったセットアップを依頼してください。",
-            phits_root.join("workbench/README-jp.docx").display()
-        ),
+        configured: state == PhitsAgentSetupState::Confirmed,
+        state,
+        source_path,
+        message,
+        checks: vec![
+            resource,
+            phits_root_check,
+            codex_global_check,
+            workspace_check,
+            root_consistency,
+        ],
     }
 }
 
@@ -1178,6 +1386,15 @@ fn inspect_phits_agent_setup(app: &AppHandle, workspace_root: &Path) -> PhitsAge
         workspace_root,
         codex_home_path().as_deref(),
     )
+}
+
+#[tauri::command]
+pub fn phits_agent_setup_inspect(
+    app: AppHandle,
+    workspace_root: String,
+) -> AppResult<PhitsAgentSetupStatus> {
+    let workspace = canonical_workspace(&workspace_root)?;
+    Ok(inspect_phits_agent_setup(&app, &workspace))
 }
 
 async fn start_connection(
@@ -1819,6 +2036,20 @@ mod tests {
     }
 
     #[test]
+    fn custom_codex_home_precedes_the_default_user_dot_codex_directory() {
+        let configured = PathBuf::from("custom-codex-home");
+        let user_home = PathBuf::from("user-home");
+        assert_eq!(
+            codex_home_path_from(Some(configured.clone()), Some(user_home.clone())),
+            Some(configured)
+        );
+        assert_eq!(
+            codex_home_path_from(None, Some(user_home.clone())),
+            Some(user_home.join(".codex"))
+        );
+    }
+
+    #[test]
     fn a_nonempty_global_override_must_contain_the_phits_pointer() {
         let directory = tempfile::tempdir().unwrap();
         let phits_root = directory.path().join("phits");
@@ -1858,6 +2089,203 @@ mod tests {
 
         let status = inspect_phits_agent_setup_paths(Some(&phits_root), &workspace, None);
         assert!(status.configured);
+    }
+
+    #[test]
+    fn accepts_official_phitspath_placeholders_and_separator_variants() {
+        let directory = tempfile::tempdir().unwrap();
+        let phits_root = directory.path().join("arbitrary-phits-location");
+        let workspace = phits_root.join("user/project");
+        let policy = phits_root.join("workbench/AI/reference_policy.md");
+        std::fs::create_dir_all(policy.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(&workspace).unwrap();
+        std::fs::write(&policy, "policy").unwrap();
+
+        for reference in [
+            "<PHITSPATH>/workbench/AI/reference_policy.md",
+            "%PHITSPATH%\\workbench\\AI\\reference_policy.md",
+            "$PHITSPATH/workbench/AI/reference_policy.md",
+            "${PHITSPATH}\\WORKBENCH/ai\\REFERENCE_POLICY.MD",
+        ] {
+            std::fs::write(
+                phits_root.join("AGENTS.md"),
+                format!("Before PHITS work, read `{reference}`."),
+            )
+            .unwrap();
+            let status = inspect_phits_agent_setup_paths(Some(&phits_root), &workspace, None);
+            assert_eq!(status.state, PhitsAgentSetupState::Confirmed, "{reference}");
+        }
+    }
+
+    #[test]
+    fn canonicalizes_an_existing_absolute_policy_reference() {
+        let directory = tempfile::tempdir().unwrap();
+        let phits_root = directory.path().join("phits");
+        let workspace = directory.path().join("workspace");
+        let codex_home = directory.path().join("custom-codex-home");
+        let policy = phits_root.join("workbench/AI/reference_policy.md");
+        std::fs::create_dir_all(policy.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(phits_root.join("alias")).unwrap();
+        std::fs::create_dir_all(&workspace).unwrap();
+        std::fs::create_dir_all(&codex_home).unwrap();
+        std::fs::write(&policy, "policy").unwrap();
+        let aliased_policy = phits_root.join("alias/../workbench/AI/reference_policy.md");
+        std::fs::write(
+            codex_home.join("AGENTS.md"),
+            format!("Read `{}`.", aliased_policy.display()),
+        )
+        .unwrap();
+
+        let status =
+            inspect_phits_agent_setup_paths(Some(&phits_root), &workspace, Some(&codex_home));
+        assert_eq!(status.state, PhitsAgentSetupState::Confirmed);
+    }
+
+    #[test]
+    fn reports_a_reference_to_another_phits_root_as_mismatch() {
+        let directory = tempfile::tempdir().unwrap();
+        let phits_root = directory.path().join("phits-current");
+        let old_phits_root = directory.path().join("phits-old");
+        let workspace = directory.path().join("workspace");
+        let codex_home = directory.path().join("codex-home");
+        let policy = phits_root.join("workbench/AI/reference_policy.md");
+        let old_policy = old_phits_root.join("workbench/AI/reference_policy.md");
+        std::fs::create_dir_all(policy.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(old_policy.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(&workspace).unwrap();
+        std::fs::create_dir_all(&codex_home).unwrap();
+        std::fs::write(&policy, "current policy").unwrap();
+        std::fs::write(&old_policy, "old policy").unwrap();
+        std::fs::write(
+            codex_home.join("AGENTS.md"),
+            format!("Read `{}`.", old_policy.display()),
+        )
+        .unwrap();
+
+        let status =
+            inspect_phits_agent_setup_paths(Some(&phits_root), &workspace, Some(&codex_home));
+        assert_eq!(status.state, PhitsAgentSetupState::Mismatch);
+        assert!(!status.configured);
+        assert_eq!(
+            status
+                .checks
+                .iter()
+                .find(|check| check.id == "rootConsistency")
+                .unwrap()
+                .state,
+            PhitsAgentSetupState::Mismatch
+        );
+    }
+
+    #[test]
+    fn reports_root_only_setup_as_partial_for_an_external_workspace() {
+        let directory = tempfile::tempdir().unwrap();
+        let phits_root = directory.path().join("phits");
+        let workspace = directory.path().join("external-workspace");
+        let policy = phits_root.join("workbench/AI/reference_policy.md");
+        std::fs::create_dir_all(policy.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(&workspace).unwrap();
+        std::fs::write(&policy, "policy").unwrap();
+        std::fs::write(
+            phits_root.join("AGENTS.md"),
+            "Read <PHITSPATH>/workbench/AI/reference_policy.md.",
+        )
+        .unwrap();
+
+        let status = inspect_phits_agent_setup_paths(Some(&phits_root), &workspace, None);
+        assert_eq!(status.state, PhitsAgentSetupState::Partial);
+        assert!(!status.configured);
+    }
+
+    #[test]
+    fn a_nonempty_workspace_override_takes_precedence_over_agents_md() {
+        let directory = tempfile::tempdir().unwrap();
+        let phits_root = directory.path().join("phits");
+        let workspace = directory.path().join("workspace");
+        let policy = phits_root.join("workbench/AI/reference_policy.md");
+        std::fs::create_dir_all(policy.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(&workspace).unwrap();
+        std::fs::write(&policy, "policy").unwrap();
+        std::fs::write(
+            workspace.join("AGENTS.md"),
+            "Read <PHITSPATH>/workbench/AI/reference_policy.md.",
+        )
+        .unwrap();
+        std::fs::write(workspace.join("AGENTS.override.md"), "other instructions").unwrap();
+
+        let status = inspect_phits_agent_setup_paths(Some(&phits_root), &workspace, None);
+        assert_eq!(status.state, PhitsAgentSetupState::Partial);
+        assert_eq!(
+            status
+                .checks
+                .iter()
+                .find(|check| check.id == "workspace")
+                .unwrap()
+                .path
+                .as_deref()
+                .map(Path::new)
+                .and_then(Path::file_name)
+                .and_then(|name| name.to_str()),
+            Some("AGENTS.override.md")
+        );
+    }
+
+    #[test]
+    fn an_empty_override_falls_back_to_agents_md() {
+        let directory = tempfile::tempdir().unwrap();
+        let phits_root = directory.path().join("phits");
+        let workspace = directory.path().join("workspace");
+        let policy = phits_root.join("workbench/AI/reference_policy.md");
+        std::fs::create_dir_all(policy.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(&workspace).unwrap();
+        std::fs::write(&policy, "policy").unwrap();
+        std::fs::write(
+            workspace.join("AGENTS.md"),
+            "Read <PHITSPATH>/workbench/AI/reference_policy.md.",
+        )
+        .unwrap();
+        std::fs::write(workspace.join("AGENTS.override.md"), "  \r\n").unwrap();
+
+        let status = inspect_phits_agent_setup_paths(Some(&phits_root), &workspace, None);
+        assert_eq!(status.state, PhitsAgentSetupState::Confirmed);
+        assert!(status.source_path.unwrap().ends_with("AGENTS.md"));
+    }
+
+    #[test]
+    fn reports_missing_resources_and_instruction_directories() {
+        let directory = tempfile::tempdir().unwrap();
+        let phits_root = directory.path().join("phits-without-ai-resources");
+        let workspace = directory.path().join("workspace");
+        std::fs::create_dir_all(&phits_root).unwrap();
+        std::fs::create_dir_all(&workspace).unwrap();
+
+        let status = inspect_phits_agent_setup_paths(
+            Some(&phits_root),
+            &workspace,
+            Some(&directory.path().join("missing-codex-home")),
+        );
+        assert_eq!(status.state, PhitsAgentSetupState::Missing);
+        assert_eq!(status.checks.len(), 5);
+        assert!(status.checks.iter().all(|check| check.path.is_some()));
+    }
+
+    #[test]
+    fn reports_unreadable_active_agents_file_without_blocking_connection() {
+        let directory = tempfile::tempdir().unwrap();
+        let phits_root = directory.path().join("phits");
+        let workspace = directory.path().join("workspace");
+        let codex_home = directory.path().join("codex-home");
+        let policy = phits_root.join("workbench/AI/reference_policy.md");
+        std::fs::create_dir_all(policy.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(&workspace).unwrap();
+        std::fs::create_dir_all(&codex_home).unwrap();
+        std::fs::write(&policy, "policy").unwrap();
+        std::fs::write(codex_home.join("AGENTS.md"), [0xff, 0xfe, 0xfd]).unwrap();
+
+        let status =
+            inspect_phits_agent_setup_paths(Some(&phits_root), &workspace, Some(&codex_home));
+        assert_eq!(status.state, PhitsAgentSetupState::Unreadable);
+        assert!(status.message.contains("接続と会話は引き続き利用できます"));
     }
 
     #[test]

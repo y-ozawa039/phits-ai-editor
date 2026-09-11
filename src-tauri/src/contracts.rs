@@ -196,7 +196,28 @@ pub struct CodexConnectResult {
 #[serde(rename_all = "camelCase")]
 pub struct PhitsAgentSetupStatus {
     pub configured: bool,
+    pub state: PhitsAgentSetupState,
     pub source_path: Option<String>,
+    pub message: String,
+    pub checks: Vec<PhitsAgentSetupCheck>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum PhitsAgentSetupState {
+    Confirmed,
+    Partial,
+    Mismatch,
+    Missing,
+    Unreadable,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PhitsAgentSetupCheck {
+    pub id: String,
+    pub state: PhitsAgentSetupState,
+    pub path: Option<String>,
     pub message: String,
 }
 

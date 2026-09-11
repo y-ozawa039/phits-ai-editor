@@ -81,11 +81,20 @@ relative paths, cursor/selection, dirty state, open tabs, diagnostics metadata,
 and bounded selected or unsaved content. Context is not rendered as the user's
 chat message.
 
-When Codex connects, Rust checks whether the resolved PHITS installation's
-`workbench/AI/reference_policy.md` is referenced by the effective global or
-workspace `AGENTS.md`. The typed connection result exposes this status to the
-UI, which shows the official AI-agent setup guidance only when the pointer is
-missing. The check never changes the user's configuration automatically.
+When a workspace opens, Rust statically inspects the resolved PHITS installation's
+`workbench/AI/reference_policy.md` and the effective `AGENTS.md` or
+`AGENTS.override.md` at the PHITS root, Codex global home, and workspace. It
+normalizes official variable forms such as `<PHITSPATH>` and absolute paths,
+canonicalizes existing paths, and separately reports the AI resource, each
+instruction scope, and consistency with the current PHITS root. The aggregate
+state is `confirmed`, `partial`, `mismatch`, `missing`, or `unreadable`.
+Partial results are informational; other problems show the checked paths and
+reasons as cautions. This is not proof that App Server loaded the instructions,
+and the check neither edits configuration nor blocks Codex connection or chat.
+When connected, the user can review a state-specific troubleshooting prompt and
+insert it into the Codex composer. If connection is unavailable, the same prompt
+can be copied to a local Codex task in ChatGPT desktop. It is never sent
+automatically and remains editable so paths can be reviewed first.
 
 App Server `fileChange` and diff events identify real edits. Before a change,
 the backend validates paths and records before snapshots. After completion it

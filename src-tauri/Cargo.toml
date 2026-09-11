@@ -1,6 +1,6 @@
 [package]
 name = "phits-ai-editor"
-version = "0.0.1-alpha"
+version = "0.0.2-alpha"
 description = "A PHITS editor with Codex integration"
 authors = ["Yohei Ozawa"]
 license = "Apache-2.0"

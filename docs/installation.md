@@ -2,7 +2,7 @@
 
 日本語 | [English](installation.en.md)
 
-この文書は、Windows 11 x64向け`0.0.1-alpha`配布物の利用者向けガイドです。
+この文書は、Windows 11 x64向け`0.0.2-alpha`配布物の利用者向けガイドです。
 PHITS AI Editorは個人開発のalpha版であり、重要な入力ファイルは事前にバックアップして
 ください。
 
@@ -10,8 +10,8 @@ PHITS AI Editorは個人開発のalpha版であり、重要な入力ファイル
 
 | 配布物 | 推奨する利用者 | Windowsへの登録 |
 | --- | --- | --- |
-| `PHITS-AI-Editor-v0.0.1-alpha-windows-x64-setup.exe` | 通常利用する方 | あり |
-| `PHITS-AI-Editor-v0.0.1-alpha-windows-x64-portable.zip` | 試用、複数版の比較、開発・調査をする方 | なし |
+| `PHITS-AI-Editor-v0.0.2-alpha-windows-x64-setup.exe` | 通常利用する方 | あり |
+| `PHITS-AI-Editor-v0.0.2-alpha-windows-x64-portable.zip` | 試用、複数版の比較、開発・調査をする方 | なし |
 
 通常はインストーラーを推奨します。GitHubが自動表示する`Source code (zip)`は
 Windows用ポータブル版ではありません。また、裸の`phits-ai-editor.exe`だけを取り出して
@@ -78,6 +78,17 @@ AI支援を利用する場合は、[OpenAI公式のCodex CLIガイド](https://d
 エディタは起動時にApp Server互換性を確認し、会話、スレッド、ファイル編集、承認の
 利用可否を表示します。CodexがなくてもPHITSの編集・実行機能は利用できます。
 
+ワークスペースを開いた時点で、設定画面で解決したPHITSルートを基準に、PHITS側のAI設定資源、
+PHITSルート、Codexグローバル、現在のワークスペースの有効な`AGENTS.md`／
+`AGENTS.override.md`、参照先ルートの整合性を静的に検査します。結果が部分確認、
+不一致、未設定、読取不能の場合は、Codexパネルで「検査したファイルと理由」を
+展開できます。これはApp Serverが実際に指示を読み込んだことを保証する検査では
+ありません。結果にかかわらずCodexへの接続と会話は利用でき、Editorが設定ファイルを
+自動変更することもありません。問題がある場合は、表示された相談文を確認・編集して
+Editor内のCodex入力欄へ挿入するかコピーできます。Codexへ接続できない場合は、
+ChatGPTデスクトップ版でこのPCを利用するローカルCodexタスクを開き、コピーした文章を
+貼り付けてください。Cloudタスクではローカルファイルを確認できない場合があります。
+
 ## 6. `.inp`／`.pht`を直接開く
 
 インストーラー版では、Explorerで対象ファイルをダブルクリックするか、右クリックして
@@ -92,7 +103,7 @@ AI支援を利用する場合は、[OpenAI公式のCodex CLIガイド](https://d
 
 ## 7. SmartScreen警告
 
-`0.0.1-alpha`はコード署名されていないため、Windows SmartScreenが警告を表示する
+`0.0.2-alpha`はコード署名されていないため、Windows SmartScreenが警告を表示する
 可能性があります。公式GitHub Release以外から取得したファイルや、SHA-256が一致しない
 ファイルは実行しないでください。配布元とハッシュを確認できた場合に限り、警告内容を
 読んだうえで利用者自身が実行を判断してください。
@@ -100,7 +111,7 @@ AI支援を利用する場合は、[OpenAI公式のCodex CLIガイド](https://d
 PowerShellでは次のように確認できます。
 
 ```powershell
-Get-FileHash .\PHITS-AI-Editor-v0.0.1-alpha-windows-x64-setup.exe -Algorithm SHA256
+Get-FileHash .\PHITS-AI-Editor-v0.0.2-alpha-windows-x64-setup.exe -Algorithm SHA256
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -129,7 +140,7 @@ PHITS AI Editorをアンインストールできます。アプリ本体、登�
 
 ## 10. 問題を報告する前に
 
-- [既知の問題](known-issues-v0.0.1-alpha.md)を確認してください。
+- [既知の問題](known-issues-v0.0.2-alpha.md)を確認してください。
 - バージョン、Windowsの版、再現手順、期待した結果、実際の結果を記録してください。
 - 認証情報、個人情報、未公開研究データ、再配布できないPHITS資料はIssueへ載せないで
   ください。

@@ -58,6 +58,22 @@ node scripts/app-server-edit-smoke.mjs (Get-Command codex).Source .integration
 
 Do not point this smoke test at research data.
 
+## Manually preview PHITS Codex setup results
+
+Preview all five static-inspection results in a debug build without changing
+the development machine's real configuration:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/preview-agent-setup-states.ps1
+```
+
+Connect to Codex in each window, inspect the result, and close the editor to
+advance to the next case. The script creates only temporary workspaces and a
+Codex home used by the inspector. The real App Server keeps using the normally
+authenticated environment, and the inspection-home override is compiled only
+into debug builds. Use `-Case Partial` for one state or
+`-PrepareOnly -KeepFixtures` to create fixtures without launching the app.
+
 ## Release build
 
 ```powershell
@@ -77,7 +93,7 @@ pnpm release:package:windows
 ```
 
 Draft output is written below
-`src-tauri/target/release/release-candidate/v0.0.1-alpha/` and remains ignored.
+`src-tauri/target/release/release-candidate/v0.0.2-alpha/` and remains ignored.
 
 ## PHITS detection
 

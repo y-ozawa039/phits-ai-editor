@@ -57,6 +57,20 @@ node scripts/app-server-edit-smoke.mjs (Get-Command codex).Source .integration
 
 このsmoke testを研究データに対して実行しないでください。
 
+## PHITS用Codex設定表示の手動確認
+
+開発端末の実設定を変更せず、5種類の静的検査結果をデバッグ版で順番に確認できます。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/preview-agent-setup-states.ps1
+```
+
+各画面でCodexへ接続し、表示を確認してEditorを閉じると次のケースが起動します。
+スクリプトは一時ワークスペースと検査専用Codex homeだけを生成します。実際のCodex
+App Serverは通常の認証済み環境を使用し、検査専用homeを参照する処理はdebug buildに
+だけ含まれます。`-Case Partial`で1状態だけ、`-PrepareOnly -KeepFixtures`で起動せずに
+fixtureだけを生成できます。
+
 ## リリースビルド
 
 ```powershell
@@ -75,7 +89,7 @@ pnpm tauri build --bundles nsis
 pnpm release:package:windows
 ```
 
-draftは`src-tauri/target/release/release-candidate/v0.0.1-alpha/`以下へ出力され、
+draftは`src-tauri/target/release/release-candidate/v0.0.2-alpha/`以下へ出力され、
 Gitの追跡対象外です。
 
 ## PHITSの検出

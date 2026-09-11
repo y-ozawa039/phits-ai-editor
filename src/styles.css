@@ -432,6 +432,24 @@ kbd, .text-button, .output-content { color: #555555; }
 .codex-compatibility-note { margin-top: 6px; padding: 7px 8px; color: #664d1f; background: #fff7e7; border: 1px solid #ead8af; border-radius: 5px; font-size: 12px; line-height: 1.45; }
 .codex-agent-setup-note { display: grid; gap: 3px; margin-bottom: 8px; }
 .codex-agent-setup-note strong { color: #5c4315; }
+.codex-agent-setup-note.partial { color: #315a6b; background: #eef8fb; border-color: #bfdae4; }
+.codex-agent-setup-note.partial strong { color: #244a5a; }
+.codex-agent-setup-note details { margin-top: 3px; }
+.codex-agent-setup-note summary { cursor: pointer; user-select: none; }
+.codex-agent-setup-note ul { display: grid; gap: 6px; margin: 6px 0 0; padding: 0; list-style: none; }
+.agent-setup-check { display: grid; gap: 1px; padding-left: 10px; border-left: 3px solid #b9b9b9; }
+.agent-setup-check.confirmed { border-left-color: #23a477; }
+.agent-setup-check.mismatch, .agent-setup-check.missing, .agent-setup-check.unreadable { border-left-color: #c17a16; }
+.agent-setup-check b { color: inherit; font-weight: 600; }
+.agent-setup-check code { overflow-wrap: anywhere; color: #666; background: transparent; font-size: 12px; }
+.codex-connection-error { display: grid; gap: 3px; margin-bottom: 8px; }
+.codex-troubleshooting-details { margin-top: 5px; padding-top: 5px; border-top: 1px solid rgb(0 0 0 / 10%); }
+.codex-troubleshooting-details > summary { cursor: pointer; font-weight: 600; user-select: none; }
+.codex-troubleshooting-details p { margin: 6px 0; }
+.codex-troubleshooting-details .desktop-codex-guidance { color: #4d4d4d; }
+.codex-troubleshooting-details textarea { box-sizing: border-box; width: 100%; min-height: 150px; margin-top: 4px; padding: 7px; resize: vertical; color: #222; background: #fff; border: 1px solid #c8c8c8; border-radius: 4px; font-family: Consolas, "Yu Gothic UI", monospace; font-size: 12px; line-height: 1.45; }
+.troubleshooting-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.troubleshooting-actions span { color: #555; font-size: 12px; }
 .saved-threads { display: grid; gap: 3px; margin-top: 6px; }
 .saved-thread { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; width: 100%; padding: 6px 7px; color: #2f2f2f; text-align: left; background: transparent; border: 1px solid transparent; border-radius: 4px; }
 .saved-thread:hover, .saved-thread.active { background: #ececec; border-color: #d8d8d8; }

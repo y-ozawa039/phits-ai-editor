@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "PHITS AI Editor",
-  "version": "0.0.1-alpha",
+  "version": "0.0.2-alpha",
   "identifier": "local.phits-ai-editor",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -57,10 +57,10 @@
       "../docs/installation.en.md": "docs/installation.en.md",
       "../docs/building.md": "docs/building.md",
       "../docs/building.en.md": "docs/building.en.md",
-      "../docs/known-issues-v0.0.1-alpha.md": "docs/known-issues-v0.0.1-alpha.md",
-      "../docs/known-issues-v0.0.1-alpha.en.md": "docs/known-issues-v0.0.1-alpha.en.md",
-      "../docs/release-notes-v0.0.1-alpha.md": "docs/release-notes-v0.0.1-alpha.md",
-      "../docs/release-notes-v0.0.1-alpha.en.md": "docs/release-notes-v0.0.1-alpha.en.md",
+      "../docs/known-issues-v0.0.2-alpha.md": "docs/known-issues-v0.0.2-alpha.md",
+      "../docs/known-issues-v0.0.2-alpha.en.md": "docs/known-issues-v0.0.2-alpha.en.md",
+      "../docs/release-notes-v0.0.2-alpha.md": "docs/release-notes-v0.0.2-alpha.md",
+      "../docs/release-notes-v0.0.2-alpha.en.md": "docs/release-notes-v0.0.2-alpha.en.md",
       "../docs/customizing-with-ai.md": "docs/customizing-with-ai.md",
       "../docs/customizing-with-ai.en.md": "docs/customizing-with-ai.en.md",
       "../docs/safety-boundaries.md": "docs/safety-boundaries.md",

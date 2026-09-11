@@ -82,7 +82,18 @@ export interface CodexConnectResult {
 
 export interface PhitsAgentSetupStatus {
   configured: boolean;
+  state: PhitsAgentSetupState;
   sourcePath: string | null;
+  message: string;
+  checks: PhitsAgentSetupCheck[];
+}
+
+export type PhitsAgentSetupState = "confirmed" | "partial" | "mismatch" | "missing" | "unreadable";
+
+export interface PhitsAgentSetupCheck {
+  id: "resource" | "phitsRoot" | "codexGlobal" | "workspace" | "rootConsistency";
+  state: PhitsAgentSetupState;
+  path: string | null;
   message: string;
 }
 

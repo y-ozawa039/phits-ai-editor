@@ -10,11 +10,11 @@ execution with AI assistance through Codex App Server.
 The first alpha release supports Windows 11 x64.
 
 - **Regular use (recommended):**
-  [Download the installer](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.1-alpha/PHITS-AI-Editor-v0.0.1-alpha-windows-x64-setup.exe)
+  [Download the installer](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.2-alpha/PHITS-AI-Editor-v0.0.2-alpha-windows-x64-setup.exe)
 - **Evaluation, portable use, or comparing versions:**
-  [Download the portable ZIP](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.1-alpha/PHITS-AI-Editor-v0.0.1-alpha-windows-x64-portable.zip)
+  [Download the portable ZIP](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.2-alpha/PHITS-AI-Editor-v0.0.2-alpha-windows-x64-portable.zip)
 - **Verify after downloading:**
-  [SHA-256 checksums](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.1-alpha/SHA256SUMS.txt)
+  [SHA-256 checksums](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.2-alpha/SHA256SUMS.txt)
 
 | Purpose | Choose | Why |
 |---|---|---|
@@ -59,13 +59,23 @@ and safety notes. After installing and signing in to Codex CLI, ask Codex:
 Confirm that the setup finishes with
 `Setup AI agent environment to PHITS is successfully finished.` before
 connecting from PHITS AI Editor. The setup registers a pointer to the PHITS
-reference policy in Codex's `AGENTS.md`. On the first connection, the editor
-checks this configuration and displays the official setup guidance in the
-Codex panel when it is missing.
+reference policy in Codex's `AGENTS.md`. Starting with `0.0.2-alpha`, the editor
+performs a static check when a workspace opens. Relative to the PHITS root resolved
+by **PHITS runtime** settings, it separately reports the PHITS AI resource, the
+effective `AGENTS.md` or `AGENTS.override.md` at the PHITS root, Codex global
+home, and current workspace, plus consistency with the current PHITS root. Both
+official variable forms such as `<PHITSPATH>` and absolute paths are accepted.
+This check does not prove that App Server loaded an instruction file, change
+the user's files, or block Codex connection and chat. For a problem result, the
+user can review and edit a generated troubleshooting prompt, insert it into the
+in-editor Codex composer, or copy it. If the Editor cannot connect to Codex, the
+prompt can be pasted into a local Codex task in ChatGPT desktop; a Cloud task may
+not be able to inspect files on the PC. Prompts are never sent automatically and
+configuration is never repaired automatically.
 
 ## Development environment
 
-- Windows 11 x64 (official binary target for `0.0.1-alpha`)
+- Windows 11 x64 (official binary target for `0.0.2-alpha`)
 - Node.js 24 / pnpm 11
 - Rust stable / MSVC
 - PHITS 3.37 (automatically detected from `PHITSPATH`, or selected under
@@ -129,7 +139,7 @@ This is not an official product developed, approved, sponsored, endorsed, or
 warranted by JAEA, the PHITS development team, OpenAI, or the author's
 affiliated institution.
 
-## Windows alpha release (`0.0.1-alpha`)
+## Windows alpha release (`0.0.2-alpha`)
 
 Implemented features include:
 
@@ -209,6 +219,6 @@ and Linux packages are future portability work and are not release
 requirements for the first alpha. See the
 [Windows alpha test report](docs/windows-alpha-test-report.md).
 
-See the [release notes](docs/release-notes-v0.0.1-alpha.en.md),
-[known issues](docs/known-issues-v0.0.1-alpha.en.md), and
+See the [release notes](docs/release-notes-v0.0.2-alpha.en.md),
+[known issues](docs/known-issues-v0.0.2-alpha.en.md), and
 [release procedure](docs/releasing.md).

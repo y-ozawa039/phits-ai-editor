@@ -1,6 +1,6 @@
 # Release procedure
 
-The first planned release is `v0.0.1-alpha`, published as a GitHub Pre-release
+The current planned release is `v0.0.2-alpha`, published as a GitHub Pre-release
 for Windows 11 x64. Repository visibility changes, tags, pushes, and GitHub
 Release publication require explicit maintainer approval.
 
@@ -42,8 +42,8 @@ pnpm release:package:windows
 
 Create these release assets without modifying their contents afterward:
 
-- `PHITS-AI-Editor-v0.0.1-alpha-windows-x64-portable.zip`
-- `PHITS-AI-Editor-v0.0.1-alpha-windows-x64-setup.exe`
+- `PHITS-AI-Editor-v0.0.2-alpha-windows-x64-portable.zip`
+- `PHITS-AI-Editor-v0.0.2-alpha-windows-x64-setup.exe`
 - `SHA256SUMS.txt`
 - `SBOM.spdx.json` or an equivalent SBOM
 - `THIRD_PARTY_NOTICES.md` and `THIRD_PARTY_LICENSES.txt`
@@ -74,7 +74,7 @@ Record the exact artifact hashes and results in the Windows alpha test report.
 ## 5. Publish
 
 1. Confirm the artifacts' recorded commit equals the intended `main` commit.
-2. Create the annotated `v0.0.1-alpha` tag.
+2. Create the annotated `v0.0.2-alpha` tag.
 3. Change the repository to public only after the exact public file list has
    been reviewed.
 4. Create a GitHub Release marked **Pre-release**, attach every asset, and copy

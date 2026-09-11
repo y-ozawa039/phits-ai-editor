@@ -17,6 +17,8 @@ import { Icon } from "./components/Icons";
 import { OutputPanel } from "./components/OutputPanel";
 import { UnsavedChangesDialog } from "./components/UnsavedChangesDialog";
 import { registerPhitsLanguage } from "./phitsLanguage";
+import { buildPhitsAgentSetupHelp } from "./phitsAgentSetupHelp";
+import packageMetadata from "../package.json";
 import { changeKindValue, makeDiffReviewFile, mergeAppliedDiffReviewFiles, movePathValue, type DiffReviewFile, type DiffReviewState } from "./diffReview";
 import { DIAGNOSTICS_RAPID_GAP_MS, DIAGNOSTICS_RAPID_THRESHOLD_MS, DIAGNOSTICS_TURN_BASE_MS, diagnosticsTurnDuration, shouldRequestDiagnostics } from "./diagnosticsMotion";
 import { applyUndoableModelContent, asUndoableTextModel, runUndoableModelHistory } from "./editorHistory";
@@ -210,6 +212,7 @@ export default function App() {
   const [diagnosticsQueuedTurns, setDiagnosticsQueuedTurns] = useState(0);
   const [codexCompatibility, setCodexCompatibility] = useState<CodexCompatibilityReport | null>(null);
   const [phitsAgentSetup, setPhitsAgentSetup] = useState<PhitsAgentSetupStatus | null>(null);
+  const [codexConnectionError, setCodexConnectionError] = useState<string | null>(null);
   const [codexProbeBusy, setCodexProbeBusy] = useState(false);
   const [output, setOutput] = useState<string[]>([]);
   const [runStatus, setRunStatus] = useState<RunStatus | null>(null);
@@ -338,6 +341,23 @@ export default function App() {
     if (lines.length) setOutput((current) => [...current, ...lines].slice(-4000));
   }, []);
 
+  const codexUnavailableReason = useMemo(() => codexConnectionError ?? (
+    codexCompatibility && !codexFeatureAvailable(codexCompatibility, "chat")
+      ? "Codex CLIまたはApp Serverの会話機能を利用できません。実行環境の互換性検査結果を確認してください。"
+      : null
+  ), [codexCompatibility, codexConnectionError]);
+
+  const codexTroubleshootingPrompt = useMemo(() => {
+    if (!workspace || (!codexUnavailableReason && phitsAgentSetup?.configured !== false)) return null;
+    return buildPhitsAgentSetupHelp({
+      workspaceRoot: workspace.root,
+      setup: phitsAgentSetup,
+      diagnostics,
+      compatibility: codexCompatibility,
+      connectionError: codexUnavailableReason,
+    });
+  }, [codexCompatibility, codexUnavailableReason, diagnostics, phitsAgentSetup, workspace]);
+
   const retainedModel = useCallback((documentId: string) => {
     const monaco = monacoRef.current;
     return monaco?.editor.getModel(monaco.Uri.parse(documentId)) ?? null;
@@ -421,11 +441,25 @@ export default function App() {
     }
   }, [notify]);
 
+  const inspectPhitsAgentSetup = useCallback(async (root?: string) => {
+    if (!isTauri() || !root) {
+      setPhitsAgentSetup(null);
+      return;
+    }
+    try {
+      setPhitsAgentSetup(await api.inspectPhitsAgentSetup(root));
+    } catch (error) {
+      setPhitsAgentSetup(null);
+      notify(`PHITS用Codex設定を検査できませんでした: ${errorMessage(error)}`, "info");
+    }
+  }, [notify]);
+
   const updateDiagnostics = useCallback(async (root?: string) => {
     if (!isTauri()) return;
     diagnosticsRequestCountRef.current += 1;
     setDiagnosticsBusy(true);
     try {
+      await inspectPhitsAgentSetup(root);
       const result = await api.diagnostics(root);
       setDiagnostics(result);
       if (result.languageSpec) {
@@ -446,7 +480,7 @@ export default function App() {
       diagnosticsRequestCountRef.current = Math.max(0, diagnosticsRequestCountRef.current - 1);
       if (diagnosticsRequestCountRef.current === 0) setDiagnosticsBusy(false);
     }
-  }, [notify]);
+  }, [inspectPhitsAgentSetup, notify]);
 
   const startQueuedDiagnosticsTurns = useCallback(() => {
     const motion = diagnosticsMotionRef.current;
@@ -646,6 +680,8 @@ export default function App() {
       setMessages([]);
       setApprovals([]);
       setSessionApprovalActive(false);
+      setPhitsAgentSetup(null);
+      setCodexConnectionError(null);
       for (const entry of documentsRef.current) retainedModel(entry.id)?.dispose();
       setOutput([]);
       setRunStatus(null);
@@ -983,7 +1019,9 @@ export default function App() {
     if (!workspace) { notify("Codexを接続するワークスペースを先に開いてください。"); return; }
     const compatibility = await probeCodexCompatibility();
     if (!codexFeatureAvailable(compatibility, "chat")) {
-      notify("Codex App Serverの会話機能に互換性がないため接続できません。実行環境の診断を確認してください。", "error");
+      const message = "Codex App Serverの会話機能に互換性がないため接続できません。実行環境の診断を確認してください。";
+      setCodexConnectionError(message);
+      notify(message, "error");
       return;
     }
     try {
@@ -994,15 +1032,20 @@ export default function App() {
       codexCompatibilityRef.current = connection.compatibility;
       setCodexCompatibility(connection.compatibility);
       setPhitsAgentSetup(connection.phitsAgentSetup);
+      setCodexConnectionError(null);
       setModels(available); setThreadLinks(connection.threads); setModel(selected?.id ?? ""); setReasoning(selected?.defaultReasoningEffort ?? selected?.supportedReasoningEfforts[0] ?? ""); setCodexConnected(true);
       setMessages((current) => [...current, { id: crypto.randomUUID(), role: "system", text: "Codex App Serverに接続しました。" }]);
-    } catch (error) { notify(`Codexに接続できませんでした: ${errorMessage(error)}`, "error"); }
+    } catch (error) {
+      const message = errorMessage(error);
+      setCodexConnectionError(message);
+      notify(`Codexに接続できませんでした: ${message}`, "error");
+    }
     finally { setCodexBusy(false); }
   }, [notify, probeCodexCompatibility, workspace]);
 
   const disconnectCodex = useCallback(async () => {
     try { await api.codexDisconnect(); } catch { /* safe local disconnected state */ }
-    setCodexConnected(false); setThreadId(null); setTurnId(null); setCodexBusy(false); setApprovals([]); setDiffReview(null); setPhitsAgentSetup(null); fileChangeBasesRef.current.clear(); turnHistoryIdsRef.current.clear(); setSessionApprovalActive(false);
+    setCodexConnected(false); setThreadId(null); setTurnId(null); setCodexBusy(false); setApprovals([]); setDiffReview(null); setCodexConnectionError(null); fileChangeBasesRef.current.clear(); turnHistoryIdsRef.current.clear(); setSessionApprovalActive(false);
   }, []);
 
   const startThread = useCallback(async () => {
@@ -1612,7 +1655,7 @@ export default function App() {
             <button aria-label="表示・フォント設定を開く" onClick={() => void openSettings("appearance")}><span>表示・フォント…</span><small>文字サイズを調整</small></button>
             <button aria-label="PHITS実行環境設定を開く" onClick={() => void openSettings("phits")}><span>PHITS実行環境…</span><small>インストール先を設定</small></button>
           </div></details>
-          <details onToggle={(event) => { if (event.currentTarget.open) closeTopMenus(menuBarRef.current, event.currentTarget); }}><summary>ヘルプ</summary><div className="menu-popover menu-help"><p>PHITS 3.37 / Codex CLI 0.153.1<br/>Version 0.0.1-alpha</p></div></details>
+          <details onToggle={(event) => { if (event.currentTarget.open) closeTopMenus(menuBarRef.current, event.currentTarget); }}><summary>ヘルプ</summary><div className="menu-popover menu-help"><p>PHITS 3.37 / Codex CLI 0.153.1<br/>Version {packageMetadata.version}</p></div></details>
         </nav>
       </header>
 
@@ -1641,7 +1684,7 @@ export default function App() {
           <OutputPanel lines={output} collapsed={outputCollapsed} height={outputHeight} onToggle={() => setOutputCollapsed((value) => !value)} onClear={() => setOutput([])} onResizeStart={startHorizontalResize}/>
         </main>
 
-        <CodexPanel open={codexOpen} width={codexWidth} fontSize={codexFontSize} connected={codexConnected} busy={codexBusy} models={models} model={model} reasoning={reasoning} approvalMode={approvalMode} sessionApprovalActive={sessionApprovalActive} threadId={threadId} threads={threadLinks} chatAvailable={codexFeatureAvailable(codexCompatibility, "chat")} threadsAvailable={codexFeatureAvailable(codexCompatibility, "threads")} writableAvailable={codexFeatureAvailable(codexCompatibility, "fileEditing") && codexFeatureAvailable(codexCompatibility, "approvals")} phitsAgentSetup={phitsAgentSetup} messages={messages} approval={currentApproval} approvalCount={approvals.length} approvalCanAccept={approvalCanAccept} contextChips={contextChips} draftRequest={draftRequest} onToggle={() => setCodexOpen((value) => !value)} onResizeStart={startVerticalResize} onResizeReset={() => setCodexPanelRatio(DEFAULT_CODEX_PANEL_RATIO)} onOpenDiff={() => { if (!currentApproval) return; setDiffReview((current) => current?.requestKey === approvalRequestKey(currentApproval) ? { ...current, selectedFileIndex: 0 } : current); }} onConnect={connectCodex} onDisconnect={disconnectCodex} onModelChange={setModel} onReasoningChange={setReasoning} onApprovalModeChange={setApprovalMode} onNewThread={startThread} onResumeThread={resumeThread} onRenameThread={renameThread} onDeleteThread={deleteThread} onRemoveContext={removeContext} onSend={sendCodex} onInterrupt={interruptCodex} onApproval={resolveApproval}/>
+        <CodexPanel open={codexOpen} width={codexWidth} fontSize={codexFontSize} connected={codexConnected} connectionError={codexUnavailableReason} troubleshootingPrompt={codexTroubleshootingPrompt} busy={codexBusy} models={models} model={model} reasoning={reasoning} approvalMode={approvalMode} sessionApprovalActive={sessionApprovalActive} threadId={threadId} threads={threadLinks} chatAvailable={codexFeatureAvailable(codexCompatibility, "chat")} threadsAvailable={codexFeatureAvailable(codexCompatibility, "threads")} writableAvailable={codexFeatureAvailable(codexCompatibility, "fileEditing") && codexFeatureAvailable(codexCompatibility, "approvals")} phitsAgentSetup={phitsAgentSetup} messages={messages} approval={currentApproval} approvalCount={approvals.length} approvalCanAccept={approvalCanAccept} contextChips={contextChips} draftRequest={draftRequest} onToggle={() => setCodexOpen((value) => !value)} onResizeStart={startVerticalResize} onResizeReset={() => setCodexPanelRatio(DEFAULT_CODEX_PANEL_RATIO)} onOpenDiff={() => { if (!currentApproval) return; setDiffReview((current) => current?.requestKey === approvalRequestKey(currentApproval) ? { ...current, selectedFileIndex: 0 } : current); }} onConnect={connectCodex} onDisconnect={disconnectCodex} onModelChange={setModel} onReasoningChange={setReasoning} onApprovalModeChange={setApprovalMode} onNewThread={startThread} onResumeThread={resumeThread} onRenameThread={renameThread} onDeleteThread={deleteThread} onRemoveContext={removeContext} onSend={sendCodex} onInterrupt={interruptCodex} onApproval={resolveApproval}/>
       </div>
 
       {settingsSection && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsSection(null); }}>

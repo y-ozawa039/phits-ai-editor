@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { CodexPanel } from "./CodexPanel";
@@ -184,18 +184,84 @@ describe("CodexPanel", () => {
   it("shows the official PHITS setup guidance when the Codex pointer is missing", () => {
     render(<CodexPanel {...baseProps} phitsAgentSetup={{
       configured: false,
+      state: "missing",
       sourcePath: null,
       message: "PHITS公式の workbench/README-jp.docx を確認してください。",
+      checks: [{ id: "codexGlobal", state: "missing", path: "C:\\Users\\user\\.codex\\AGENTS.md", message: "有効な指示ファイルがありません。" }],
     }} />);
     expect(screen.getByRole("alert")).toHaveTextContent("PHITS用Codex設定を確認してください");
     expect(screen.getByRole("alert")).toHaveTextContent("workbench/README-jp.docx");
+    fireEvent.click(screen.getByText("検査したファイルと理由"));
+    expect(screen.getByRole("alert")).toHaveTextContent("C:\\Users\\user\\.codex\\AGENTS.md");
+  });
+
+  it("presents a partial setup result as non-blocking information", () => {
+    render(<CodexPanel {...baseProps} phitsAgentSetup={{
+      configured: false,
+      state: "partial",
+      sourcePath: null,
+      message: "PHITS側のAI設定は確認しました。接続と会話は引き続き利用できます。",
+      checks: [{ id: "phitsRoot", state: "confirmed", path: "D:\\phits337\\AGENTS.md", message: "現在のPHITSルートに対応する参照を確認しました。" }],
+    }} />);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("PHITS用Codex設定を一部確認しました");
+    expect(screen.getByRole("status")).toHaveTextContent("接続と会話は引き続き利用できます");
+  });
+
+  it("shows an editable desktop-Codex handoff before an Editor connection succeeds", async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    render(<CodexPanel {...baseProps} connected={false} threadId={null} troubleshootingPrompt="診断結果と安全な復旧手順" phitsAgentSetup={{
+      configured: false,
+      state: "partial",
+      sourcePath: null,
+      message: "PHITS側だけ確認しました。",
+      checks: [],
+    }} />);
+
+    expect(screen.getByText(/ChatGPTデスクトップ版でCodexを開き/)).toBeInTheDocument();
+    const prompt = screen.getByRole("textbox", { name: "生成AIへの相談文" });
+    fireEvent.change(prompt, { target: { value: "編集した相談文" } });
+    fireEvent.click(screen.getByRole("button", { name: "相談文をコピー" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("編集した相談文"));
+    expect(screen.queryByRole("button", { name: "Codex入力欄へ挿入" })).not.toBeInTheDocument();
+  });
+
+  it("offers the desktop-Codex handoff when chat compatibility prevents connection", () => {
+    render(<CodexPanel {...baseProps} connected={false} threadId={null} chatAvailable={false} connectionError="Codex CLIを利用できません。" troubleshootingPrompt="接続診断文" phitsAgentSetup={{
+      configured: true,
+      state: "confirmed",
+      sourcePath: "C:\\phits\\AGENTS.md",
+      message: "確認しました。",
+      checks: [],
+    }} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Codexに接続できませんでした");
+    expect(screen.getByRole("textbox", { name: "生成AIへの相談文" })).toHaveValue("接続診断文");
+    expect(screen.getByText(/ChatGPTデスクトップ版/)).toBeInTheDocument();
+  });
+
+  it("inserts the reviewed troubleshooting text into the connected composer without sending it", () => {
+    const onSend = vi.fn();
+    render(<CodexPanel {...baseProps} troubleshootingPrompt="初期相談文" onSend={onSend} phitsAgentSetup={{
+      configured: false,
+      state: "partial",
+      sourcePath: null,
+      message: "PHITS側だけ確認しました。",
+      checks: [],
+    }} />);
+    fireEvent.change(screen.getByRole("textbox", { name: "生成AIへの相談文" }), { target: { value: "確認済み相談文" } });
+    fireEvent.click(screen.getByRole("button", { name: "Codex入力欄へ挿入" }));
+    expect(screen.getByPlaceholderText("Codexにメッセージを送信…")).toHaveValue("確認済み相談文");
+    expect(onSend).not.toHaveBeenCalled();
   });
 
   it("does not show setup guidance after the PHITS Codex pointer is verified", () => {
     render(<CodexPanel {...baseProps} phitsAgentSetup={{
       configured: true,
+      state: "confirmed",
       sourcePath: "C:\\Users\\user\\.codex\\AGENTS.md",
       message: "PHITS用Codex設定を確認しました。",
+      checks: [],
     }} />);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });

@@ -10,6 +10,7 @@ export interface ComposerDraftRequest { id: number; text: string }
 
 interface CodexPanelProps {
   open: boolean; width: number; fontSize?: number; connected: boolean; busy: boolean;
+  connectionError?: string | null; troubleshootingPrompt?: string | null;
   models: CodexModel[]; model: string; reasoning: string; approvalMode: ApprovalMode;
   sessionApprovalActive?: boolean; threadId: string | null; threads?: CodexThreadLink[];
   chatAvailable?: boolean; threadsAvailable?: boolean; writableAvailable?: boolean;
@@ -33,6 +34,8 @@ function formatLastUsed(value: string) {
 
 export function CodexPanel(props: CodexPanelProps) {
   const [draft, setDraft] = useState("");
+  const [troubleshootingDraft, setTroubleshootingDraft] = useState("");
+  const [copyStatus, setCopyStatus] = useState("");
   const [menu, setMenu] = useState<{ thread: CodexThreadLink; x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
@@ -46,6 +49,10 @@ export function CodexPanel(props: CodexPanelProps) {
   const writableAvailable = props.writableAvailable !== false;
 
   useEffect(() => { if (props.draftRequest) setDraft(props.draftRequest.text); }, [props.draftRequest]);
+  useEffect(() => {
+    setTroubleshootingDraft(props.troubleshootingPrompt ?? "");
+    setCopyStatus("");
+  }, [props.troubleshootingPrompt]);
   useLayoutEffect(() => {
     followLatestRef.current = true;
     const transcript = transcriptRef.current;
@@ -68,12 +75,28 @@ export function CodexPanel(props: CodexPanelProps) {
   const openMenu = (thread: CodexThreadLink, x: number, y: number) => setMenu({ thread, x, y });
   const rename = () => { if (!menu) return; const title = window.prompt("スレッド名", menu.thread.title)?.trim(); if (title && title !== menu.thread.title) props.onRenameThread(menu.thread.threadId, title); setMenu(null); };
   const remove = () => { if (menu) props.onDeleteThread(menu.thread.threadId, menu.thread.title); setMenu(null); };
+  const agentSetup = props.phitsAgentSetup;
+  const agentSetupNeedsAttention = Boolean(agentSetup && ["mismatch", "missing", "unreadable"].includes(agentSetup.state));
+  const agentSetupTitle = agentSetup?.state === "partial" ? "PHITS用Codex設定を一部確認しました" : "PHITS用Codex設定を確認してください";
+  const agentCheckLabels = { resource: "PHITS AI設定資源", phitsRoot: "PHITSルートの指示", codexGlobal: "Codexグローバル指示", workspace: "ワークスペース指示", rootConsistency: "PHITSルートの整合性" } as const;
+  const copyTroubleshootingPrompt = async () => {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard API unavailable");
+      await navigator.clipboard.writeText(troubleshootingDraft);
+      setCopyStatus("相談文をコピーしました。");
+    } catch {
+      setCopyStatus("コピーできませんでした。文章を選択してコピーしてください。");
+    }
+  };
+  const troubleshootingEditor = props.troubleshootingPrompt ? <details className="codex-troubleshooting-details"><summary>生成AIへの相談文を表示</summary><p>送信前に内容とパスを確認し、必要に応じて編集してください。</p>{!props.connected && <p className="desktop-codex-guidance">ChatGPTデスクトップ版でCodexを開き、このPCを利用するローカルタスクへ次の文章を貼り付けてください。Cloudタスクではローカルファイルを確認できない場合があります。</p>}<textarea aria-label="生成AIへの相談文" rows={10} value={troubleshootingDraft} onChange={(event) => { setTroubleshootingDraft(event.target.value); setCopyStatus(""); }} /><div className="troubleshooting-actions"><button className="secondary-button" onClick={() => void copyTroubleshootingPrompt()}>相談文をコピー</button>{props.connected && <button className="secondary-button" onClick={() => setDraft(troubleshootingDraft)}>Codex入力欄へ挿入</button>}<span aria-live="polite">{copyStatus}</span></div></details> : null;
+  const setupNeedsExplanation = Boolean(agentSetup && !agentSetup.configured);
 
   return <aside className="codex-panel" style={{ width: props.width, "--codex-font-size": `${props.fontSize ?? 14}px` } as CSSProperties} aria-label="Codex">
     <div className="vertical-resizer" onPointerDown={props.onResizeStart} onDoubleClick={props.onResizeReset} title="ドラッグで幅を変更・ダブルクリックで既定幅" />
     <header className="codex-titlebar"><div className="panel-title codex-brand"><span className="brand-mark"><Icon name="spark" /></span>Codex</div><div className={`connection-state ${props.connected ? "online" : ""}`}><span />{props.connected ? "接続済み" : "未接続"}</div><button className="icon-button" onClick={props.onToggle} aria-label="Codexパネルを閉じる"><Icon name="panel" /></button></header>
-    <div className="codex-controls">{!props.connected ? <><button className="primary-button wide" onClick={props.onConnect} disabled={props.busy || !chatAvailable}>Codexに接続</button>{!chatAvailable && <div className="codex-compatibility-note">App Serverの会話機能に互換性がありません。実行環境の診断を確認してください。</div>}</> : <>
-      {props.phitsAgentSetup && !props.phitsAgentSetup.configured && <div className="codex-compatibility-note codex-agent-setup-note" role="alert"><strong>PHITS用Codex設定を確認してください</strong><span>{props.phitsAgentSetup.message}</span></div>}
+    <div className="codex-controls">
+      {agentSetup && !agentSetup.configured && <div className={`codex-compatibility-note codex-agent-setup-note ${agentSetup.state}`} role={agentSetupNeedsAttention ? "alert" : "status"}><strong>{agentSetupTitle}</strong><span>{agentSetup.message}</span><details><summary>検査したファイルと理由</summary><ul>{agentSetup.checks.map((check) => <li className={`agent-setup-check ${check.state}`} key={check.id}><b>{agentCheckLabels[check.id]}</b><span>{check.message}</span>{check.path && <code>{check.path}</code>}</li>)}</ul></details>{troubleshootingEditor}</div>}
+      {!props.connected ? <><button className="primary-button wide" onClick={props.onConnect} disabled={props.busy || !chatAvailable}>Codexに接続</button>{!chatAvailable && !props.connectionError && <div className="codex-compatibility-note">App Serverの会話機能に互換性がありません。実行環境の診断を確認してください。</div>}{props.connectionError && <div className="codex-compatibility-note codex-connection-error" role="alert"><strong>Codexに接続できませんでした</strong><span>{props.connectionError}</span>{!setupNeedsExplanation && troubleshootingEditor}</div>}</> : <>
       <div className="select-row"><label>モデル<select value={props.model} onChange={(e) => props.onModelChange(e.target.value)}>{props.models.map((entry) => <option value={entry.id} key={entry.id}>{entry.displayName}</option>)}</select></label><label>思考<select value={props.reasoning} onChange={(e) => props.onReasoningChange(e.target.value)} disabled={!efforts.length}>{efforts.map((effort) => <option value={effort} key={effort}>{effort}</option>)}</select></label></div>
       <label className="approval-mode-label">アクションの承認<select value={writableAvailable ? props.approvalMode : "consultationOnly"} disabled={!writableAvailable} onChange={(e) => props.onApprovalModeChange(e.target.value as ApprovalMode)}><option value="confirmFirst">確認優先</option><option value="consultationOnly">相談のみ</option><option value="onRequest">必要時のみ確認</option></select></label>
       {!writableAvailable && <div className="codex-compatibility-note">編集または承認Schemaに互換性がないため、この接続では相談のみに制限します。</div>}
