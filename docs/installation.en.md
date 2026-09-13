@@ -2,7 +2,7 @@
 
 [日本語](installation.md) | English
 
-This guide covers the `0.0.2-alpha` distribution for Windows 11 x64. PHITS AI
+This guide covers the `0.0.3-alpha` distribution for Windows 11 x64. PHITS AI
 Editor is an independently developed alpha application. Back up important
 input files before use.
 
@@ -10,8 +10,8 @@ input files before use.
 
 | Artifact | Recommended for | Windows integration |
 | --- | --- | --- |
-| `PHITS-AI-Editor-v0.0.2-alpha-windows-x64-setup.exe` | Normal use | Yes |
-| `PHITS-AI-Editor-v0.0.2-alpha-windows-x64-portable.zip` | Evaluation, side-by-side versions, development, and investigation | No |
+| `PHITS-AI-Editor-v0.0.3-alpha-windows-x64-setup.exe` | Normal use | Yes |
+| `PHITS-AI-Editor-v0.0.3-alpha-windows-x64-portable.zip` | Evaluation, side-by-side versions, development, and investigation | No |
 
 We recommend the installer for normal use. GitHub's automatically generated
 `Source code (zip)` is not the portable Windows application. Although a bare
@@ -112,7 +112,7 @@ With the portable edition, you can:
 
 ## 7. SmartScreen warning
 
-`0.0.2-alpha` is not code-signed, so Windows SmartScreen may show a warning.
+`0.0.3-alpha` is not code-signed, so Windows SmartScreen may show a warning.
 Do not run a file obtained outside the official GitHub Release or a file whose
 SHA-256 does not match. Continue only after verifying the source and hash and
 reading the warning yourself.
@@ -120,7 +120,7 @@ reading the warning yourself.
 Use PowerShell to verify an artifact:
 
 ```powershell
-Get-FileHash .\PHITS-AI-Editor-v0.0.2-alpha-windows-x64-setup.exe -Algorithm SHA256
+Get-FileHash .\PHITS-AI-Editor-v0.0.3-alpha-windows-x64-setup.exe -Algorithm SHA256
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -151,7 +151,7 @@ release.
 
 ## 10. Before reporting a problem
 
-- Review the [known issues](known-issues-v0.0.2-alpha.en.md).
+- Review the [known issues](known-issues-v0.0.3-alpha.en.md).
 - Record the application version, Windows version, reproduction steps,
   expected result, and actual result.
 - Do not post credentials, personal information, unpublished research data, or

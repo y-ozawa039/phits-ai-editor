@@ -93,7 +93,7 @@ pnpm release:package:windows
 ```
 
 Draft output is written below
-`src-tauri/target/release/release-candidate/v0.0.2-alpha/` and remains ignored.
+`src-tauri/target/release/release-candidate/v0.0.3-alpha/` and remains ignored.
 
 ## PHITS detection
 

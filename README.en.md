@@ -7,14 +7,14 @@ Codex-assisted input editing in one interface.
 
 ## Download for Windows
 
-The first alpha release supports Windows 11 x64.
+The current alpha release supports Windows 11 x64.
 
 - **Regular use (recommended):**
-  [Download the installer](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.2-alpha/PHITS-AI-Editor-v0.0.2-alpha-windows-x64-setup.exe)
+  [Download the installer](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.3-alpha/PHITS-AI-Editor-v0.0.3-alpha-windows-x64-setup.exe)
 - **Evaluation, portable use, or comparing versions:**
-  [Download the portable ZIP](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.2-alpha/PHITS-AI-Editor-v0.0.2-alpha-windows-x64-portable.zip)
+  [Download the portable ZIP](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.3-alpha/PHITS-AI-Editor-v0.0.3-alpha-windows-x64-portable.zip)
 - **Verify after downloading:**
-  [SHA-256 checksums](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.2-alpha/SHA256SUMS.txt)
+  [SHA-256 checksums](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.3-alpha/SHA256SUMS.txt)
 
 | Purpose | Choose | Why |
 |---|---|---|
@@ -71,7 +71,7 @@ for the detailed checks and troubleshooting steps.
 
 ## System requirements
 
-- Windows 11 x64 (distribution target for `0.0.2-alpha`)
+- Windows 11 x64 (distribution target for `0.0.3-alpha`)
 - A PHITS runtime environment when running input files (automatically detected
   from `PHITSPATH` or selected in Settings)
 - Codex CLI 0.153.1 or later when using AI assistance
@@ -121,7 +121,7 @@ This is not an official product developed, approved, sponsored, endorsed, or
 warranted by JAEA, the PHITS development team, OpenAI, or the author's
 affiliated institution.
 
-## Windows alpha release (`0.0.2-alpha`)
+## Windows alpha release (`0.0.3-alpha`)
 
 Implemented features include:
 
@@ -161,5 +161,5 @@ development environment. See the
 Ubuntu support and Linux packages are possible future ports and are not
 currently available.
 
-See the [release notes](docs/release-notes-v0.0.2-alpha.en.md) and
-[known issues](docs/known-issues-v0.0.2-alpha.en.md).
+See the [release notes](docs/release-notes-v0.0.3-alpha.en.md) and
+[known issues](docs/known-issues-v0.0.3-alpha.en.md).
