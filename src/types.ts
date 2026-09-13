@@ -117,6 +117,26 @@ export interface CodexCompatibilityReport {
   messages: string[];
 }
 
+export type CodexSandboxProbeState = "available" | "limited" | "unavailable";
+export type CodexSandboxCheckId = "appServer" | "windowsSandbox" | "commandExecution" | "workspaceWrite";
+
+export interface CodexSandboxCheck {
+  id: CodexSandboxCheckId;
+  state: CodexSandboxProbeState;
+  detail: string;
+}
+
+export interface CodexSandboxProbeReport {
+  state: CodexSandboxProbeState;
+  workspaceRoot: string;
+  checkedAt: string;
+  readiness: string | null;
+  allowedImplementations: string[];
+  checks: CodexSandboxCheck[];
+  messages: string[];
+  supportPrompt: string;
+}
+
 export interface CodexEvent {
   method: string;
   params: unknown;

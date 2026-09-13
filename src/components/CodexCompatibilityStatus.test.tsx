@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { CodexCompatibilityStatus } from "./CodexCompatibilityStatus";
-import type { CodexCompatibilityReport } from "../types";
+import type { CodexCompatibilityReport, CodexSandboxProbeReport, PhitsAgentSetupStatus } from "../types";
 
 const report: CodexCompatibilityReport = {
   state: "limited",
@@ -40,5 +40,48 @@ describe("CodexCompatibilityStatus", () => {
   it("shows the startup probing state", () => {
     render(<CodexCompatibilityStatus report={null} busy />);
     expect(screen.getByText("Codex機能を確認中…")).toBeTruthy();
+  });
+
+  it("adds live editing checks to the existing expandable diagnosis", () => {
+    const compatibleReport: CodexCompatibilityReport = {
+      ...report,
+      state: "compatible",
+      features: report.features.map((feature) => ({ ...feature, state: "available" })),
+    };
+    const sandbox: CodexSandboxProbeReport = {
+      state: "available",
+      workspaceRoot: "C:\\work",
+      checkedAt: "2026-09-13T00:00:00Z",
+      readiness: "ready",
+      allowedImplementations: ["unelevated"],
+      checks: [
+        { id: "appServer", state: "available", detail: "ok" },
+        { id: "windowsSandbox", state: "available", detail: "ok" },
+        { id: "commandExecution", state: "available", detail: "ok" },
+        { id: "workspaceWrite", state: "available", detail: "ok" },
+      ],
+      messages: [],
+      supportPrompt: "",
+    };
+    const setup = { configured: true } as PhitsAgentSetupStatus;
+
+    const { container } = render(
+      <CodexCompatibilityStatus
+        report={compatibleReport}
+        busy={false}
+        sandbox={sandbox}
+        setup={setup}
+      />,
+    );
+    const summary = screen.getByRole("button", { name: "Codex編集環境：確認済み" });
+
+    fireEvent.click(summary);
+
+    const windowsSandbox = container.querySelector(".codex-feature-row-wide");
+    expect(windowsSandbox).toHaveClass("codex-feature-row-wide");
+    expect(windowsSandbox).toHaveTextContent("WindowsSandbox利用可能");
+    expect(container.querySelectorAll(".codex-feature-spacer")).toHaveLength(1);
+    expect(screen.getByText("コマンド実行")).toBeTruthy();
+    expect(screen.getAllByText("ファイル編集")).toHaveLength(2);
   });
 });

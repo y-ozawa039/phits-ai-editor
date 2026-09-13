@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { ApprovalDecision, ApprovalMode, ApprovalRequest, CodexChangeGroupV1, CodexChangeHistoryEntryV1, CodexCompatibilityReport, CodexConnectResult, CodexHistoryChangeInput, CodexHistoryPreview, DocumentData, EditorContextV1, PhitsAgentSetupStatus, PhitsAppSettings, RuntimeDiagnostics, StartupOpenRequest, UtilityKind, WorkspaceInfo } from "./types";
+import type { ApprovalDecision, ApprovalMode, ApprovalRequest, CodexChangeGroupV1, CodexChangeHistoryEntryV1, CodexCompatibilityReport, CodexConnectResult, CodexHistoryChangeInput, CodexHistoryPreview, CodexSandboxProbeReport, DocumentData, EditorContextV1, PhitsAgentSetupStatus, PhitsAppSettings, RuntimeDiagnostics, StartupOpenRequest, UtilityKind, WorkspaceInfo } from "./types";
 
 export const api = {
   openWorkspace: (path: string, restoreRunState = true, preferredInput?: string) => invoke<WorkspaceInfo>("workspace_open", { path, restoreRunState, preferredInput }),
@@ -10,6 +10,7 @@ export const api = {
   saveDocumentAs: (workspaceRoot: string, targetPath: string, content: string, sourceDocument?: DocumentData | null) => invoke<DocumentData>("document_save_as", { workspaceRoot, targetPath, content, sourceDocument: sourceDocument ?? null }),
   diagnostics: (workspaceRoot?: string) => invoke<RuntimeDiagnostics>("runtime_diagnose", { workspaceRoot }),
   codexCompatibilityProbe: (force = false) => invoke<CodexCompatibilityReport>("codex_compatibility_probe", { force }),
+  codexSandboxProbe: (workspaceRoot: string) => invoke<CodexSandboxProbeReport>("codex_sandbox_probe", { workspaceRoot }),
   getPhitsSettings: () => invoke<PhitsAppSettings>("phits_settings_get"),
   setPhitsSettings: (phitsRoot?: string | null) => invoke<PhitsAppSettings>("phits_settings_set", { phitsRoot: phitsRoot ?? null }),
   loadLanguageSpec: (phitsRoot?: string) => invoke<unknown>("language_spec_load", { phitsRoot }),

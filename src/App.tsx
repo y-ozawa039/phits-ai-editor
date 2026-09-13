@@ -22,7 +22,7 @@ import packageMetadata from "../package.json";
 import { changeKindValue, makeDiffReviewFile, mergeAppliedDiffReviewFiles, movePathValue, type DiffReviewFile, type DiffReviewState } from "./diffReview";
 import { DIAGNOSTICS_RAPID_GAP_MS, DIAGNOSTICS_RAPID_THRESHOLD_MS, DIAGNOSTICS_TURN_BASE_MS, diagnosticsTurnDuration, shouldRequestDiagnostics } from "./diagnosticsMotion";
 import { applyUndoableModelContent, asUndoableTextModel, runUndoableModelHistory } from "./editorHistory";
-import type { ApprovalDecision, ApprovalFileChange, ApprovalMode, ApprovalRequest, ApprovalResolvedEvent, CodexChangeGroupV1, CodexCompatibilityReport, CodexContextOptions, CodexEvent, CodexFeatureId, CodexFileChangeEvent, CodexHistoryPreview, CodexModel, CodexThreadLink, DocumentData, DocumentRevisionV1, EditorContextV1, EditorSelectionContext, PhitsAgentSetupStatus, RunStatus, RuntimeDiagnostics, StartupOpenRequest, UtilityKind, WorkspaceInfo } from "./types";
+import type { ApprovalDecision, ApprovalFileChange, ApprovalMode, ApprovalRequest, ApprovalResolvedEvent, CodexChangeGroupV1, CodexCompatibilityReport, CodexContextOptions, CodexEvent, CodexFeatureId, CodexFileChangeEvent, CodexHistoryPreview, CodexModel, CodexSandboxProbeReport, CodexThreadLink, DocumentData, DocumentRevisionV1, EditorContextV1, EditorSelectionContext, PhitsAgentSetupStatus, RunStatus, RuntimeDiagnostics, StartupOpenRequest, UtilityKind, WorkspaceInfo } from "./types";
 import { codexPanelWidth, DEFAULT_CODEX_PANEL_RATIO, FONT_SIZE_PRESETS, loadFontSizeDefaults, loadUiPreferences, MAX_CODEX_PANEL_RATIO, MAX_FONT_SIZE, MIN_CODEX_PANEL_WIDTH, MIN_FONT_SIZE, normalizeCodexPanelRatio, saveFontSizeDefaults, saveUiPreferences } from "./uiPreferences";
 import { closeTopMenus } from "./topMenu";
 import { loadWorkspaceSession, saveWorkspaceSession } from "./workspaceSession";
@@ -212,6 +212,8 @@ export default function App() {
   const [diagnosticsQueuedTurns, setDiagnosticsQueuedTurns] = useState(0);
   const [codexCompatibility, setCodexCompatibility] = useState<CodexCompatibilityReport | null>(null);
   const [phitsAgentSetup, setPhitsAgentSetup] = useState<PhitsAgentSetupStatus | null>(null);
+  const [codexSandboxReport, setCodexSandboxReport] = useState<CodexSandboxProbeReport | null>(null);
+  const [codexSandboxBusy, setCodexSandboxBusy] = useState(false);
   const [codexConnectionError, setCodexConnectionError] = useState<string | null>(null);
   const [codexProbeBusy, setCodexProbeBusy] = useState(false);
   const [output, setOutput] = useState<string[]>([]);
@@ -348,15 +350,21 @@ export default function App() {
   ), [codexCompatibility, codexConnectionError]);
 
   const codexTroubleshootingPrompt = useMemo(() => {
-    if (!workspace || (!codexUnavailableReason && phitsAgentSetup?.configured !== false)) return null;
+    if (!workspace || (
+      !codexUnavailableReason
+      && phitsAgentSetup?.configured !== false
+      && codexSandboxReport?.state !== "limited"
+      && codexSandboxReport?.state !== "unavailable"
+    )) return null;
     return buildPhitsAgentSetupHelp({
       workspaceRoot: workspace.root,
       setup: phitsAgentSetup,
       diagnostics,
       compatibility: codexCompatibility,
+      sandbox: codexSandboxReport,
       connectionError: codexUnavailableReason,
     });
-  }, [codexCompatibility, codexUnavailableReason, diagnostics, phitsAgentSetup, workspace]);
+  }, [codexCompatibility, codexSandboxReport, codexUnavailableReason, diagnostics, phitsAgentSetup, workspace]);
 
   const retainedModel = useCallback((documentId: string) => {
     const monaco = monacoRef.current;
@@ -451,6 +459,25 @@ export default function App() {
     } catch (error) {
       setPhitsAgentSetup(null);
       notify(`PHITS用Codex設定を検査できませんでした: ${errorMessage(error)}`, "info");
+    }
+  }, [notify]);
+
+  const probeCodexSandbox = useCallback(async (root?: string): Promise<CodexSandboxProbeReport | null> => {
+    if (!isTauri() || !root) {
+      setCodexSandboxReport(null);
+      return null;
+    }
+    setCodexSandboxBusy(true);
+    try {
+      const report = await api.codexSandboxProbe(root);
+      setCodexSandboxReport(report);
+      return report;
+    } catch (error) {
+      setCodexSandboxReport(null);
+      notify(`Codex編集環境を診断できませんでした: ${errorMessage(error)}`, "info");
+      return null;
+    } finally {
+      setCodexSandboxBusy(false);
     }
   }, [notify]);
 
@@ -552,6 +579,7 @@ export default function App() {
     if (shouldRequestDiagnostics(motion.rapidMode, diagnosticsRequestCountRef.current)) {
       void updateDiagnostics(workspace.root);
       void probeCodexCompatibility(true);
+      if (codexConnected) void probeCodexSandbox(workspace.root);
     }
 
     if (motion.spinning || !diagnosticsRotorRef.current) return;
@@ -565,7 +593,7 @@ export default function App() {
       if (!motion.rapidMode) motion.spinning = false;
       motion.normalAnimation = null;
     }).catch(() => undefined);
-  }, [probeCodexCompatibility, startQueuedDiagnosticsTurns, updateDiagnostics, workspace]);
+  }, [codexConnected, probeCodexCompatibility, probeCodexSandbox, startQueuedDiagnosticsTurns, updateDiagnostics, workspace]);
 
   useEffect(() => () => {
     const motion = diagnosticsMotionRef.current;
@@ -681,6 +709,7 @@ export default function App() {
       setApprovals([]);
       setSessionApprovalActive(false);
       setPhitsAgentSetup(null);
+      setCodexSandboxReport(null);
       setCodexConnectionError(null);
       for (const entry of documentsRef.current) retainedModel(entry.id)?.dispose();
       setOutput([]);
@@ -1034,6 +1063,12 @@ export default function App() {
       setPhitsAgentSetup(connection.phitsAgentSetup);
       setCodexConnectionError(null);
       setModels(available); setThreadLinks(connection.threads); setModel(selected?.id ?? ""); setReasoning(selected?.defaultReasoningEffort ?? selected?.supportedReasoningEfforts[0] ?? ""); setCodexConnected(true);
+      const sandbox = await probeCodexSandbox(workspace.root);
+      if (sandbox?.state === "unavailable") {
+        notify("Codexには接続できましたが、Sandbox内のファイル編集を確認できませんでした。診断結果を確認してください。", "error");
+      } else if (sandbox?.state === "limited") {
+        notify("Codex編集環境の診断に確認事項があります。", "info");
+      }
       setMessages((current) => [...current, { id: crypto.randomUUID(), role: "system", text: "Codex App Serverに接続しました。" }]);
     } catch (error) {
       const message = errorMessage(error);
@@ -1041,7 +1076,7 @@ export default function App() {
       notify(`Codexに接続できませんでした: ${message}`, "error");
     }
     finally { setCodexBusy(false); }
-  }, [notify, probeCodexCompatibility, workspace]);
+  }, [notify, probeCodexCompatibility, probeCodexSandbox, workspace]);
 
   const disconnectCodex = useCallback(async () => {
     try { await api.codexDisconnect(); } catch { /* safe local disconnected state */ }
@@ -1049,10 +1084,17 @@ export default function App() {
   }, []);
 
   const startThread = useCallback(async () => {
-    if (!workspace) return;
-    if (!codexFeatureAvailable(codexCompatibility, "threads")) { notify("このCodex CLIではスレッド機能を利用できません。", "error"); return; }
-    try { setCodexBusy(true); const id = await api.codexThreadStart(workspace.root, model || undefined, reasoning || undefined); setThreadId(id); setThreadLinks((current) => [{ threadId: id, title: "新しい会話", lastUsedAt: new Date().toISOString(), model, reasoningEffort: reasoning }, ...current.filter((item) => item.threadId !== id)]); setMessages([]); }
-    catch (error) { notify(`スレッドを開始できませんでした: ${errorMessage(error)}`, "error"); }
+    if (!workspace) return null;
+    if (!codexFeatureAvailable(codexCompatibility, "threads")) { notify("このCodex CLIではスレッド機能を利用できません。", "error"); return null; }
+    try {
+      setCodexBusy(true);
+      const id = await api.codexThreadStart(workspace.root, model || undefined, reasoning || undefined);
+      setThreadId(id);
+      setThreadLinks((current) => [{ threadId: id, title: "新しい会話", lastUsedAt: new Date().toISOString(), model, reasoningEffort: reasoning }, ...current.filter((item) => item.threadId !== id)]);
+      setMessages([]);
+      return id;
+    }
+    catch (error) { notify(`スレッドを開始できませんでした: ${errorMessage(error)}`, "error"); return null; }
     finally { setCodexBusy(false); }
   }, [codexCompatibility, model, notify, reasoning, workspace]);
 
@@ -1674,7 +1716,7 @@ export default function App() {
           {workspace ? <>
             <div className="workspace-name" title={workspace.root}><Icon name="chevron"/><span>{fileName(workspace.root)}</span></div>
             <div className="file-list">{allFiles.map((path) => <button className={`file-item${activeDocument?.document?.relativePath === path ? " selected" : ""}${pendingReviewPaths.has(path) ? " codex-pending" : ""}`} onClick={() => openDocument(path)} onContextMenu={(event) => { if (path.toLowerCase().endsWith(".out")) { event.preventDefault(); void analyzeOutput(path); } }} key={path} title={pendingReviewPaths.has(path) ? `${path}（Codexの変更・未確認）` : path.toLowerCase().endsWith(".out") ? `${path}（右クリックでCodex解析）` : path}><Icon name="file"/><span>{path}</span>{pendingReviewPaths.has(path) && <span className="codex-review-marker" aria-label="Codexの変更・未確認">AI</span>}</button>)}{!allFiles.length && <div className="explorer-empty">編集できるファイルがありません。</div>}</div>
-            <section className="diagnostics-card"><div className="diagnostics-heading"><span>実行環境</span><button className="diagnostics-refresh" onClick={handleDiagnosticsRefresh} aria-label={diagnosticsBusy || codexProbeBusy || diagnosticsQueuedTurns > 0 ? "実行環境を診断中" : "実行環境を再診断"} aria-busy={diagnosticsBusy || codexProbeBusy || diagnosticsQueuedTurns > 0} title={diagnosticsBusy || codexProbeBusy || diagnosticsQueuedTurns > 0 ? "診断中" : "再診断"}><span ref={diagnosticsRotorRef} className="diagnostics-refresh-rotor"><span ref={diagnosticsPulseRef} className="diagnostics-refresh-pulse"><Icon name="refresh"/></span></span></button></div>{diagnosticsQueuedTurns > 0 && <p className="diagnostics-refresh-status" aria-live="polite">再診断中お待ちください（残り{diagnosticsQueuedTurns}回転）</p>}<div className="diagnostic-row"><span className={`diagnostic-dot ${diagnostics?.compatibility === "supported" ? "ok" : diagnostics?.compatibility === "unsupportedOlder" ? "bad" : "warn"}`}/><div><strong>PHITS {diagnostics?.phitsVersion ?? "—"}</strong><small>{compatibilityLabel(diagnostics?.compatibility)}</small></div></div><div className="diagnostic-row"><span className={`diagnostic-dot ${codexCompatibility?.state === "compatible" ? "ok" : codexCompatibility?.state === "limited" ? "warn" : diagnostics?.codexCompatible ? "muted" : "bad"}`}/><div><strong>Codex {codexCompatibility?.codexVersion ?? diagnostics?.codexVersion ?? "—"}</strong><small>{codexProbeBusy ? "互換性を確認中" : codexCompatibility?.state === "compatible" ? "互換性確認済み" : codexCompatibility?.state === "limited" ? "一部機能のみ利用可能" : "未接続 / 利用不可"}</small></div></div><CodexCompatibilityStatus report={codexCompatibility} busy={codexProbeBusy}/>{diagnostics?.messages.filter((message) => !message.startsWith("Codex CLIは検証基準")).slice(0, 2).map((message) => <p className="diagnostic-message" key={message}>{message}</p>)}</section>
+            <section className="diagnostics-card"><div className="diagnostics-heading"><span>実行環境</span><button className="diagnostics-refresh" onClick={handleDiagnosticsRefresh} aria-label={diagnosticsBusy || codexProbeBusy || codexSandboxBusy || diagnosticsQueuedTurns > 0 ? "実行環境を診断中" : "実行環境を再診断"} aria-busy={diagnosticsBusy || codexProbeBusy || codexSandboxBusy || diagnosticsQueuedTurns > 0} title={diagnosticsBusy || codexProbeBusy || codexSandboxBusy || diagnosticsQueuedTurns > 0 ? "診断中" : "再診断"}><span ref={diagnosticsRotorRef} className="diagnostics-refresh-rotor"><span ref={diagnosticsPulseRef} className="diagnostics-refresh-pulse"><Icon name="refresh"/></span></span></button></div>{diagnosticsQueuedTurns > 0 && <p className="diagnostics-refresh-status" aria-live="polite">再診断中お待ちください（残り{diagnosticsQueuedTurns}回転）</p>}<div className="diagnostic-row"><span className={`diagnostic-dot ${diagnostics?.compatibility === "supported" ? "ok" : diagnostics?.compatibility === "unsupportedOlder" ? "bad" : "warn"}`}/><div><strong>PHITS {diagnostics?.phitsVersion ?? "—"}</strong><small>{compatibilityLabel(diagnostics?.compatibility)}</small></div></div><div className="diagnostic-row"><span className={`diagnostic-dot ${codexCompatibility?.state === "compatible" ? "ok" : codexCompatibility?.state === "limited" ? "warn" : diagnostics?.codexCompatible ? "muted" : "bad"}`}/><div><strong>Codex {codexCompatibility?.codexVersion ?? diagnostics?.codexVersion ?? "—"}</strong><small>{codexProbeBusy ? "互換性を確認中" : codexCompatibility?.state === "compatible" ? "互換性確認済み" : codexCompatibility?.state === "limited" ? "一部機能のみ利用可能" : "未接続 / 利用不可"}</small></div></div><CodexCompatibilityStatus report={codexCompatibility} busy={codexProbeBusy} sandbox={codexSandboxReport} sandboxBusy={codexSandboxBusy} setup={phitsAgentSetup}/>{diagnostics?.messages.filter((message) => !message.startsWith("Codex CLIは検証基準")).slice(0, 2).map((message) => <p className="diagnostic-message" key={message}>{message}</p>)}</section>
           </> : <div className="workspace-empty"><div className="empty-folder"><Icon name="folder"/></div><strong>ワークスペースなし</strong><p>.inp / .pht を含むフォルダーを開きます。</p><button className="secondary-button" onClick={chooseWorkspace}>フォルダーを開く</button></div>}
         </aside>}
 
@@ -1684,7 +1726,7 @@ export default function App() {
           <OutputPanel lines={output} collapsed={outputCollapsed} height={outputHeight} onToggle={() => setOutputCollapsed((value) => !value)} onClear={() => setOutput([])} onResizeStart={startHorizontalResize}/>
         </main>
 
-        <CodexPanel open={codexOpen} width={codexWidth} fontSize={codexFontSize} connected={codexConnected} connectionError={codexUnavailableReason} troubleshootingPrompt={codexTroubleshootingPrompt} busy={codexBusy} models={models} model={model} reasoning={reasoning} approvalMode={approvalMode} sessionApprovalActive={sessionApprovalActive} threadId={threadId} threads={threadLinks} chatAvailable={codexFeatureAvailable(codexCompatibility, "chat")} threadsAvailable={codexFeatureAvailable(codexCompatibility, "threads")} writableAvailable={codexFeatureAvailable(codexCompatibility, "fileEditing") && codexFeatureAvailable(codexCompatibility, "approvals")} phitsAgentSetup={phitsAgentSetup} messages={messages} approval={currentApproval} approvalCount={approvals.length} approvalCanAccept={approvalCanAccept} contextChips={contextChips} draftRequest={draftRequest} onToggle={() => setCodexOpen((value) => !value)} onResizeStart={startVerticalResize} onResizeReset={() => setCodexPanelRatio(DEFAULT_CODEX_PANEL_RATIO)} onOpenDiff={() => { if (!currentApproval) return; setDiffReview((current) => current?.requestKey === approvalRequestKey(currentApproval) ? { ...current, selectedFileIndex: 0 } : current); }} onConnect={connectCodex} onDisconnect={disconnectCodex} onModelChange={setModel} onReasoningChange={setReasoning} onApprovalModeChange={setApprovalMode} onNewThread={startThread} onResumeThread={resumeThread} onRenameThread={renameThread} onDeleteThread={deleteThread} onRemoveContext={removeContext} onSend={sendCodex} onInterrupt={interruptCodex} onApproval={resolveApproval}/>
+        <CodexPanel open={codexOpen} width={codexWidth} fontSize={codexFontSize} connected={codexConnected} connectionError={codexUnavailableReason} troubleshootingPrompt={codexTroubleshootingPrompt} busy={codexBusy} models={models} model={model} reasoning={reasoning} approvalMode={approvalMode} sessionApprovalActive={sessionApprovalActive} threadId={threadId} threads={threadLinks} chatAvailable={codexFeatureAvailable(codexCompatibility, "chat")} threadsAvailable={codexFeatureAvailable(codexCompatibility, "threads")} writableAvailable={codexFeatureAvailable(codexCompatibility, "fileEditing") && codexFeatureAvailable(codexCompatibility, "approvals")} phitsAgentSetup={phitsAgentSetup} sandboxReport={codexSandboxReport} sandboxBusy={codexSandboxBusy} messages={messages} approval={currentApproval} approvalCount={approvals.length} approvalCanAccept={approvalCanAccept} contextChips={contextChips} draftRequest={draftRequest} onToggle={() => setCodexOpen((value) => !value)} onResizeStart={startVerticalResize} onResizeReset={() => setCodexPanelRatio(DEFAULT_CODEX_PANEL_RATIO)} onOpenDiff={() => { if (!currentApproval) return; setDiffReview((current) => current?.requestKey === approvalRequestKey(currentApproval) ? { ...current, selectedFileIndex: 0 } : current); }} onConnect={connectCodex} onDisconnect={disconnectCodex} onModelChange={setModel} onReasoningChange={setReasoning} onApprovalModeChange={setApprovalMode} onNewThread={startThread} onResumeThread={resumeThread} onRenameThread={renameThread} onDeleteThread={deleteThread} onRemoveContext={removeContext} onSend={sendCodex} onInterrupt={interruptCodex} onApproval={resolveApproval}/>
       </div>
 
       {settingsSection && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsSection(null); }}>

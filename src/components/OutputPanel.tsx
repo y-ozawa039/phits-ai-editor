@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from "react";
 import { Icon } from "./Icons";
 
 interface OutputPanelProps {
@@ -10,6 +11,14 @@ interface OutputPanelProps {
 }
 
 export function OutputPanel({ lines, collapsed, height, onToggle, onClear, onResizeStart }: OutputPanelProps) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const followLatestRef = useRef(true);
+
+  useLayoutEffect(() => {
+    const content = contentRef.current;
+    if (!collapsed && content && followLatestRef.current) content.scrollTop = content.scrollHeight;
+  }, [collapsed, lines]);
+
   return (
     <section className={`output-panel${collapsed ? " collapsed" : ""}`} style={collapsed ? undefined : { height }} aria-label="実行出力">
       {!collapsed && <div className="horizontal-resizer" onPointerDown={onResizeStart} />}
@@ -23,7 +32,10 @@ export function OutputPanel({ lines, collapsed, height, onToggle, onClear, onRes
         </div>
       </header>
       {!collapsed && (
-        <div className="output-content" role="log" aria-live="polite">
+        <div ref={contentRef} className="output-content" role="log" aria-live="polite" onScroll={(event) => {
+          const content = event.currentTarget;
+          followLatestRef.current = content.scrollHeight - content.scrollTop - content.clientHeight <= 24;
+        }}>
           {lines.length ? lines.map((line, index) => <div className="output-line" key={`${index}-${line.slice(0, 20)}`}>{line}</div>) : <div className="empty-note">実行出力はここに表示されます。</div>}
         </div>
       )}

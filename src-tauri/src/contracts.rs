@@ -269,6 +269,44 @@ pub struct CodexCompatibilityReport {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub enum CodexSandboxProbeState {
+    Available,
+    Limited,
+    Unavailable,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CodexSandboxCheckId {
+    AppServer,
+    WindowsSandbox,
+    CommandExecution,
+    WorkspaceWrite,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexSandboxCheck {
+    pub id: CodexSandboxCheckId,
+    pub state: CodexSandboxProbeState,
+    pub detail: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexSandboxProbeReport {
+    pub state: CodexSandboxProbeState,
+    pub workspace_root: String,
+    pub checked_at: String,
+    pub readiness: Option<String>,
+    pub allowed_implementations: Vec<String>,
+    pub checks: Vec<CodexSandboxCheck>,
+    pub messages: Vec<String>,
+    pub support_prompt: String,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub enum ApprovalMode {
     ConfirmFirst,
     ConsultationOnly,

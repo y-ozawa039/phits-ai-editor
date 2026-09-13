@@ -30,14 +30,16 @@ use crate::{
     },
     contracts::{
         ApprovalMode, CodexCompatibilityReport, CodexConnectResult, CodexFeatureId,
-        CodexFeatureState, CodexModel, CodexThreadLink, EditorContextV1, PhitsAgentSetupCheck,
-        PhitsAgentSetupState, PhitsAgentSetupStatus,
+        CodexFeatureState, CodexModel, CodexSandboxCheck, CodexSandboxCheckId,
+        CodexSandboxProbeReport, CodexSandboxProbeState, CodexThreadLink, EditorContextV1,
+        PhitsAgentSetupCheck, PhitsAgentSetupState, PhitsAgentSetupStatus,
     },
     diagnostics::{codex_compatibility_probe, resolve_codex_executable, resolve_phits_root},
     error::{AppError, AppResult},
     settings::app_phits_root,
     workspace::{path_to_string, resolve_existing_path, resolve_save_path, validate_relative_path},
 };
+use uuid::Uuid;
 
 const CODEX_BASELINE: (u32, u32, u32) = (0, 153, 1);
 const APP_SERVER_INSTRUCTIONS: &str = r#"You are the editing agent embedded in PHITS AI Editor.
@@ -1441,9 +1443,380 @@ async fn start_connection(
     });
     tokio::spawn(reader_loop(connection.clone(), stdout, app.clone()));
     tokio::spawn(stderr_loop(stderr, app));
-    connection.request("initialize", json!({ "clientInfo": { "name": "phits_ai_editor", "title": "PHITS AI Editor", "version": env!("CARGO_PKG_VERSION") } })).await?;
-    connection.notify("initialized", json!({})).await?;
+    if let Err(error) = connection
+        .request("initialize", json!({ "clientInfo": { "name": "phits_ai_editor", "title": "PHITS AI Editor", "version": env!("CARGO_PKG_VERSION") } }))
+        .await
+    {
+        let _ = close_connection(&connection).await;
+        return Err(error);
+    }
+    if let Err(error) = connection.notify("initialized", json!({})).await {
+        let _ = close_connection(&connection).await;
+        return Err(error);
+    }
     Ok(connection)
+}
+
+async fn close_connection(connection: &Arc<CodexConnection>) -> AppResult<()> {
+    if let Some(mut stdin) = connection.stdin.lock().await.take() {
+        let _ = stdin.shutdown().await;
+    }
+    let mut child = connection.child.lock().await;
+    if timeout(Duration::from_secs(3), child.wait()).await.is_err() {
+        child.start_kill()?;
+        let _ = timeout(Duration::from_secs(2), child.wait()).await;
+    }
+    Ok(())
+}
+
+fn short_probe_error(error: impl std::fmt::Display) -> String {
+    let message = error.to_string().replace(['\r', '\n'], " ");
+    message.chars().take(800).collect()
+}
+
+fn sandbox_check(
+    id: CodexSandboxCheckId,
+    state: CodexSandboxProbeState,
+    detail: impl Into<String>,
+) -> CodexSandboxCheck {
+    CodexSandboxCheck {
+        id,
+        state,
+        detail: detail.into(),
+    }
+}
+
+fn sandbox_probe_state(checks: &[CodexSandboxCheck]) -> CodexSandboxProbeState {
+    if checks.iter().any(|check| {
+        matches!(
+            check.id,
+            CodexSandboxCheckId::AppServer
+                | CodexSandboxCheckId::CommandExecution
+                | CodexSandboxCheckId::WorkspaceWrite
+        ) && check.state == CodexSandboxProbeState::Unavailable
+    }) {
+        CodexSandboxProbeState::Unavailable
+    } else if checks
+        .iter()
+        .any(|check| check.state != CodexSandboxProbeState::Available)
+    {
+        CodexSandboxProbeState::Limited
+    } else {
+        CodexSandboxProbeState::Available
+    }
+}
+
+fn sandbox_support_prompt(
+    workspace_root: &Path,
+    checks: &[CodexSandboxCheck],
+    readiness: Option<&str>,
+    allowed_implementations: &[String],
+) -> String {
+    let check_lines = checks
+        .iter()
+        .map(|check| format!("- {:?}: {:?} — {}", check.id, check.state, check.detail))
+        .collect::<Vec<_>>()
+        .join("\n");
+    format!(
+        "PHITS AI EditorのCodex編集環境診断で問題が見つかりました。次の診断結果を確認し、原因を特定してください。必要な変更を提案する前に、Windows Sandbox、Codex CLI設定、組織ポリシーのどこで失敗しているかを切り分けてください。セキュリティ制限を一括解除せず、PHITSワークスペース内の編集に必要な最小限の修正を提案してください。\n\nワークスペース: {}\nWindows Sandbox readiness: {}\n許可された実装: {}\n診断結果:\n{}",
+        workspace_root.display(),
+        readiness.unwrap_or("取得できませんでした"),
+        if allowed_implementations.is_empty() {
+            "指定なし".to_string()
+        } else {
+            allowed_implementations.join(", ")
+        },
+        check_lines
+    )
+}
+
+#[cfg(windows)]
+fn workspace_write_probe_command(marker_path: &Path, marker: &str) -> Vec<String> {
+    vec![
+        "powershell.exe".to_string(),
+        "-NoLogo".to_string(),
+        "-NoProfile".to_string(),
+        "-NonInteractive".to_string(),
+        "-Command".to_string(),
+        "[System.IO.File]::WriteAllText($args[0], $args[1], [System.Text.UTF8Encoding]::new($false))"
+            .to_string(),
+        path_to_string(marker_path),
+        marker.to_string(),
+    ]
+}
+
+#[cfg(not(windows))]
+fn workspace_write_probe_command(marker_path: &Path, marker: &str) -> Vec<String> {
+    vec![
+        "/bin/sh".to_string(),
+        "-c".to_string(),
+        "printf %s \"$1\" > \"$2\"".to_string(),
+        "phits-editor-probe".to_string(),
+        marker.to_string(),
+        path_to_string(marker_path),
+    ]
+}
+
+fn unavailable_sandbox_report(workspace_root: &Path, detail: String) -> CodexSandboxProbeReport {
+    let checks = vec![
+        sandbox_check(
+            CodexSandboxCheckId::AppServer,
+            CodexSandboxProbeState::Unavailable,
+            detail.clone(),
+        ),
+        sandbox_check(
+            CodexSandboxCheckId::WindowsSandbox,
+            CodexSandboxProbeState::Unavailable,
+            "App Serverへ接続できないため検査できませんでした。",
+        ),
+        sandbox_check(
+            CodexSandboxCheckId::CommandExecution,
+            CodexSandboxProbeState::Unavailable,
+            "App Serverへ接続できないため検査できませんでした。",
+        ),
+        sandbox_check(
+            CodexSandboxCheckId::WorkspaceWrite,
+            CodexSandboxProbeState::Unavailable,
+            "App Serverへ接続できないため検査できませんでした。",
+        ),
+    ];
+    CodexSandboxProbeReport {
+        state: CodexSandboxProbeState::Unavailable,
+        workspace_root: path_to_string(workspace_root),
+        checked_at: Utc::now().to_rfc3339(),
+        readiness: None,
+        allowed_implementations: Vec::new(),
+        messages: vec![detail],
+        support_prompt: sandbox_support_prompt(workspace_root, &checks, None, &[]),
+        checks,
+    }
+}
+
+#[tauri::command]
+pub async fn codex_sandbox_probe(
+    app: AppHandle,
+    workspace_root: String,
+) -> AppResult<CodexSandboxProbeReport> {
+    let workspace = canonical_workspace(&workspace_root)?;
+    let compatibility = match codex_compatibility_probe(false).await {
+        Ok(report) => report,
+        Err(error) => {
+            return Ok(unavailable_sandbox_report(
+                &workspace,
+                short_probe_error(error),
+            ));
+        }
+    };
+
+    let existing = connection_slot().lock().await.clone();
+    let (connection, temporary) = match existing {
+        Some(connection) if connection.workspace_root == workspace => (connection, false),
+        _ => match start_connection(app, workspace.clone(), compatibility).await {
+            Ok(connection) => (connection, true),
+            Err(error) => {
+                return Ok(unavailable_sandbox_report(
+                    &workspace,
+                    short_probe_error(error),
+                ));
+            }
+        },
+    };
+
+    let mut checks = vec![sandbox_check(
+        CodexSandboxCheckId::AppServer,
+        CodexSandboxProbeState::Available,
+        "Codex App Serverへ接続できました。",
+    )];
+    let mut messages = Vec::new();
+
+    let readiness_result = connection
+        .request("windowsSandbox/readiness", json!({}))
+        .await;
+    let readiness = readiness_result
+        .as_ref()
+        .ok()
+        .and_then(|value| value.get("status"))
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    match readiness.as_deref() {
+        Some("ready") => checks.push(sandbox_check(
+            CodexSandboxCheckId::WindowsSandbox,
+            CodexSandboxProbeState::Available,
+            "Windows Sandboxは準備済みです。",
+        )),
+        Some("notConfigured") => checks.push(sandbox_check(
+            CodexSandboxCheckId::WindowsSandbox,
+            CodexSandboxProbeState::Unavailable,
+            "Windows Sandboxが未設定です。CodexのWindows Sandboxセットアップが必要です。",
+        )),
+        Some("updateRequired") => checks.push(sandbox_check(
+            CodexSandboxCheckId::WindowsSandbox,
+            CodexSandboxProbeState::Unavailable,
+            "Windows Sandboxの設定更新が必要です。",
+        )),
+        Some(other) => checks.push(sandbox_check(
+            CodexSandboxCheckId::WindowsSandbox,
+            CodexSandboxProbeState::Limited,
+            format!("未知の準備状態が返されました: {other}"),
+        )),
+        None => {
+            let detail = match readiness_result {
+                Ok(_) => "Windows Sandboxの準備状態を解釈できませんでした。".to_string(),
+                Err(error) => format!(
+                    "Windows Sandboxの準備状態を取得できませんでした: {}",
+                    short_probe_error(error)
+                ),
+            };
+            checks.push(sandbox_check(
+                CodexSandboxCheckId::WindowsSandbox,
+                CodexSandboxProbeState::Limited,
+                detail,
+            ));
+        }
+    }
+
+    let allowed_implementations = connection
+        .request("configRequirements/read", json!({}))
+        .await
+        .ok()
+        .and_then(|value| {
+            value
+                .pointer("/requirements/allowedWindowsSandboxImplementations")
+                .and_then(Value::as_array)
+                .cloned()
+        })
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|value| value.as_str().map(str::to_string))
+        .collect::<Vec<_>>();
+
+    match tempfile::Builder::new()
+        .prefix(".phits-editor-codex-probe-")
+        .tempdir_in(&workspace)
+    {
+        Ok(directory) => {
+            let marker = format!("PHITS_AI_EDITOR_SANDBOX_PROBE:{}", Uuid::new_v4());
+            let marker_path = directory.path().join("workspace-write.txt");
+            let command_result = connection
+                .request(
+                    "command/exec",
+                    json!({
+                        "command": workspace_write_probe_command(&marker_path, &marker),
+                        "cwd": workspace,
+                        "sandboxPolicy": {
+                            "type": "workspaceWrite",
+                            "writableRoots": [workspace],
+                            "networkAccess": false
+                        },
+                        "timeoutMs": 10_000,
+                        "outputBytesCap": 16_384
+                    }),
+                )
+                .await;
+            match command_result {
+                Ok(result) => {
+                    let exit_code = result.get("exitCode").and_then(Value::as_i64);
+                    if exit_code == Some(0) {
+                        checks.push(sandbox_check(
+                            CodexSandboxCheckId::CommandExecution,
+                            CodexSandboxProbeState::Available,
+                            "Sandbox内で検査コマンドを実行できました。",
+                        ));
+                        match std::fs::read_to_string(&marker_path) {
+                            Ok(content) if content == marker => checks.push(sandbox_check(
+                                CodexSandboxCheckId::WorkspaceWrite,
+                                CodexSandboxProbeState::Available,
+                                "ワークスペース内で検査ファイルを作成し、内容を確認できました。",
+                            )),
+                            Ok(_) => checks.push(sandbox_check(
+                                CodexSandboxCheckId::WorkspaceWrite,
+                                CodexSandboxProbeState::Unavailable,
+                                "検査ファイルの内容が一致しませんでした。",
+                            )),
+                            Err(error) => checks.push(sandbox_check(
+                                CodexSandboxCheckId::WorkspaceWrite,
+                                CodexSandboxProbeState::Unavailable,
+                                format!(
+                                    "検査ファイルを確認できませんでした: {}",
+                                    short_probe_error(error)
+                                ),
+                            )),
+                        }
+                    } else {
+                        let stderr = result
+                            .get("stderr")
+                            .and_then(Value::as_str)
+                            .unwrap_or_default();
+                        checks.push(sandbox_check(
+                            CodexSandboxCheckId::CommandExecution,
+                            CodexSandboxProbeState::Unavailable,
+                            format!(
+                                "検査コマンドが終了コード {:?} で失敗しました: {}",
+                                exit_code,
+                                short_probe_error(stderr)
+                            ),
+                        ));
+                        checks.push(sandbox_check(
+                            CodexSandboxCheckId::WorkspaceWrite,
+                            CodexSandboxProbeState::Unavailable,
+                            "検査コマンドが失敗したため、書込みを確認できませんでした。",
+                        ));
+                    }
+                }
+                Err(error) => {
+                    let detail = short_probe_error(error);
+                    checks.push(sandbox_check(
+                        CodexSandboxCheckId::CommandExecution,
+                        CodexSandboxProbeState::Unavailable,
+                        format!("Sandbox内で検査コマンドを実行できませんでした: {detail}"),
+                    ));
+                    checks.push(sandbox_check(
+                        CodexSandboxCheckId::WorkspaceWrite,
+                        CodexSandboxProbeState::Unavailable,
+                        "検査コマンドが起動できないため、書込みを確認できませんでした。",
+                    ));
+                }
+            }
+        }
+        Err(error) => {
+            let detail = short_probe_error(error);
+            checks.push(sandbox_check(
+                CodexSandboxCheckId::CommandExecution,
+                CodexSandboxProbeState::Limited,
+                "検査用フォルダーを作成できないため、コマンド検査を省略しました。",
+            ));
+            checks.push(sandbox_check(
+                CodexSandboxCheckId::WorkspaceWrite,
+                CodexSandboxProbeState::Unavailable,
+                format!("ワークスペースに検査用フォルダーを作成できませんでした: {detail}"),
+            ));
+        }
+    }
+
+    if temporary && let Err(error) = close_connection(&connection).await {
+        messages.push(format!(
+            "診断用Codex App Serverの終了時に問題が発生しました: {}",
+            short_probe_error(error)
+        ));
+    }
+
+    let state = sandbox_probe_state(&checks);
+    let support_prompt = sandbox_support_prompt(
+        &workspace,
+        &checks,
+        readiness.as_deref(),
+        &allowed_implementations,
+    );
+    Ok(CodexSandboxProbeReport {
+        state,
+        workspace_root: path_to_string(&workspace),
+        checked_at: Utc::now().to_rfc3339(),
+        readiness,
+        allowed_implementations,
+        checks,
+        messages,
+        support_prompt,
+    })
 }
 
 #[tauri::command]
@@ -1496,15 +1869,7 @@ pub async fn disconnect_internal() -> AppResult<()> {
     let Some(connection) = connection else {
         return Ok(());
     };
-    if let Some(mut stdin) = connection.stdin.lock().await.take() {
-        let _ = stdin.shutdown().await;
-    }
-    let mut child = connection.child.lock().await;
-    if timeout(Duration::from_secs(3), child.wait()).await.is_err() {
-        child.start_kill()?;
-        let _ = timeout(Duration::from_secs(2), child.wait()).await;
-    }
-    Ok(())
+    close_connection(&connection).await
 }
 
 #[tauri::command]
@@ -1907,6 +2272,66 @@ mod tests {
         );
         assert_eq!(models.len(), 1);
         assert_eq!(models[0].supported_reasoning_efforts, vec!["low", "medium"]);
+    }
+
+    #[test]
+    fn sandbox_probe_requires_command_and_workspace_write() {
+        let checks = vec![
+            sandbox_check(
+                CodexSandboxCheckId::AppServer,
+                CodexSandboxProbeState::Available,
+                "ok",
+            ),
+            sandbox_check(
+                CodexSandboxCheckId::WindowsSandbox,
+                CodexSandboxProbeState::Limited,
+                "unknown",
+            ),
+            sandbox_check(
+                CodexSandboxCheckId::CommandExecution,
+                CodexSandboxProbeState::Available,
+                "ok",
+            ),
+            sandbox_check(
+                CodexSandboxCheckId::WorkspaceWrite,
+                CodexSandboxProbeState::Unavailable,
+                "failed",
+            ),
+        ];
+        assert_eq!(
+            sandbox_probe_state(&checks),
+            CodexSandboxProbeState::Unavailable
+        );
+    }
+
+    #[test]
+    fn sandbox_probe_keeps_readiness_uncertainty_as_limited() {
+        let checks = vec![
+            sandbox_check(
+                CodexSandboxCheckId::AppServer,
+                CodexSandboxProbeState::Available,
+                "ok",
+            ),
+            sandbox_check(
+                CodexSandboxCheckId::WindowsSandbox,
+                CodexSandboxProbeState::Limited,
+                "unknown",
+            ),
+            sandbox_check(
+                CodexSandboxCheckId::CommandExecution,
+                CodexSandboxProbeState::Available,
+                "ok",
+            ),
+            sandbox_check(
+                CodexSandboxCheckId::WorkspaceWrite,
+                CodexSandboxProbeState::Available,
+                "ok",
+            ),
+        ];
+        assert_eq!(
+            sandbox_probe_state(&checks),
+            CodexSandboxProbeState::Limited
+        );
     }
 
     #[test]

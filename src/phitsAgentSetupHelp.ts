@@ -1,11 +1,12 @@
 import packageMetadata from "../package.json";
-import type { CodexCompatibilityReport, PhitsAgentSetupStatus, RuntimeDiagnostics } from "./types";
+import type { CodexCompatibilityReport, CodexSandboxProbeReport, PhitsAgentSetupStatus, RuntimeDiagnostics } from "./types";
 
 interface PhitsAgentSetupHelpInput {
   workspaceRoot: string;
   setup: PhitsAgentSetupStatus | null;
   diagnostics: RuntimeDiagnostics | null;
   compatibility: CodexCompatibilityReport | null;
+  sandbox: CodexSandboxProbeReport | null;
   connectionError: string | null;
 }
 
@@ -33,6 +34,19 @@ const pathSourceLabels = {
   unavailable: "未検出",
 } as const;
 
+const sandboxCheckLabels = {
+  appServer: "Codex App Server",
+  windowsSandbox: "Windows Sandbox",
+  commandExecution: "Sandbox内コマンド実行",
+  workspaceWrite: "ワークスペース編集",
+} as const;
+
+const sandboxStateLabels = {
+  available: "利用可能",
+  limited: "要確認",
+  unavailable: "利用不可",
+} as const;
+
 export function buildPhitsAgentSetupHelp(input: PhitsAgentSetupHelpInput): string {
   const setupLines = input.setup?.checks.map((check) => [
     `- ${checkLabels[check.id]}: ${setupStateLabels[check.state]}`,
@@ -42,6 +56,9 @@ export function buildPhitsAgentSetupHelp(input: PhitsAgentSetupHelpInput): strin
   const featureLines = input.compatibility?.features.map((feature) =>
     `- ${feature.id}: ${feature.state} (${feature.detail})`,
   ) ?? ["- App Server互換性: 検査結果なし"];
+  const sandboxLines = input.sandbox?.checks.map((check) =>
+    `- ${sandboxCheckLabels[check.id]}: ${sandboxStateLabels[check.state]} (${check.detail})`,
+  ) ?? ["- Codex編集環境: 実動作検査なし"];
   const connectionSection = input.connectionError
     ? [
         "Editor内のCodexへ接続できなかったため、ChatGPTデスクトップ版のローカルCodexタスクから調査しています。",
@@ -68,6 +85,13 @@ export function buildPhitsAgentSetupHelp(input: PhitsAgentSetupHelpInput): strin
     "Codex App Server互換性:",
     ...featureLines,
     "",
+    "Codex編集環境の実動作検査:",
+    ...sandboxLines,
+    ...(input.sandbox?.readiness ? [`- Windows Sandbox readiness: ${input.sandbox.readiness}`] : []),
+    ...(input.sandbox?.allowedImplementations.length
+      ? [`- 組織ポリシーで許可されたWindows Sandbox実装: ${input.sandbox.allowedImplementations.join(", ")}`]
+      : []),
+    "",
     "依頼:",
     "1. 上記結果から考えられる原因を、確定事項と推測に分けて説明してください。",
     "2. アクセスできる場合は、解決したPHITSルートにある workbench/README-jp.docx と workbench/execution_setup_for_agent.md を読み、公式手順を優先してください。",
@@ -76,6 +100,6 @@ export function buildPhitsAgentSetupHelp(input: PhitsAgentSetupHelpInput): strin
     "5. ファイルを変更する前に、バックアップ方法、変更対象、変更差分、元に戻す方法を提示し、私の確認を求めてください。既存の指示を削除または全面上書きしないでください。",
     "6. 認証情報、研究データ、PHITS入力・出力の内容は収集しないでください。PHITS計算も実行しないでください。",
     "",
-    "注意: この結果は設定ファイルの静的検査であり、Codex App Serverが指示を実際に読み込んだことの証明ではありません。ローカルファイルを確認できないCloudタスクではなく、このPCへアクセスできるローカルCodexタスクとして調査してください。",
+    "注意: PHITS用Codex設定は設定ファイルの静的検査であり、Codex App Serverが指示を実際に読み込んだことの証明ではありません。Codex編集環境については、モデルを使用せずSandbox内で検査コマンドと一時ファイルの書込みを実行した結果です。ローカルファイルを確認できないCloudタスクではなく、このPCへアクセスできるローカルCodexタスクとして調査してください。",
   ].join("\n");
 }

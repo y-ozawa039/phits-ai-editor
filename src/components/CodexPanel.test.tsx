@@ -191,7 +191,7 @@ describe("CodexPanel", () => {
     }} />);
     expect(screen.getByRole("alert")).toHaveTextContent("PHITS用Codex設定を確認してください");
     expect(screen.getByRole("alert")).toHaveTextContent("workbench/README-jp.docx");
-    fireEvent.click(screen.getByText("検査したファイルと理由"));
+    fireEvent.click(screen.getByText("診断項目と検査理由"));
     expect(screen.getByRole("alert")).toHaveTextContent("C:\\Users\\user\\.codex\\AGENTS.md");
   });
 
@@ -255,6 +255,42 @@ describe("CodexPanel", () => {
     expect(onSend).not.toHaveBeenCalled();
   });
 
+  it("creates a thread before inserting troubleshooting text when none is selected", async () => {
+    const onNewThread = vi.fn(() => Promise.resolve("thread-help"));
+    const onSend = vi.fn();
+    render(<CodexPanel {...baseProps} threadId={null} threads={[]} troubleshootingPrompt="初期相談文" onNewThread={onNewThread} onSend={onSend} phitsAgentSetup={{
+      configured: false,
+      state: "partial",
+      sourcePath: null,
+      message: "PHITS側だけ確認しました。",
+      checks: [],
+    }} />);
+    fireEvent.click(screen.getByText("生成AIへの相談文を表示"));
+    fireEvent.change(screen.getByRole("textbox", { name: "生成AIへの相談文" }), { target: { value: "確認済み相談文" } });
+    fireEvent.click(screen.getByRole("button", { name: "Codex入力欄へ挿入" }));
+
+    await waitFor(() => expect(onNewThread).toHaveBeenCalledOnce());
+    await waitFor(() => expect(screen.getByPlaceholderText("[新しいスレッド]をクリックするか、既存スレッドを選択してください")).toHaveValue("確認済み相談文"));
+    expect(screen.getByText("新しい相談用スレッドを作成しました。内容を確認して送信してください。")).toBeInTheDocument();
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it("keeps troubleshooting text when automatic thread creation fails", async () => {
+    const onNewThread = vi.fn(() => Promise.resolve(null));
+    render(<CodexPanel {...baseProps} threadId={null} threads={[]} troubleshootingPrompt="保持する相談文" onNewThread={onNewThread} phitsAgentSetup={{
+      configured: false,
+      state: "partial",
+      sourcePath: null,
+      message: "PHITS側だけ確認しました。",
+      checks: [],
+    }} />);
+    fireEvent.click(screen.getByText("生成AIへの相談文を表示"));
+    fireEvent.click(screen.getByRole("button", { name: "Codex入力欄へ挿入" }));
+
+    await waitFor(() => expect(screen.getByText("相談用スレッドを作成できませんでした。相談文は保持されています。")).toBeInTheDocument());
+    expect(screen.getByRole("textbox", { name: "生成AIへの相談文" })).toHaveValue("保持する相談文");
+  });
+
   it("does not show setup guidance after the PHITS Codex pointer is verified", () => {
     render(<CodexPanel {...baseProps} phitsAgentSetup={{
       configured: true,
@@ -264,6 +300,55 @@ describe("CodexPanel", () => {
       checks: [],
     }} />);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("does not occupy the panel when every Codex environment check passes", () => {
+    render(<CodexPanel {...baseProps} phitsAgentSetup={{
+      configured: true,
+      state: "confirmed",
+      sourcePath: "C:\\Users\\user\\.codex\\AGENTS.md",
+      message: "PHITS用Codex設定を確認しました。",
+      checks: [],
+    }} sandboxReport={{
+      state: "available",
+      workspaceRoot: "C:\\work",
+      checkedAt: "2026-09-13T00:00:00Z",
+      readiness: "ready",
+      allowedImplementations: [],
+      checks: [{ id: "workspaceWrite", state: "available", detail: "書込みを確認しました。" }],
+      messages: [],
+      supportPrompt: "",
+    }} />);
+    expect(screen.queryByText("Codex編集環境を確認しました")).not.toBeInTheDocument();
+    expect(screen.queryByText("診断項目と検査理由")).not.toBeInTheDocument();
+  });
+
+  it("adds sandbox failures to the existing connection diagnosis", () => {
+    render(<CodexPanel {...baseProps} troubleshootingPrompt="統合診断の相談文" phitsAgentSetup={{
+      configured: true,
+      state: "confirmed",
+      sourcePath: "C:\\Users\\user\\.codex\\AGENTS.md",
+      message: "PHITS用Codex設定を確認しました。",
+      checks: [{ id: "codexGlobal", state: "confirmed", path: "C:\\Users\\user\\.codex\\AGENTS.md", message: "参照を確認しました。" }],
+    }} sandboxReport={{
+      state: "unavailable",
+      workspaceRoot: "C:\\work",
+      checkedAt: "2026-09-13T00:00:00Z",
+      readiness: "notConfigured",
+      allowedImplementations: ["elevated"],
+      checks: [
+        { id: "windowsSandbox", state: "unavailable", detail: "Windows Sandboxが未設定です。" },
+        { id: "workspaceWrite", state: "unavailable", detail: "書込みを確認できませんでした。" },
+      ],
+      messages: [],
+      supportPrompt: "統合診断の相談文",
+    }} />);
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Codexからファイルを編集できません");
+    fireEvent.click(screen.getByText("診断項目と検査理由"));
+    expect(alert).toHaveTextContent("PHITS参照設定");
+    expect(alert).toHaveTextContent("Windows Sandbox");
+    expect(alert).toHaveTextContent("ワークスペース編集");
   });
 
   it("follows streaming messages while the transcript is at the latest position", () => {

@@ -20,6 +20,7 @@ describe("buildPhitsAgentSetupHelp", () => {
         messages: [],
       },
       compatibility: null,
+      sandbox: null,
       setup: {
         configured: false,
         state: "mismatch",
@@ -48,6 +49,7 @@ describe("buildPhitsAgentSetupHelp", () => {
       setup: null,
       diagnostics: null,
       compatibility: null,
+      sandbox: null,
       connectionError: null,
     });
     expect(prompt).toContain("静的検査");

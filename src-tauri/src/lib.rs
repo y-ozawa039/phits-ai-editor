@@ -58,6 +58,7 @@ pub fn run() {
             runner::run_phits_stop_graceful,
             runner::run_utility,
             codex::phits_agent_setup_inspect,
+            codex::codex_sandbox_probe,
             codex::codex_connect,
             codex::codex_disconnect,
             codex::codex_thread_start,

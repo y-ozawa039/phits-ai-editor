@@ -140,6 +140,7 @@ svg { width: 18px; height: 18px; flex: none; }
 .codex-probe-summary[aria-expanded="true"] .codex-probe-chevron { transform: rotate(180deg); }
 .codex-feature-list { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 8px; margin-top: 4px; }
 .codex-feature-row { min-width: 0; display: grid; grid-template-columns: 7px minmax(0, 1fr) auto; align-items: center; gap: 6px; min-height: 24px; color: #444; font-size: 12px; }
+.codex-feature-row-wide { grid-column: 1 / -1; grid-template-columns: 7px max-content max-content minmax(0, 1fr); }
 .codex-feature-row small { color: #777; font-size: 12px; white-space: nowrap; }
 .codex-feature-row .diagnostic-dot { width: 6px; height: 6px; box-shadow: none; }
 .explorer-panel .panel-title, .explorer-panel .workspace-name, .explorer-panel .file-item, .explorer-panel .explorer-empty { font-size: var(--explorer-font-size, 12px); }
@@ -437,9 +438,13 @@ kbd, .text-button, .output-content { color: #555555; }
 .codex-agent-setup-note details { margin-top: 3px; }
 .codex-agent-setup-note summary { cursor: pointer; user-select: none; }
 .codex-agent-setup-note ul { display: grid; gap: 6px; margin: 6px 0 0; padding: 0; list-style: none; }
+.codex-diagnostic-group { display: grid; gap: 3px; margin-top: 7px; }
+.codex-diagnostic-group + .codex-diagnostic-group { padding-top: 7px; border-top: 1px solid rgb(0 0 0 / 10%); }
 .agent-setup-check { display: grid; gap: 1px; padding-left: 10px; border-left: 3px solid #b9b9b9; }
-.agent-setup-check.confirmed { border-left-color: #23a477; }
+.agent-setup-check.confirmed, .agent-setup-check.available { border-left-color: #23a477; }
 .agent-setup-check.mismatch, .agent-setup-check.missing, .agent-setup-check.unreadable { border-left-color: #c17a16; }
+.agent-setup-check.limited { border-left-color: #c17a16; }
+.agent-setup-check.unavailable { border-left-color: #d9535c; }
 .agent-setup-check b { color: inherit; font-weight: 600; }
 .agent-setup-check code { overflow-wrap: anywhere; color: #666; background: transparent; font-size: 12px; }
 .codex-connection-error { display: grid; gap: 3px; margin-bottom: 8px; }
