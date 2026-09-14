@@ -3,6 +3,7 @@ export interface UiPreferences {
   codexOpen: boolean;
   outputOpen: boolean;
   explorerFontSize: number;
+  explorerPanelWidth: number;
   editorFontSize: number;
   codexFontSize: number;
   codexPanelRatio: number;
@@ -20,6 +21,9 @@ export const FONT_SIZE_DEFAULTS_KEY = "phits-ai-editor.global-font-defaults.v1";
 const LEGACY_UI_PREFERENCES_KEY = "phits-ai-editor.ui-preferences.v1";
 export const MIN_FONT_SIZE = 12;
 export const MAX_FONT_SIZE = 28;
+export const DEFAULT_EXPLORER_PANEL_WIDTH = 240;
+export const MIN_EXPLORER_PANEL_WIDTH = 200;
+export const MAX_EXPLORER_PANEL_WIDTH = 420;
 export const DEFAULT_CODEX_PANEL_RATIO = 1 / 3;
 export const MAX_CODEX_PANEL_RATIO = 1 / 2;
 export const MIN_CODEX_PANEL_WIDTH = 360;
@@ -29,6 +33,7 @@ export const DEFAULT_UI_PREFERENCES: UiPreferences = {
   codexOpen: true,
   outputOpen: true,
   explorerFontSize: 14,
+  explorerPanelWidth: DEFAULT_EXPLORER_PANEL_WIDTH,
   editorFontSize: 14,
   codexFontSize: 14,
   codexPanelRatio: DEFAULT_CODEX_PANEL_RATIO,
@@ -50,6 +55,11 @@ export function normalizeCodexPanelRatio(value: unknown): number {
   return Math.max(0.2, Math.min(MAX_CODEX_PANEL_RATIO, value));
 }
 
+export function normalizeExplorerPanelWidth(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return DEFAULT_EXPLORER_PANEL_WIDTH;
+  return Math.max(MIN_EXPLORER_PANEL_WIDTH, Math.min(MAX_EXPLORER_PANEL_WIDTH, Math.round(value)));
+}
+
 export function codexPanelWidth(viewportWidth: number, ratio: number): number {
   const safeViewport = Math.max(0, viewportWidth);
   const maximum = safeViewport * MAX_CODEX_PANEL_RATIO;
@@ -64,6 +74,7 @@ export function normalizeUiPreferences(value: unknown): UiPreferences {
     codexOpen: typeof source.codexOpen === "boolean" ? source.codexOpen : DEFAULT_UI_PREFERENCES.codexOpen,
     outputOpen: typeof source.outputOpen === "boolean" ? source.outputOpen : DEFAULT_UI_PREFERENCES.outputOpen,
     explorerFontSize: clampFontSize(source.explorerFontSize, DEFAULT_UI_PREFERENCES.explorerFontSize),
+    explorerPanelWidth: normalizeExplorerPanelWidth(source.explorerPanelWidth),
     editorFontSize: clampFontSize(source.editorFontSize),
     codexFontSize: clampFontSize(source.codexFontSize, DEFAULT_UI_PREFERENCES.codexFontSize),
     codexPanelRatio: normalizeCodexPanelRatio(source.codexPanelRatio),

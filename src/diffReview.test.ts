@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { applyUnifiedDiff, countDiffHunks, makeDiffReviewFile, mergeAppliedDiffReviewFiles } from "./diffReview";
+import { applyUnifiedDiff, countDiffHunks, makeDiffReviewFile, mergeAppliedDiffReviewFiles, reviewTabPaths } from "./diffReview";
 
 describe("Codex main editor diff review", () => {
+  it("selects unique non-deleted final paths for editor tabs", () => {
+    expect(reviewTabPaths([
+      { path: "notes.txt", kind: "add", original: "", modified: "note", diff: "", hunkCount: 1 },
+      { path: "old.inp", movedTo: "renamed.inp", kind: "update", original: "old", modified: "new", diff: "", hunkCount: 1 },
+      { path: "unused.txt", kind: "delete", original: "old", modified: "", diff: "", hunkCount: 1 },
+      { path: "NOTES.TXT", kind: "update", original: "note", modified: "note2", diff: "", hunkCount: 1 },
+    ])).toEqual(["notes.txt", "renamed.inp"]);
+  });
+
   it("reconstructs the complete file for an insertion at the first line", () => {
     const original = "$MPI=15\n[ Parameters ]\n";
     const diff = "@@ -1 +1,2 @@\n+TEST\n $MPI=15\n@@ -2 +3 @@\n [ Parameters ]";

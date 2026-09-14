@@ -55,4 +55,28 @@ describe("buildPhitsAgentSetupHelp", () => {
     expect(prompt).toContain("静的検査");
     expect(prompt).toContain("証明ではありません");
   });
+
+  it("reports the active Sandbox mode without implying the Windows optional feature", () => {
+    const prompt = buildPhitsAgentSetupHelp({
+      workspaceRoot: "C:\\work",
+      setup: null,
+      diagnostics: null,
+      compatibility: null,
+      connectionError: null,
+      sandbox: {
+        state: "unavailable",
+        workspaceRoot: "C:\\work",
+        checkedAt: "2026-09-14T00:00:00Z",
+        readiness: "ready",
+        implementation: "unelevated",
+        allowedImplementations: ["elevated", "unelevated"],
+        checks: [{ id: "windowsSandbox", state: "available", detail: "CodexのSandboxは準備済みです。" }],
+        messages: [],
+        supportPrompt: "",
+      },
+    });
+    expect(prompt).toContain("現在のSandbox方式: unelevated");
+    expect(prompt).toContain("許可されたSandbox方式: elevated, unelevated");
+    expect(prompt).not.toContain("Windows Sandbox readiness");
+  });
 });

@@ -3,7 +3,7 @@
 [日本語](release-notes-v0.0.3-alpha.md) | English
 
 `0.0.3-alpha` extends Codex connection checks with a live diagnostic that tests
-command execution inside Windows Sandbox and writing to the current workspace.
+command execution inside the Codex sandbox and writing to the current workspace.
 
 ## Which file should I download?
 
@@ -16,7 +16,7 @@ Verify the selected artifact against `SHA256SUMS.txt` before running it.
 
 ## Changes
 
-- The diagnostic reports Codex App Server connectivity, Windows Sandbox
+- The diagnostic reports Codex App Server connectivity, sandbox
   readiness, command execution inside the sandbox, and current-workspace writes
   separately.
 - The live probe does not call a model. It writes a temporary marker in the

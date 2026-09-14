@@ -29,6 +29,20 @@ export interface DiffReviewState {
   historyIds?: string[];
 }
 
+export function reviewTabPaths(files: DiffReviewFile[]): string[] {
+  const paths: string[] = [];
+  const seen = new Set<string>();
+  for (const file of files) {
+    if (file.kind.toLowerCase() === "delete") continue;
+    const path = file.movedTo ?? file.path;
+    const key = path.replace(/\\/g, "/").toLocaleLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    paths.push(path);
+  }
+  return paths;
+}
+
 interface HunkHeader {
   oldStart: number;
   oldCount: number;

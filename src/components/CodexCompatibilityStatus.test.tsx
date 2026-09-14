@@ -42,6 +42,13 @@ describe("CodexCompatibilityStatus", () => {
     expect(screen.getByText("Codex機能を確認中…")).toBeTruthy();
   });
 
+  it("replaces the previous result with one stable label while rechecking", () => {
+    render(<CodexCompatibilityStatus report={report} busy sandboxBusy />);
+    expect(screen.getByRole("button", { name: "Codex編集環境：確認中…" })).toBeTruthy();
+    expect(screen.queryByText("Codex編集環境：編集不可")).toBeNull();
+    expect(screen.queryByText("編集環境を確認中…")).toBeNull();
+  });
+
   it("adds live editing checks to the existing expandable diagnosis", () => {
     const compatibleReport: CodexCompatibilityReport = {
       ...report,
@@ -53,6 +60,7 @@ describe("CodexCompatibilityStatus", () => {
       workspaceRoot: "C:\\work",
       checkedAt: "2026-09-13T00:00:00Z",
       readiness: "ready",
+      implementation: "unelevated",
       allowedImplementations: ["unelevated"],
       checks: [
         { id: "appServer", state: "available", detail: "ok" },
@@ -79,8 +87,10 @@ describe("CodexCompatibilityStatus", () => {
 
     const windowsSandbox = container.querySelector(".codex-feature-row-wide");
     expect(windowsSandbox).toHaveClass("codex-feature-row-wide");
-    expect(windowsSandbox).toHaveTextContent("WindowsSandbox利用可能");
+    expect(windowsSandbox).toHaveTextContent("Sandbox利用可能");
     expect(container.querySelectorAll(".codex-feature-spacer")).toHaveLength(1);
+    expect(screen.getByText("Sandbox方式")).toBeTruthy();
+    expect(screen.getAllByText("unelevated")).toHaveLength(2);
     expect(screen.getByText("コマンド実行")).toBeTruthy();
     expect(screen.getAllByText("ファイル編集")).toHaveLength(2);
   });

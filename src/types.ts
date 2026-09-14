@@ -131,6 +131,7 @@ export interface CodexSandboxProbeReport {
   workspaceRoot: string;
   checkedAt: string;
   readiness: string | null;
+  implementation?: string | null;
   allowedImplementations: string[];
   checks: CodexSandboxCheck[];
   messages: string[];

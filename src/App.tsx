@@ -19,11 +19,11 @@ import { UnsavedChangesDialog } from "./components/UnsavedChangesDialog";
 import { registerPhitsLanguage } from "./phitsLanguage";
 import { buildPhitsAgentSetupHelp } from "./phitsAgentSetupHelp";
 import packageMetadata from "../package.json";
-import { changeKindValue, makeDiffReviewFile, mergeAppliedDiffReviewFiles, movePathValue, type DiffReviewFile, type DiffReviewState } from "./diffReview";
+import { changeKindValue, makeDiffReviewFile, mergeAppliedDiffReviewFiles, movePathValue, reviewTabPaths, type DiffReviewFile, type DiffReviewState } from "./diffReview";
 import { DIAGNOSTICS_RAPID_GAP_MS, DIAGNOSTICS_RAPID_THRESHOLD_MS, DIAGNOSTICS_TURN_BASE_MS, diagnosticsTurnDuration, shouldRequestDiagnostics } from "./diagnosticsMotion";
 import { applyUndoableModelContent, asUndoableTextModel, runUndoableModelHistory } from "./editorHistory";
 import type { ApprovalDecision, ApprovalFileChange, ApprovalMode, ApprovalRequest, ApprovalResolvedEvent, CodexChangeGroupV1, CodexCompatibilityReport, CodexContextOptions, CodexEvent, CodexFeatureId, CodexFileChangeEvent, CodexHistoryPreview, CodexModel, CodexSandboxProbeReport, CodexThreadLink, DocumentData, DocumentRevisionV1, EditorContextV1, EditorSelectionContext, PhitsAgentSetupStatus, RunStatus, RuntimeDiagnostics, StartupOpenRequest, UtilityKind, WorkspaceInfo } from "./types";
-import { codexPanelWidth, DEFAULT_CODEX_PANEL_RATIO, FONT_SIZE_PRESETS, loadFontSizeDefaults, loadUiPreferences, MAX_CODEX_PANEL_RATIO, MAX_FONT_SIZE, MIN_CODEX_PANEL_WIDTH, MIN_FONT_SIZE, normalizeCodexPanelRatio, saveFontSizeDefaults, saveUiPreferences } from "./uiPreferences";
+import { codexPanelWidth, DEFAULT_CODEX_PANEL_RATIO, DEFAULT_EXPLORER_PANEL_WIDTH, FONT_SIZE_PRESETS, loadFontSizeDefaults, loadUiPreferences, MAX_CODEX_PANEL_RATIO, MAX_EXPLORER_PANEL_WIDTH, MAX_FONT_SIZE, MIN_CODEX_PANEL_WIDTH, MIN_EXPLORER_PANEL_WIDTH, MIN_FONT_SIZE, normalizeCodexPanelRatio, normalizeExplorerPanelWidth, saveFontSizeDefaults, saveUiPreferences } from "./uiPreferences";
 import { closeTopMenus } from "./topMenu";
 import { loadWorkspaceSession, saveWorkspaceSession } from "./workspaceSession";
 
@@ -222,6 +222,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(initialUiPreferences.sidebarOpen);
   const [codexOpen, setCodexOpen] = useState(initialUiPreferences.codexOpen);
   const [codexPanelRatio, setCodexPanelRatio] = useState(initialUiPreferences.codexPanelRatio);
+  const [explorerPanelWidth, setExplorerPanelWidth] = useState(initialUiPreferences.explorerPanelWidth);
   const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
   const [outputHeight, setOutputHeight] = useState(206);
   const [outputCollapsed, setOutputCollapsed] = useState(!initialUiPreferences.outputOpen);
@@ -319,12 +320,13 @@ export default function App() {
       codexOpen,
       outputOpen: !outputCollapsed,
       explorerFontSize,
+      explorerPanelWidth,
       editorFontSize,
       codexFontSize,
       codexPanelRatio,
       approvalMode,
     });
-  }, [approvalMode, codexFontSize, codexOpen, codexPanelRatio, editorFontSize, explorerFontSize, outputCollapsed, sidebarOpen]);
+  }, [approvalMode, codexFontSize, codexOpen, codexPanelRatio, editorFontSize, explorerFontSize, explorerPanelWidth, outputCollapsed, sidebarOpen]);
 
   useEffect(() => {
     const update = () => setViewportWidth(window.innerWidth);
@@ -662,6 +664,45 @@ export default function App() {
       setActiveId(next.id);
       selectInput();
     } catch (error) { notify(`${relativePath} を開けませんでした: ${errorMessage(error)}`, "error"); }
+  }, [notify]);
+
+  const openDiffFilesInTabs = useCallback(async (files: DiffReviewFile[]) => {
+    const currentWorkspace = workspaceRef.current;
+    if (!currentWorkspace) return;
+    const paths = reviewTabPaths(files);
+    const existingIds = new Map<string, string>();
+    const pathsToLoad: string[] = [];
+    for (const path of paths) {
+      const existing = documentsRef.current.find((entry) => entry.document && samePath(entry.document.relativePath, path));
+      if (existing) existingIds.set(normalizedPath(path), existing.id);
+      else pathsToLoad.push(path);
+    }
+
+    const loaded = (await Promise.all(pathsToLoad.map(async (path) => {
+      try {
+        return await api.readDocument(currentWorkspace.root, path);
+      } catch (error) {
+        notify(`${path} をCodexの変更タブとして開けませんでした: ${errorMessage(error)}`, "error");
+        return null;
+      }
+    }))).filter((document): document is DocumentData => document !== null);
+
+    if (loaded.length) {
+      setDocuments((current) => {
+        const next = [...current];
+        for (const document of loaded) {
+          if (next.some((entry) => entry.document && samePath(entry.document.relativePath, document.relativePath))) continue;
+          next.push({ id: document.path, name: fileName(document.relativePath), document, content: document.content, dirty: false });
+        }
+        return next;
+      });
+    }
+
+    const firstPath = paths[0];
+    if (!firstPath) return;
+    const active = existingIds.get(normalizedPath(firstPath))
+      ?? loaded.find((document) => samePath(document.relativePath, firstPath))?.path;
+    if (active) setActiveId(active);
   }, [notify]);
 
   const activateDocument = useCallback((id: string) => {
@@ -1364,6 +1405,7 @@ export default function App() {
         }));
         const accumulatedFiles = mergeAppliedDiffReviewFiles(turnDiffFilesRef.current.get(turnKey) ?? [], appliedFiles);
         turnDiffFilesRef.current.set(turnKey, accumulatedFiles);
+        await openDiffFilesInTabs(accumulatedFiles);
         setPendingReviewPaths((current) => {
           const next = new Set(current);
           for (const file of accumulatedFiles) next.add(file.movedTo ?? file.path);
@@ -1404,7 +1446,7 @@ export default function App() {
     void updateDiagnostics();
     void probeCodexCompatibility();
     return () => { cancelled = true; unlisteners.forEach((unlisten) => unlisten()); };
-  }, [appendOutput, applyRetainedModelContent, notify, prepareDiffReviewFiles, probeCodexCompatibility, updateDiagnostics, workspace]);
+  }, [appendOutput, applyRetainedModelContent, notify, openDiffFilesInTabs, prepareDiffReviewFiles, probeCodexCompatibility, updateDiagnostics, workspace]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -1512,6 +1554,22 @@ export default function App() {
     const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
     window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
   }, [codexWidth, viewportWidth]);
+
+  const startExplorerResize = useCallback((event: React.PointerEvent) => {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const startX = event.clientX;
+    const startWidth = explorerPanelWidth;
+    const move = (e: PointerEvent) => {
+      const nextWidth = Math.max(MIN_EXPLORER_PANEL_WIDTH, Math.min(MAX_EXPLORER_PANEL_WIDTH, startWidth + e.clientX - startX));
+      setExplorerPanelWidth(normalizeExplorerPanelWidth(nextWidth));
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }, [explorerPanelWidth]);
 
   const startHorizontalResize = useCallback((event: React.PointerEvent) => {
     event.currentTarget.setPointerCapture(event.pointerId); const startY = event.clientY, startHeight = outputHeight;
@@ -1711,7 +1769,8 @@ export default function App() {
       </div>
 
       <div className="work-area">
-        {sidebarOpen && <aside className="explorer-panel" style={{ "--explorer-font-size": `${explorerFontSize}px` } as CSSProperties}>
+        {sidebarOpen && <aside className="explorer-panel" style={{ width: explorerPanelWidth, "--explorer-font-size": `${explorerFontSize}px` } as CSSProperties}>
+          <div className="explorer-resizer" onPointerDown={startExplorerResize} onDoubleClick={() => setExplorerPanelWidth(DEFAULT_EXPLORER_PANEL_WIDTH)} title="ドラッグで幅を変更・ダブルクリックで既定幅" />
           <header className="panel-header"><div className="panel-title">エクスプローラー</div><button className="icon-button" onClick={chooseWorkspace} title="フォルダーを開く"><Icon name="folder"/></button></header>
           {workspace ? <>
             <div className="workspace-name" title={workspace.root}><Icon name="chevron"/><span>{fileName(workspace.root)}</span></div>
@@ -1722,7 +1781,7 @@ export default function App() {
 
         <main className="editor-column">
           <EditorTabs tabs={documents.map((entry) => ({ id: entry.id, name: entry.name, dirty: entry.dirty, codexPending: !!entry.document && pendingReviewPaths.has(entry.document.relativePath) }))} activeId={activeId} onActivate={activateDocument} onClose={closeDocument}/>
-          <div className="editor-stage">{diffReview ? <DiffReview review={diffReview} approval={approvals.find((entry) => diffReview.requestKey === approvalRequestKey(entry))} fontSize={editorFontSize} beforeMount={beforeMount} onSelectFile={(index) => { setDiffReview((current) => current ? { ...current, selectedFileIndex: index } : current); const path = diffReview.files[index]?.path; const entry = documents.find((item) => item.document?.relativePath === path); if (entry) setActiveId(entry.id); }} onDecision={resolveApproval} onFinalize={finalizeCodexReview} onClose={() => setDiffReview(null)}/> : activeDocument ? <Editor height="100%" path={activeDocument.id} language="phits" theme="phits-light" value={activeDocument.content} beforeMount={beforeMount} onMount={onEditorMount} onChange={(content) => setDocuments((current) => current.map((entry) => entry.id === activeDocument.id ? { ...entry, content: content ?? "", dirty: (content ?? "") !== entry.document?.content } : entry))} options={editorOptions} keepCurrentModel loading={<div className="editor-loading">Monaco Editorを読み込んでいます…</div>}/> : <div className="welcome-screen"><h1>PHITS AI Editor</h1><p>PHITS入力の編集、実行、Codex支援をひとつの画面で。</p><div className="welcome-actions"><button className="primary-button" onClick={chooseWorkspace}><Icon name="folder"/>ワークスペースを開く</button><button className="secondary-button" onClick={newDocument}><Icon name="file"/>新しい入力</button></div><div className="welcome-hint"><kbd>Ctrl</kbd> + <kbd>O</kbd> でフォルダーを開く</div></div>}</div>
+          <div className="editor-stage">{diffReview ? <DiffReview review={diffReview} approval={approvals.find((entry) => diffReview.requestKey === approvalRequestKey(entry))} fontSize={editorFontSize} beforeMount={beforeMount} onSelectFile={(index) => { setDiffReview((current) => current ? { ...current, selectedFileIndex: index } : current); const file = diffReview.files[index]; const path = file ? file.movedTo ?? file.path : undefined; const entry = path ? documents.find((item) => item.document && samePath(item.document.relativePath, path)) : undefined; if (entry) setActiveId(entry.id); }} onDecision={resolveApproval} onFinalize={finalizeCodexReview} onClose={() => setDiffReview(null)}/> : activeDocument ? <Editor height="100%" path={activeDocument.id} language="phits" theme="phits-light" value={activeDocument.content} beforeMount={beforeMount} onMount={onEditorMount} onChange={(content) => setDocuments((current) => current.map((entry) => entry.id === activeDocument.id ? { ...entry, content: content ?? "", dirty: (content ?? "") !== entry.document?.content } : entry))} options={editorOptions} keepCurrentModel loading={<div className="editor-loading">Monaco Editorを読み込んでいます…</div>}/> : <div className="welcome-screen"><h1>PHITS AI Editor</h1><p>PHITS入力の編集、実行、Codex支援をひとつの画面で。</p><div className="welcome-actions"><button className="primary-button" onClick={chooseWorkspace}><Icon name="folder"/>ワークスペースを開く</button><button className="secondary-button" onClick={newDocument}><Icon name="file"/>新しい入力</button></div><div className="welcome-hint"><kbd>Ctrl</kbd> + <kbd>O</kbd> でフォルダーを開く</div></div>}</div>
           <OutputPanel lines={output} collapsed={outputCollapsed} height={outputHeight} onToggle={() => setOutputCollapsed((value) => !value)} onClear={() => setOutput([])} onResizeStart={startHorizontalResize}/>
         </main>
 

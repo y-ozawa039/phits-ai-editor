@@ -2,7 +2,7 @@
 
 日本語 | [English](release-notes-v0.0.3-alpha.en.md)
 
-`0.0.3-alpha`は、Codexとの接続確認に加えて、Windows Sandbox内で実際に
+`0.0.3-alpha`は、Codexとの接続確認に加えて、CodexのSandbox内で実際に
 コマンドを実行し、現在のワークスペースへ書き込めるかを診断するalpha更新です。
 
 ## どのファイルをダウンロードするか
@@ -16,7 +16,7 @@
 
 ## 変更点
 
-- Codex App Serverへの接続、Windows Sandboxの準備状態、Sandbox内でのコマンド実行、
+- Codex App Serverへの接続、Sandboxの準備状態、Sandbox内でのコマンド実行、
   現在のワークスペースへの書き込みを個別に診断します。
 - 実動作診断ではモデルを呼び出さず、ワークスペース内へ一時的な検査ファイルを書き込み、
   内容を確認してから削除します。PHITS計算は実行しません。

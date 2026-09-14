@@ -299,6 +299,7 @@ pub struct CodexSandboxProbeReport {
     pub workspace_root: String,
     pub checked_at: String,
     pub readiness: Option<String>,
+    pub implementation: Option<String>,
     pub allowed_implementations: Vec<String>,
     pub checks: Vec<CodexSandboxCheck>,
     pub messages: Vec<String>,

@@ -335,9 +335,10 @@ describe("CodexPanel", () => {
       workspaceRoot: "C:\\work",
       checkedAt: "2026-09-13T00:00:00Z",
       readiness: "notConfigured",
+      implementation: "elevated",
       allowedImplementations: ["elevated"],
       checks: [
-        { id: "windowsSandbox", state: "unavailable", detail: "Windows Sandboxが未設定です。" },
+        { id: "windowsSandbox", state: "unavailable", detail: "CodexのSandboxが未設定です。" },
         { id: "workspaceWrite", state: "unavailable", detail: "書込みを確認できませんでした。" },
       ],
       messages: [],
@@ -347,7 +348,10 @@ describe("CodexPanel", () => {
     expect(alert).toHaveTextContent("Codexからファイルを編集できません");
     fireEvent.click(screen.getByText("診断項目と検査理由"));
     expect(alert).toHaveTextContent("PHITS参照設定");
-    expect(alert).toHaveTextContent("Windows Sandbox");
+    expect(alert).toHaveTextContent("Sandbox");
+    expect(alert).toHaveTextContent("Sandbox方式");
+    expect(alert).toHaveTextContent("elevated");
+    expect(alert).not.toHaveTextContent("Windows Sandbox");
     expect(alert).toHaveTextContent("ワークスペース編集");
   });
 

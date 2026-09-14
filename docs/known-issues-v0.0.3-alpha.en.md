@@ -8,7 +8,7 @@
 - Users must provide PHITS, Codex CLI, MPI/OpenMP prerequisites, and licenses.
 - PHITS Codex setup inspection is a static diagnostic. It cannot confirm that
   App Server actually loaded an instruction file.
-- The live Windows Sandbox probe confirms that a temporary file could be created
+- The live Codex sandbox probe confirms that a temporary file could be created
   at the time of diagnosis. It does not guarantee every later Codex operation or
   behavior after an organization policy changes.
 - Direct Codex execution of PHITS, ANGEL, DCHAIN, and PHIG-3D is prohibited. Use

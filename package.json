@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "docs:check": "node scripts/check-documentation-languages.mjs",
     "test:licenses": "node --test scripts/license-compliance.test.mjs",
+    "test:app-server-command": "node scripts/app-server-command-smoke.mjs",
     "test:app-server-edit": "node scripts/app-server-edit-smoke.mjs",
     "test:codex-schema": "node scripts/validate-codex-schema.mjs schemas/codex/0.153.1",
     "licenses:generate": "node scripts/generate-third-party-notices.mjs",

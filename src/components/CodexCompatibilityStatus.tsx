@@ -11,7 +11,7 @@ const FEATURE_LABELS: Record<CodexFeatureId, string> = {
 
 const SANDBOX_LABELS: Record<CodexSandboxCheckId, string> = {
   appServer: "App Server",
-  windowsSandbox: "Windows Sandbox",
+  windowsSandbox: "Sandbox",
   commandExecution: "コマンド実行",
   workspaceWrite: "ファイル編集",
 };
@@ -78,11 +78,12 @@ export function CodexCompatibilityStatus({
   if (!report) return null;
   const state = combinedState(report, sandbox, setup);
   const label = combinedLabel(report, sandbox, setup);
+  const displayLabel = busy || sandboxBusy ? "Codex編集環境：確認中…" : label;
   const windowsSandboxCheck = sandbox?.checks.find((check) => check.id === "windowsSandbox");
   const remainingSandboxChecks = sandbox?.checks.filter((check) => check.id !== "appServer" && check.id !== "windowsSandbox") ?? [];
   const renderSandboxCheck = (check: CodexSandboxProbeReport["checks"][number]) => <div className={`codex-feature-row${check.id === "windowsSandbox" ? " codex-feature-row-wide" : ""}`} key={check.id} title={check.detail}>
     <span className={`diagnostic-dot ${check.state === "available" ? "ok" : check.state === "limited" ? "warn" : "bad"}`} />
-    <span>{check.id === "windowsSandbox" ? <>Windows<br />Sandbox</> : SANDBOX_LABELS[check.id]}</span>
+    <span>{SANDBOX_LABELS[check.id]}</span>
     <small>{check.state === "available" ? "利用可能" : check.state === "limited" ? "要確認" : "利用不可"}</small>
   </div>;
   return <section className={`codex-compatibility ${state}`} aria-label="Codex機能の互換性と編集環境">
@@ -94,12 +95,7 @@ export function CodexCompatibilityStatus({
       onClick={() => setExpanded((value) => !value)}
     >
       <span className={`diagnostic-dot ${state === "compatible" ? "ok" : state === "limited" ? "warn" : "bad"}`} />
-      <strong>{label}</strong>
-      {(busy || sandboxBusy) && (
-        <span className="codex-probe-busy">
-          {sandboxBusy ? "編集環境を確認中…" : "再確認中…"}
-        </span>
-      )}
+      <strong>{displayLabel}</strong>
       <Icon name="chevron" className="codex-probe-chevron" />
     </button>
     {expanded && <div className="codex-feature-list" id={detailsId}>
@@ -116,6 +112,16 @@ export function CodexCompatibilityStatus({
       {setup && windowsSandboxCheck && <span className="codex-feature-spacer" aria-hidden="true" />}
       {windowsSandboxCheck && renderSandboxCheck(windowsSandboxCheck)}
       {remainingSandboxChecks.map(renderSandboxCheck)}
+      {sandbox && <div className="codex-feature-row codex-feature-row-wide" title="Codexが現在使用するSandbox方式">
+        <span className="diagnostic-dot" />
+        <span>Sandbox方式</span>
+        <small>{sandbox.implementation ?? "取得不可"}</small>
+      </div>}
+      {sandbox?.allowedImplementations.length ? <div className="codex-feature-row codex-feature-row-wide" title="組織ポリシーで許可されたSandbox方式">
+        <span className="diagnostic-dot" />
+        <span>許可方式</span>
+        <small>{sandbox.allowedImplementations.join(", ")}</small>
+      </div> : null}
     </div>}
     {report.messages.slice(0, 1).map((message) => <p className="diagnostic-message" key={message}>{message}</p>)}
   </section>;

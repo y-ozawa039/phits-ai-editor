@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { codexPanelWidth, DEFAULT_CODEX_PANEL_RATIO, DEFAULT_UI_PREFERENCES, FACTORY_FONT_SIZE_DEFAULTS, FONT_SIZE_DEFAULTS_KEY, FONT_SIZE_PRESETS, loadFontSizeDefaults, loadUiPreferences, MAX_FONT_SIZE, MIN_FONT_SIZE, normalizeCodexPanelRatio, normalizeFontSizeDefaults, normalizeUiPreferences, saveFontSizeDefaults, saveUiPreferences, UI_PREFERENCES_KEY } from "./uiPreferences";
+import { codexPanelWidth, DEFAULT_CODEX_PANEL_RATIO, DEFAULT_EXPLORER_PANEL_WIDTH, DEFAULT_UI_PREFERENCES, FACTORY_FONT_SIZE_DEFAULTS, FONT_SIZE_DEFAULTS_KEY, FONT_SIZE_PRESETS, loadFontSizeDefaults, loadUiPreferences, MAX_EXPLORER_PANEL_WIDTH, MAX_FONT_SIZE, MIN_EXPLORER_PANEL_WIDTH, MIN_FONT_SIZE, normalizeCodexPanelRatio, normalizeExplorerPanelWidth, normalizeFontSizeDefaults, normalizeUiPreferences, saveFontSizeDefaults, saveUiPreferences, UI_PREFERENCES_KEY } from "./uiPreferences";
 
 describe("UI preferences", () => {
   it("loads defaults when storage is empty or malformed", () => {
     expect(loadUiPreferences({ getItem: () => null })).toEqual(DEFAULT_UI_PREFERENCES);
     expect(loadUiPreferences({ getItem: () => "not-json" })).toEqual(DEFAULT_UI_PREFERENCES);
     expect(DEFAULT_UI_PREFERENCES.explorerFontSize).toBe(14);
+    expect(DEFAULT_UI_PREFERENCES.explorerPanelWidth).toBe(240);
     expect(DEFAULT_UI_PREFERENCES.editorFontSize).toBe(14);
     expect(DEFAULT_UI_PREFERENCES.codexFontSize).toBe(14);
     expect(FONT_SIZE_PRESETS).toEqual([12, 14, 16, 18, 20, 24, 28]);
@@ -24,6 +25,7 @@ describe("UI preferences", () => {
       codexOpen: false,
       outputOpen: false,
       explorerFontSize: MIN_FONT_SIZE,
+      explorerPanelWidth: DEFAULT_EXPLORER_PANEL_WIDTH,
       editorFontSize: MAX_FONT_SIZE,
       codexFontSize: MAX_FONT_SIZE,
       codexPanelRatio: DEFAULT_CODEX_PANEL_RATIO,
@@ -59,6 +61,13 @@ describe("UI preferences", () => {
     expect(codexPanelWidth(1500, DEFAULT_CODEX_PANEL_RATIO)).toBe(500);
     expect(codexPanelWidth(1500, 0.9)).toBe(750);
     expect(codexPanelWidth(900, 0.2)).toBe(360);
+  });
+
+  it("uses a 240 px explorer by default and clamps saved widths", () => {
+    expect(normalizeExplorerPanelWidth(undefined)).toBe(DEFAULT_EXPLORER_PANEL_WIDTH);
+    expect(normalizeExplorerPanelWidth(150)).toBe(MIN_EXPLORER_PANEL_WIDTH);
+    expect(normalizeExplorerPanelWidth(500)).toBe(MAX_EXPLORER_PANEL_WIDTH);
+    expect(normalizeExplorerPanelWidth(287.6)).toBe(288);
   });
 
   it("loads and clamps app-wide font defaults independently of a workspace", () => {

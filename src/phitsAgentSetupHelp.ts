@@ -36,7 +36,7 @@ const pathSourceLabels = {
 
 const sandboxCheckLabels = {
   appServer: "Codex App Server",
-  windowsSandbox: "Windows Sandbox",
+  windowsSandbox: "Sandbox",
   commandExecution: "Sandbox内コマンド実行",
   workspaceWrite: "ワークスペース編集",
 } as const;
@@ -87,9 +87,10 @@ export function buildPhitsAgentSetupHelp(input: PhitsAgentSetupHelpInput): strin
     "",
     "Codex編集環境の実動作検査:",
     ...sandboxLines,
-    ...(input.sandbox?.readiness ? [`- Windows Sandbox readiness: ${input.sandbox.readiness}`] : []),
+    ...(input.sandbox?.readiness ? [`- Sandbox readiness: ${input.sandbox.readiness}`] : []),
+    ...(input.sandbox ? [`- 現在のSandbox方式: ${input.sandbox.implementation ?? "取得できませんでした"}`] : []),
     ...(input.sandbox?.allowedImplementations.length
-      ? [`- 組織ポリシーで許可されたWindows Sandbox実装: ${input.sandbox.allowedImplementations.join(", ")}`]
+      ? [`- 組織ポリシーで許可されたSandbox方式: ${input.sandbox.allowedImplementations.join(", ")}`]
       : []),
     "",
     "依頼:",
