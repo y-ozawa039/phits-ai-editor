@@ -1,0 +1,69 @@
+name: Windows clean build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Windows release candidate
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify locked Rust dependencies
+        run: cargo fetch --manifest-path src-tauri/Cargo.toml --locked
+
+      - name: Run frontend, documentation, schema, and license checks
+        run: pnpm check
+
+      - name: Run Rust checks
+        run: |
+          cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+          cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings
+          cargo test --manifest-path src-tauri/Cargo.toml --locked
+
+      - name: Build portable executable and NSIS installer
+        run: pnpm tauri build
+
+      - name: Package release candidate and checksums
+        run: pnpm release:package:windows
+
+      - name: Locate release candidate
+        shell: pwsh
+        run: |
+          $version = (Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json).version
+          $releaseDirectory = Join-Path $PWD "src-tauri\target\release\release-candidate\v$version"
+          if (-not (Test-Path -LiteralPath $releaseDirectory -PathType Container)) {
+            throw "Release candidate directory was not generated: $releaseDirectory"
+          }
+          "RELEASE_CANDIDATE_DIR=$releaseDirectory" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Get-Content -LiteralPath (Join-Path $releaseDirectory "SHA256SUMS.txt")
+
+      - name: Upload Windows release candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: PHITS-AI-Editor-windows-x64-${{ github.sha }}
+          path: ${{ env.RELEASE_CANDIDATE_DIR }}/*
+          if-no-files-found: error
+          retention-days: 14
