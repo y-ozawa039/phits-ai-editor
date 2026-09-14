@@ -7,7 +7,7 @@ export interface UiPreferences {
   editorFontSize: number;
   codexFontSize: number;
   codexPanelRatio: number;
-  approvalMode: "confirmFirst" | "consultationOnly" | "onRequest";
+  approvalMode: "confirmFirst" | "consultationOnly" | "onRequest" | "autonomousWorkspace";
 }
 
 export interface FontSizeDefaults {
@@ -78,7 +78,7 @@ export function normalizeUiPreferences(value: unknown): UiPreferences {
     editorFontSize: clampFontSize(source.editorFontSize),
     codexFontSize: clampFontSize(source.codexFontSize, DEFAULT_UI_PREFERENCES.codexFontSize),
     codexPanelRatio: normalizeCodexPanelRatio(source.codexPanelRatio),
-    approvalMode: source.approvalMode === "consultationOnly" || source.approvalMode === "onRequest" ? source.approvalMode : "confirmFirst",
+    approvalMode: source.approvalMode === "consultationOnly" || source.approvalMode === "onRequest" || source.approvalMode === "autonomousWorkspace" ? source.approvalMode : "confirmFirst",
   };
 }
 

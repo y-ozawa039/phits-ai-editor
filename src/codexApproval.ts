@@ -19,6 +19,8 @@ function approvalKind(method: string, value: unknown): ApprovalKind | null {
     ? "fileChange"
     : method === "item/commandExecution/requestApproval"
       ? "commandExecution"
+      : method === "phits/run/requestApproval"
+        ? "phitsRun"
       : null;
   if (!expected || (value !== undefined && value !== expected)) return null;
   return expected;
@@ -48,8 +50,8 @@ export function normalizeAvailableDecisions(value: unknown, kind: ApprovalKind):
     }
     return [];
   });
-  const defaults: ApprovalDecision[] = kind === "fileChange"
-    ? ["accept", "acceptForSession", "decline", "cancel"]
+  const defaults: ApprovalDecision[] = kind === "phitsRun"
+    ? ["accept", "decline"]
     : ["accept", "acceptForSession", "decline", "cancel"];
   return Array.from(new Set(values.length ? values : defaults));
 }
@@ -80,6 +82,10 @@ export function normalizeApprovalRequest(value: unknown): ApprovalRequest | null
     command: optionalString(source.command),
     cwd: optionalString(source.cwd),
     commandActions: Array.isArray(source.commandActions) ? source.commandActions : undefined,
+    inputRelativePath: optionalString(source.inputRelativePath),
+    phitsRoot: optionalString(source.phitsRoot),
+    phitsVersion: optionalString(source.phitsVersion),
+    executionMode: source.executionMode === "normal" || source.executionMode === "calculationPriority" ? source.executionMode : undefined,
     networkApprovalContext: source.networkApprovalContext,
     additionalPermissions: source.additionalPermissions,
     proposedExecpolicyAmendment: source.proposedExecpolicyAmendment,

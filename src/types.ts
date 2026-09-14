@@ -3,7 +3,7 @@ export type Compatibility = "supported" | "newerUnverified" | "unsupportedOlder"
 export type PhitsPathSource = "workspaceSetting" | "appSetting" | "environment" | "standardLocation" | "unavailable";
 export type RunState = "launchRequested" | "running" | "stopRequested" | "completed" | "failed" | "unresolved";
 export type UtilityKind = "angel" | "dchain" | "phig3d";
-export type ApprovalMode = "confirmFirst" | "consultationOnly" | "onRequest";
+export type ApprovalMode = "confirmFirst" | "consultationOnly" | "onRequest" | "autonomousWorkspace";
 export type ApprovalDecision = "accept" | "acceptForSession" | "decline" | "cancel" | "acceptWithExecPolicyAmendment";
 
 export interface WorkspaceInfo {
@@ -164,6 +164,7 @@ export interface EditorContextV1 {
   version: 1;
   activeDocumentPath?: string;
   activeInputPath?: string;
+  activeInputDirty?: boolean;
   cursor?: { line: number; column: number };
   selection?: EditorSelectionContext;
   dirty: boolean;
@@ -251,7 +252,7 @@ export interface DocumentRevisionV1 {
   dirty: boolean;
 }
 
-export type ApprovalKind = "fileChange" | "commandExecution";
+export type ApprovalKind = "fileChange" | "commandExecution" | "phitsRun";
 
 export interface ApprovalFileChange {
   path: string;
@@ -273,6 +274,10 @@ export interface ApprovalRequest {
   command?: string | null;
   cwd?: string | null;
   commandActions?: unknown[] | null;
+  inputRelativePath?: string | null;
+  phitsRoot?: string | null;
+  phitsVersion?: string | null;
+  executionMode?: ExecutionMode | null;
   networkApprovalContext?: unknown;
   additionalPermissions?: unknown;
   proposedExecpolicyAmendment?: unknown;

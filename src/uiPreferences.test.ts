@@ -53,6 +53,7 @@ describe("UI preferences", () => {
 
   it("keeps a safe global Codex approval mode", () => {
     expect(normalizeUiPreferences({ approvalMode: "onRequest" }).approvalMode).toBe("onRequest");
+    expect(normalizeUiPreferences({ approvalMode: "autonomousWorkspace" }).approvalMode).toBe("autonomousWorkspace");
     expect(normalizeUiPreferences({ approvalMode: "never" }).approvalMode).toBe("confirmFirst");
   });
 

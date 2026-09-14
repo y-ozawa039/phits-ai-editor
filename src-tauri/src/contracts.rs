@@ -312,6 +312,27 @@ pub enum ApprovalMode {
     ConfirmFirst,
     ConsultationOnly,
     OnRequest,
+    AutonomousWorkspace,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexPhitsRunPreview {
+    pub input_relative_path: String,
+    pub work_dir: String,
+    pub phits_root: String,
+    pub phits_version: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexPhitsRunResult {
+    pub run_id: String,
+    pub state: RunState,
+    pub message: String,
+    pub exit_code: Option<i32>,
+    pub stdout_tail: String,
+    pub stderr_tail: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -348,6 +369,8 @@ pub struct EditorContextV1 {
     pub version: u32,
     pub active_document_path: Option<String>,
     pub active_input_path: Option<String>,
+    #[serde(default)]
+    pub active_input_dirty: bool,
     pub cursor: Option<EditorPositionV1>,
     pub selection: Option<EditorSelectionV1>,
     pub dirty: bool,

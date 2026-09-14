@@ -9,10 +9,11 @@ describe("Codex Editor Context", () => {
     expect(defaultContextOptions().diagnostics).toBe(false);
   });
   it("keeps the visible user message separate from context history", () => {
-    const encoded = serializeEditorContext({ ...base(), activeDocumentPath: "main.inp" });
+    const encoded = serializeEditorContext({ ...base(), activeDocumentPath: "main.inp", activeInputPath: "main.inp", activeInputDirty: true });
     expect(encoded.startsWith(EDITOR_CONTEXT_PREFIX)).toBe(true);
     expect(isEditorContextText(encoded)).toBe(true);
     expect(visibleHistoryText(["半径を変更して", encoded])).toBe("半径を変更して");
+    expect(encoded).toContain('"activeInputDirty":true');
   });
 
   it("measures UTF-8 bytes and rejects oversized selection text", () => {

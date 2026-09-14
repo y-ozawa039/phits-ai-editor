@@ -37,8 +37,9 @@ execution, saving, path handling, or Codex approvals.
   using atomic replacement and the existing one-generation backup mechanism.
 - Keep PHITS run selection explicit. Multiple `.inp` or `.pht` files in one
   folder must never cause an arbitrary input to run.
-- Do not launch PHITS, ANGEL, DCHAIN, or PHIG-3D from Codex turns. Application
-  toolbar actions must use the validated official executable or wrapper paths.
+- Do not let Codex launch PHITS, ANGEL, DCHAIN, or PHIG-3D directly. A Codex
+  PHITS request must return through the editor-owned MCP bridge and validated
+  Rust Runner. Toolbar actions use the same validated official wrapper path.
 - Keep network access and workspace-external writes unavailable to Codex in all
   exposed approval modes. Consultation-only turns must reject modifications in
   Rust, not merely hide an approval button.

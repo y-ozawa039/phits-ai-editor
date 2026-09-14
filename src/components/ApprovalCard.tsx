@@ -64,7 +64,7 @@ export function ApprovalCard({ approval, queuedCount, onDecision, onOpenDiff, al
     <section className="approval-card" aria-label="Codex承認要求" data-request-key={approvalRequestKey(approval)}>
       <div className="approval-heading">
         <span className="approval-icon">!</span>
-        <div><strong>{approval.kind === "fileChange" ? "ファイル変更の承認" : network ? "ネットワーク利用の承認" : "コマンド実行の承認"}</strong><small>{queuedCount > 1 ? `残り ${queuedCount} 件` : "内容を確認してください"}</small></div>
+        <div><strong>{approval.kind === "fileChange" ? "ファイル変更の承認" : approval.kind === "phitsRun" ? "PHITS通常実行の承認" : network ? "ネットワーク利用の承認" : "コマンド実行の承認"}</strong><small>{queuedCount > 1 ? `残り ${queuedCount} 件` : "内容を確認してください"}</small></div>
       </div>
 
       {approval.reason && <p className="approval-reason">{stripAnsi(approval.reason)}</p>}
@@ -87,6 +87,14 @@ export function ApprovalCard({ approval, queuedCount, onDecision, onOpenDiff, al
             <p className="approval-warning">個別差分を取得できませんでした。対象と理由を確認し、不明な場合は拒否してください。</p>
           )}
           {approval.grantRoot && <div className="approval-field"><span>書き込み許可範囲</span><code>{approval.grantRoot}</code></div>}
+        </div>
+      ) : approval.kind === "phitsRun" ? (
+        <div className="command-approval-details">
+          <div className="approval-field"><span>入力ファイル</span><code>{approval.inputRelativePath || "不明"}</code></div>
+          <div className="approval-field"><span>作業ディレクトリ</span><code>{approval.cwd || approval.workspaceRoot || "不明"}</code></div>
+          <div className="approval-field"><span>PHITSルート</span><code>{approval.phitsRoot || "不明"}</code></div>
+          <div className="approval-field"><span>PHITSバージョン</span><code>{approval.phitsVersion || "取得できませんでした"}</code></div>
+          <p className="approval-warning">エディタが検証済みの公式ラッパーを使って通常実行します。Codexへshell実行権限は渡しません。</p>
         </div>
       ) : (
         <div className="command-approval-details">

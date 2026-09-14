@@ -1,5 +1,6 @@
 mod codex;
 mod codex_history;
+mod codex_mcp;
 mod contracts;
 mod diagnostics;
 mod documents;
@@ -15,6 +16,8 @@ use std::path::PathBuf;
 
 use state::AppState;
 use tauri::{Emitter, Manager};
+
+pub use codex_mcp::run_mcp_child_from_args;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {

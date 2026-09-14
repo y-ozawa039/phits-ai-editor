@@ -1,6 +1,6 @@
 [package]
 name = "phits-ai-editor"
-version = "0.0.4-alpha"
+version = "0.0.5-alpha"
 description = "A PHITS editor with Codex integration"
 authors = ["Yohei Ozawa"]
 license = "Apache-2.0"
@@ -26,7 +26,7 @@ hex = "0.4"
 uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde", "clock"] }
 regex = "1"
-tokio = { version = "1", features = ["process", "io-util", "sync", "time", "rt-multi-thread", "macros"] }
+tokio = { version = "1", features = ["process", "io-util", "io-std", "net", "sync", "time", "rt-multi-thread", "macros"] }
 dunce = "1"
 tempfile = "3"
 

@@ -28,6 +28,7 @@ use crate::{
         CodexHistoryChangeInput, codex_change_history_abort, codex_change_history_begin,
         codex_change_history_complete,
     },
+    codex_mcp::McpHost,
     contracts::{
         ApprovalMode, CodexCompatibilityReport, CodexConnectResult, CodexFeatureId,
         CodexFeatureState, CodexModel, CodexSandboxCheck, CodexSandboxCheckId,
@@ -44,9 +45,9 @@ use uuid::Uuid;
 const CODEX_BASELINE: (u32, u32, u32) = (0, 153, 1);
 const APP_SERVER_INSTRUCTIONS: &str = r#"You are the editing agent embedded in PHITS AI Editor.
 
-Work only inside the current PHITS workspace. Never run PHITS, ANGEL, DCHAIN, or PHIG-3D, and never use network access.
+Work only inside the current PHITS workspace. Never launch PHITS, ANGEL, DCHAIN, or PHIG-3D with a shell command, and never use network access. When the user asks to run PHITS, call the run_phits tool supplied by the phits_ai_editor MCP server. That tool can run only the saved input identified by activeInputPath and returns the result to this turn. Do not substitute a direct executable or wrapper command if the tool rejects the request.
 
-The application appends a PHITS_EDITOR_CONTEXT_V1 item to every user turn. Treat that item as application-supplied editor state. Its activeDocumentPath is the currently open file, activeInputPath is the PHITS execution target, cursor and selection are one-based editor positions, and dirtyBuffer contains the unsaved buffer only when supplied. Resolve phrases such as "the current file", "the open file", and "here" from this context.
+The application appends a PHITS_EDITOR_CONTEXT_V1 item to every user turn. Treat that item as application-supplied editor state. Its activeDocumentPath is the currently open file, activeInputPath is the PHITS execution target, activeInputDirty says whether that execution target has unsaved changes, cursor and selection are one-based editor positions, and dirtyBuffer contains the current document's unsaved buffer only when supplied. Resolve phrases such as "the current file", "the open file", and "here" from this context.
 
 When the user asks to edit, create, rename, move, or delete a file and the turn is writable, perform the requested change now with Codex's built-in file-editing capability so the App Server emits a fileChange item and the PHITS AI Editor can present its review and approval UI. Do not merely print a unified diff, patch, replacement text, or instructions in chat unless the user explicitly asks only for a proposal or explanation. Never claim a file was changed unless the built-in editing action completed.
 
@@ -82,6 +83,7 @@ struct CodexConnection {
     thread_modes: Mutex<HashMap<String, ApprovalMode>>,
     thread_revisions: Mutex<HashMap<String, DiskRevision>>,
     change_histories: Mutex<HashMap<String, String>>,
+    mcp_host: McpHost,
     next_id: AtomicU64,
     workspace_root: PathBuf,
     compatibility: CodexCompatibilityReport,
@@ -92,14 +94,18 @@ struct CodexConnection {
 fn approval_policy(mode: ApprovalMode) -> &'static str {
     match mode {
         ApprovalMode::OnRequest => "on-request",
-        ApprovalMode::ConfirmFirst | ApprovalMode::ConsultationOnly => "untrusted",
+        ApprovalMode::ConfirmFirst
+        | ApprovalMode::ConsultationOnly
+        | ApprovalMode::AutonomousWorkspace => "untrusted",
     }
 }
 
 fn sandbox_policy(mode: ApprovalMode, workspace_root: &Path) -> Value {
     match mode {
         ApprovalMode::ConsultationOnly => json!({ "type": "readOnly" }),
-        ApprovalMode::ConfirmFirst | ApprovalMode::OnRequest => json!({
+        ApprovalMode::ConfirmFirst
+        | ApprovalMode::OnRequest
+        | ApprovalMode::AutonomousWorkspace => json!({
             "type": "workspaceWrite", "writableRoots": [workspace_root], "networkAccess": false
         }),
     }
@@ -518,6 +524,7 @@ async fn record_notification_state(connection: &CodexConnection, method: &str, p
                     .retain(|key, _| !key.starts_with(&prefix));
             }
             if let Some(thread_id) = params.get("threadId").and_then(Value::as_str) {
+                connection.mcp_host.clear_active_turn(thread_id).await;
                 let prefix = format!("{thread_id}\u{1f}");
                 connection
                     .thread_revisions
@@ -727,13 +734,14 @@ async fn reader_loop(
                     }
                     item => (item, None),
                 };
-                let consultation_only =
+                let approval_mode =
                     if let Some(thread_id) = params.get("threadId").and_then(Value::as_str) {
                         connection.thread_modes.lock().await.get(thread_id).copied()
-                            == Some(ApprovalMode::ConsultationOnly)
                     } else {
-                        false
+                        None
                     };
+                let consultation_only = approval_mode == Some(ApprovalMode::ConsultationOnly);
+                let autonomous_workspace = approval_mode == Some(ApprovalMode::AutonomousWorkspace);
                 let disk_conflict = if method == "item/fileChange/requestApproval" {
                     approval_has_disk_conflict(&connection, &params, item.as_ref())
                         .await
@@ -774,6 +782,16 @@ async fn reader_loop(
                         .send_json(&json!({ "id": id, "result": { "decision": "decline" } }))
                         .await;
                     let _ = app.emit("codex://log", reason);
+                    continue;
+                }
+                if autonomous_workspace && method == "item/fileChange/requestApproval" {
+                    let _ = connection
+                        .send_json(&json!({ "id": id, "result": { "decision": "accept" } }))
+                        .await;
+                    let _ = app.emit(
+                        "codex://log",
+                        "自律実行（ワークスペース内）モードで、検証済みのファイル変更を許可しました。",
+                    );
                     continue;
                 }
                 let turn_diff = if let Some(key) = scoped_turn_key(&params) {
@@ -1405,26 +1423,33 @@ async fn start_connection(
     compatibility: CodexCompatibilityReport,
 ) -> AppResult<Arc<CodexConnection>> {
     let executable = verify_codex_version().await?;
-    let mut child = Command::new(executable)
+    let mcp_host = McpHost::start(app.clone(), workspace_root.clone()).await?;
+    let child = Command::new(executable)
         .arg("app-server")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(false)
         .spawn()
-        .map_err(|error| AppError::Message(format!("Failed to start Codex App Server: {error}")))?;
-    let stdin = child
-        .stdin
-        .take()
-        .ok_or_else(|| AppError::Message("Codex stdin was not available".into()))?;
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| AppError::Message("Codex stdout was not available".into()))?;
-    let stderr = child
-        .stderr
-        .take()
-        .ok_or_else(|| AppError::Message("Codex stderr was not available".into()))?;
+        .map_err(|error| AppError::Message(format!("Failed to start Codex App Server: {error}")));
+    let mut child = match child {
+        Ok(child) => child,
+        Err(error) => {
+            mcp_host.close().await;
+            return Err(error);
+        }
+    };
+    let streams = (child.stdin.take(), child.stdout.take(), child.stderr.take());
+    let (stdin, stdout, stderr) = match streams {
+        (Some(stdin), Some(stdout), Some(stderr)) => (stdin, stdout, stderr),
+        _ => {
+            mcp_host.close().await;
+            let _ = child.start_kill();
+            return Err(AppError::Message(
+                "Codex App Serverの入出力ストリームを取得できません。".into(),
+            ));
+        }
+    };
     let connection = Arc::new(CodexConnection {
         stdin: Mutex::new(Some(stdin)),
         child: Mutex::new(child),
@@ -1435,6 +1460,7 @@ async fn start_connection(
         thread_modes: Mutex::new(HashMap::new()),
         thread_revisions: Mutex::new(HashMap::new()),
         change_histories: Mutex::new(HashMap::new()),
+        mcp_host,
         next_id: AtomicU64::new(1),
         workspace_root,
         compatibility,
@@ -1458,6 +1484,7 @@ async fn start_connection(
 }
 
 async fn close_connection(connection: &Arc<CodexConnection>) -> AppResult<()> {
+    connection.mcp_host.close().await;
     if let Some(mut stdin) = connection.stdin.lock().await.take() {
         let _ = stdin.shutdown().await;
     }
@@ -2021,7 +2048,8 @@ pub async fn codex_thread_start(
     )?;
     ensure_workspace(&connection, &workspace_root).await?;
     let result = connection.request("thread/start", json!({
-        "cwd": connection.workspace_root, "model": model, "approvalPolicy": "untrusted", "sandbox": "workspace-write", "developerInstructions": APP_SERVER_INSTRUCTIONS
+        "cwd": connection.workspace_root, "model": model, "approvalPolicy": "untrusted", "sandbox": "workspace-write", "developerInstructions": APP_SERVER_INSTRUCTIONS,
+        "config": connection.mcp_host.thread_config()?
     })).await?;
     let id = result
         .pointer("/thread/id")
@@ -2042,7 +2070,8 @@ pub async fn codex_thread_resume(workspace_root: String, thread_id: String) -> A
     )?;
     ensure_workspace(&connection, &workspace_root).await?;
     connection.request("thread/resume", json!({
-        "threadId": thread_id, "cwd": connection.workspace_root, "approvalPolicy": "untrusted", "sandbox": "workspace-write", "developerInstructions": APP_SERVER_INSTRUCTIONS
+        "threadId": thread_id, "cwd": connection.workspace_root, "approvalPolicy": "untrusted", "sandbox": "workspace-write", "developerInstructions": APP_SERVER_INSTRUCTIONS,
+        "config": connection.mcp_host.thread_config()?
     })).await?;
     persist_thread_link(&connection.workspace_root, &thread_id, None, None)?;
     connection
@@ -2169,8 +2198,8 @@ pub async fn codex_turn_start(
         }
     }
     let mut input = vec![json!({ "type": "text", "text": text })];
-    if let Some(context) = context {
-        let context_text = editor_context_input(&context)?;
+    if let Some(context) = context.as_ref() {
+        let context_text = editor_context_input(context)?;
         input.push(json!({ "type": "text", "text": context_text }));
     }
     let mut links = load_thread_links(&connection.workspace_root)?;
@@ -2216,11 +2245,19 @@ pub async fn codex_turn_start(
                 .into_iter()
                 .collect();
     }
-    connection.request("turn/start", json!({
-        "threadId": thread_id, "input": input, "cwd": connection.workspace_root,
+    connection
+        .mcp_host
+        .set_active_turn(thread_id.clone(), effective_mode, context.as_ref())
+        .await;
+    let result = connection.request("turn/start", json!({
+        "threadId": thread_id.clone(), "input": input, "cwd": connection.workspace_root,
         "model": model, "effort": reasoning_effort, "approvalPolicy": approval_policy(effective_mode),
         "sandboxPolicy": sandbox_policy(effective_mode, &connection.workspace_root)
-    })).await
+    })).await;
+    if result.is_err() {
+        connection.mcp_host.clear_active_turn(&thread_id).await;
+    }
+    result
 }
 
 #[tauri::command]
@@ -2244,6 +2281,7 @@ pub async fn codex_turn_interrupt(thread_id: String, turn_id: String) -> AppResu
             json!({ "threadId": thread_id, "turnId": turn_id }),
         )
         .await?;
+    connection.mcp_host.clear_active_turn(&thread_id).await;
     #[cfg(windows)]
     tokio::task::spawn_blocking(move || {
         terminate_windows_turn_processes(app_server_pid, &baseline)
@@ -2266,6 +2304,18 @@ pub async fn codex_approval_resolve(
         return Err(AppError::Message("Unsupported approval decision".into()));
     }
     let connection = current_connection().await?;
+    if method == "phits/run/requestApproval" {
+        if connection
+            .mcp_host
+            .resolve_approval(&request_id, &decision)
+            .await?
+        {
+            return Ok(());
+        }
+        return Err(AppError::Message(
+            "PHITS実行の承認要求はすでに終了しています。".into(),
+        ));
+    }
     require_codex_feature(
         &connection.compatibility,
         CodexFeatureId::Approvals,
@@ -2473,16 +2523,28 @@ mod tests {
     }
 
     #[test]
-    fn maps_only_the_three_exposed_approval_modes() {
+    fn maps_all_exposed_approval_modes_without_disabling_the_sandbox() {
         assert_eq!(approval_policy(ApprovalMode::ConfirmFirst), "untrusted");
         assert_eq!(approval_policy(ApprovalMode::ConsultationOnly), "untrusted");
         assert_eq!(approval_policy(ApprovalMode::OnRequest), "on-request");
+        assert_eq!(
+            approval_policy(ApprovalMode::AutonomousWorkspace),
+            "untrusted"
+        );
         assert_eq!(
             sandbox_policy(ApprovalMode::ConsultationOnly, Path::new(r"C:\work"))["type"],
             "readOnly"
         );
         assert_eq!(
             sandbox_policy(ApprovalMode::ConfirmFirst, Path::new(r"C:\work"))["networkAccess"],
+            false
+        );
+        assert_eq!(
+            sandbox_policy(ApprovalMode::AutonomousWorkspace, Path::new(r"C:\work"))["type"],
+            "workspaceWrite"
+        );
+        assert_eq!(
+            sandbox_policy(ApprovalMode::AutonomousWorkspace, Path::new(r"C:\work"))["networkAccess"],
             false
         );
     }
@@ -2503,6 +2565,9 @@ mod tests {
         assert!(APP_SERVER_INSTRUCTIONS.contains("App Server emits a fileChange item"));
         assert!(APP_SERVER_INSTRUCTIONS.contains("Do not merely print a unified diff"));
         assert!(APP_SERVER_INSTRUCTIONS.contains("activeDocumentPath"));
+        assert!(APP_SERVER_INSTRUCTIONS.contains("activeInputDirty"));
+        assert!(APP_SERVER_INSTRUCTIONS.contains("run_phits tool"));
+        assert!(APP_SERVER_INSTRUCTIONS.contains("Never launch PHITS"));
     }
 
     #[test]
@@ -2787,6 +2852,7 @@ mod tests {
             version: 1,
             active_document_path: Some("sample.inp".into()),
             active_input_path: Some("sample.inp".into()),
+            active_input_dirty: false,
             cursor: None,
             selection: None,
             dirty: false,

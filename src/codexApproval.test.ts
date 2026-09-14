@@ -48,5 +48,26 @@ describe("Codex approval normalization", () => {
     expect(normalizeAvailableDecisions(["accept", "acceptForSession", "unknown"], "fileChange")).toEqual(["accept", "acceptForSession"]);
     expect(normalizeAvailableDecisions([{ acceptWithExecpolicyAmendment: { execpolicy_amendment: ["pnpm", "test"] } }], "commandExecution")).toEqual(["acceptWithExecPolicyAmendment"]);
     expect(normalizeAvailableDecisions(undefined, "fileChange")).toContain("cancel");
+    expect(normalizeAvailableDecisions(undefined, "phitsRun")).toEqual(["accept", "decline"]);
+  });
+
+  it("normalizes the editor-owned PHITS run approval without accepting a shell command", () => {
+    expect(normalizeApprovalRequest({
+      requestId: "run-1",
+      method: "phits/run/requestApproval",
+      kind: "phitsRun",
+      inputRelativePath: "case.inp",
+      cwd: "C:\\work",
+      phitsRoot: "C:\\phits",
+      phitsVersion: "3.370",
+      executionMode: "normal",
+      availableDecisions: ["accept", "decline"],
+      changes: [],
+    })).toMatchObject({
+      kind: "phitsRun",
+      inputRelativePath: "case.inp",
+      phitsRoot: "C:\\phits",
+      executionMode: "normal",
+    });
   });
 });

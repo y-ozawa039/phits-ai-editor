@@ -1177,10 +1177,18 @@ export default function App() {
       })) : [];
     const relativePath = entry?.document?.relativePath;
     const dirty = dirtyOverride ?? entry?.dirty ?? false;
+    const activeInputEntry = workspace?.primaryInput
+      ? documents.find((item) => item.document && samePath(item.document.relativePath, workspace.primaryInput!))
+      : undefined;
+    const activeInputDirty = activeInputEntry?.document && entry?.document
+      && samePath(activeInputEntry.document.relativePath, entry.document.relativePath)
+      ? dirty
+      : activeInputEntry?.dirty ?? false;
     return boundedEditorContext({
       version: 1,
       activeDocumentPath: contextOptions.activeDocument ? relativePath : undefined,
       activeInputPath: workspace?.primaryInput ?? undefined,
+      activeInputDirty,
       cursor: contextOptions.activeDocument ? cursor : undefined,
       selection: contextOptions.selection ? selection : undefined,
       dirty,

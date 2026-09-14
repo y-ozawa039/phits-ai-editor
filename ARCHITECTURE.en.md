@@ -112,6 +112,14 @@ application restart. Normal and calculation-priority modes differ in how much
 of the editor/Codex environment remains active, but both preserve explicit input
 ownership.
 
+A Codex request for a normal run returns to the editor through a local MCP
+server added only to the current connection. The MCP child does not launch
+PHITS; it forwards the request over an authenticated loopback connection to the
+Rust boundary. Rust checks the active turn, approval mode, saved state, input
+path, PHITS root, official wrapper, and run lock before invoking the existing
+Runner and returning the result to the same Codex turn. Global Codex settings
+are not modified.
+
 ## Compatibility strategy
 
 Codex CLI 0.153.1 App Server schemas are the minimum pinned contract. Startup

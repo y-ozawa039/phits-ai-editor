@@ -15,8 +15,8 @@ use uuid::Uuid;
 
 use crate::{
     contracts::{
-        Compatibility, ExecutionMode, FileFingerprintV1, PhitsOutputEvent, RunManifestV1, RunState,
-        RunStatus, UtilityKind, WorkspaceInfo,
+        CodexPhitsRunPreview, CodexPhitsRunResult, Compatibility, ExecutionMode, FileFingerprintV1,
+        PhitsOutputEvent, RunManifestV1, RunState, RunStatus, UtilityKind, WorkspaceInfo,
     },
     diagnostics::{
         phits_compatibility, phits_wrapper_path, read_phits_version, resolve_phits_root,
@@ -58,6 +58,132 @@ struct RunContext {
 struct PreparedRun {
     manifest: RunManifestV1,
     manifest_path: PathBuf,
+}
+
+const CODEX_OUTPUT_TAIL_BYTES: usize = 32 * 1024;
+
+fn extend_output_tail(tail: &mut Vec<u8>, chunk: &[u8]) {
+    tail.extend_from_slice(chunk);
+    if tail.len() > CODEX_OUTPUT_TAIL_BYTES {
+        tail.drain(..tail.len() - CODEX_OUTPUT_TAIL_BYTES);
+    }
+}
+
+pub(crate) fn inspect_codex_run_request(
+    app: &AppHandle,
+    workspace_root: &str,
+    input_relative_path: &str,
+) -> AppResult<CodexPhitsRunPreview> {
+    let context = resolve_run_context(app, workspace_root, Some(input_relative_path), false)?;
+    Ok(CodexPhitsRunPreview {
+        input_relative_path: context.input_relative.to_string_lossy().replace('\\', "/"),
+        work_dir: context.work_dir.to_string_lossy().into_owned(),
+        phits_root: context.phits_root.to_string_lossy().into_owned(),
+        phits_version: context.phits_version,
+    })
+}
+
+pub(crate) async fn run_phits_from_codex(
+    app: AppHandle,
+    workspace_root: &str,
+    input_relative_path: &str,
+) -> AppResult<CodexPhitsRunResult> {
+    let context = resolve_run_context(&app, workspace_root, Some(input_relative_path), false)?;
+    let spec = phits_command_spec(&context)?;
+    let state = app.state::<AppState>();
+    acquire_run_lock(&state, &context.work_dir).await?;
+    let prepared = match prepare_run(&context, ExecutionMode::Normal) {
+        Ok(prepared) => prepared,
+        Err(error) => {
+            release_run_lock(&state, &context.work_dir).await;
+            return Err(error);
+        }
+    };
+    let mut command = command_from_spec(&spec, false);
+    command
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .stdin(Stdio::null());
+    let mut child = match command.spawn() {
+        Ok(child) => child,
+        Err(error) => {
+            let message = format!("PHITSを起動できませんでした: {error}");
+            mark_manifest_failed(&prepared.manifest_path, &prepared.manifest, &message);
+            release_run_lock(&state, &context.work_dir).await;
+            return Err(AppError::Message(message));
+        }
+    };
+    let running = RunStatus {
+        run_id: prepared.manifest.run_id.clone(),
+        mode: ExecutionMode::Normal,
+        state: RunState::Running,
+        message: "Codexの要求によりPHITSを通常実行しています。".into(),
+    };
+    let _ = app.emit(EVENT_STATE, &running);
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+    let stdout_task = stdout.map(|stream| {
+        let app = app.clone();
+        let run_id = running.run_id.clone();
+        tokio::spawn(async move { stream_output_with_tail(app, run_id, "stdout", stream).await })
+    });
+    let stderr_task = stderr.map(|stream| {
+        let app = app.clone();
+        let run_id = running.run_id.clone();
+        tokio::spawn(async move { stream_output_with_tail(app, run_id, "stderr", stream).await })
+    });
+    let outcome = child.wait().await;
+    let stdout_tail = match stdout_task {
+        Some(task) => task
+            .await
+            .unwrap_or_else(|error| format!("出力取得失敗: {error}")),
+        None => String::new(),
+    };
+    let stderr_tail = match stderr_task {
+        Some(task) => task
+            .await
+            .unwrap_or_else(|error| format!("出力取得失敗: {error}")),
+        None => String::new(),
+    };
+    let (run_state, exit_code, message) = match outcome {
+        Ok(status) if status.success() => (
+            RunState::Completed,
+            status.code(),
+            "PHITSが正常に終了しました。".to_owned(),
+        ),
+        Ok(status) => (
+            RunState::Failed,
+            status.code(),
+            format!("PHITSが終了コード{:?}で終了しました。", status.code()),
+        ),
+        Err(error) => (
+            RunState::Failed,
+            None,
+            format!("PHITSの終了を確認できませんでした: {error}"),
+        ),
+    };
+    update_manifest_state(
+        &prepared.manifest_path,
+        &prepared.manifest,
+        run_state.clone(),
+        (run_state == RunState::Failed).then(|| message.clone()),
+    );
+    let final_status = RunStatus {
+        run_id: running.run_id.clone(),
+        mode: ExecutionMode::Normal,
+        state: run_state.clone(),
+        message: message.clone(),
+    };
+    let _ = app.emit(EVENT_STATE, final_status);
+    release_run_lock(&state, &context.work_dir).await;
+    Ok(CodexPhitsRunResult {
+        run_id: running.run_id,
+        state: run_state,
+        message,
+        exit_code,
+        stdout_tail,
+        stderr_tail,
+    })
 }
 
 #[tauri::command]
@@ -908,6 +1034,49 @@ where
     }
 }
 
+async fn stream_output_with_tail<R>(
+    app: AppHandle,
+    run_id: String,
+    stream_name: &'static str,
+    mut stream: R,
+) -> String
+where
+    R: tokio::io::AsyncRead + Unpin,
+{
+    let mut buffer = vec![0_u8; MAX_EVENT_BYTES];
+    let mut tail = Vec::new();
+    loop {
+        match stream.read(&mut buffer).await {
+            Ok(0) => break,
+            Ok(count) => {
+                extend_output_tail(&mut tail, &buffer[..count]);
+                let _ = app.emit(
+                    EVENT_OUTPUT,
+                    PhitsOutputEvent {
+                        run_id: run_id.clone(),
+                        stream: stream_name.into(),
+                        text: String::from_utf8_lossy(&buffer[..count]).into_owned(),
+                    },
+                );
+            }
+            Err(error) => {
+                let detail = format!("出力ストリームを読み取れません: {error}");
+                let _ = app.emit(
+                    EVENT_OUTPUT,
+                    PhitsOutputEvent {
+                        run_id: run_id.clone(),
+                        stream: "diagnostic".into(),
+                        text: detail.clone(),
+                    },
+                );
+                extend_output_tail(&mut tail, detail.as_bytes());
+                break;
+            }
+        }
+    }
+    String::from_utf8_lossy(&tail).into_owned()
+}
+
 fn replace_first_batch_count(input: &[u8]) -> Option<Vec<u8>> {
     let line_end = input
         .iter()
@@ -1000,6 +1169,14 @@ mod tests {
         assert!(!value.existed);
         assert_eq!(value.size, None);
         assert_eq!(value.tail_sha256, None);
+    }
+
+    #[test]
+    fn codex_output_tail_keeps_only_the_latest_bounded_bytes() {
+        let mut tail = vec![b'a'; CODEX_OUTPUT_TAIL_BYTES - 2];
+        extend_output_tail(&mut tail, b"bcdef");
+        assert_eq!(tail.len(), CODEX_OUTPUT_TAIL_BYTES);
+        assert!(tail.ends_with(b"bcdef"));
     }
 
     #[test]

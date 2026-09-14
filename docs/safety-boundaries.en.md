@@ -27,7 +27,9 @@ support, or Codex integration is customized.
   fixed output and temporary names.
 - Normal execution uses the validated local PHITS wrapper/environment. ANGEL,
   DCHAIN, and PHIG-3D use fixed validated application paths.
-- Codex turns cannot directly start PHITS or its utilities.
+- Codex cannot start PHITS or its utilities directly through the shell. A
+  normal PHITS run request returns through the editor-owned temporary MCP tool
+  and uses only the same Rust Runner and official wrapper.
 - PHITS, its manuals and assets, and user input/output are not redistributed
   under this project's Apache license.
 
@@ -35,14 +37,20 @@ support, or Codex integration is customized.
 
 - Codex CLI runs locally and is not bundled. Its authentication data must never
   enter logs, Editor Context, Git, or release archives.
-- The exposed modes are confirm-first, consultation-only, and on-request.
-  Unrestricted filesystem access and unconditional approval are not exposed.
+- The exposed modes are confirm-first, consultation-only, on-request, and
+  autonomous-workspace. Autonomous mode automatically allows only validated
+  workspace file changes and a normal run of the currently selected saved
+  input. Unrestricted filesystem access and unconditional command approval are
+  not exposed.
 - Network access from Codex commands and writes outside the workspace remain
   unavailable in every mode.
 - An approval response must be one of the decisions offered by App Server.
   Unknown decisions are rejected. Consultation-only file or permission requests
   are rejected by Rust.
 - Session approvals expire when the App Server connection ends.
+- Rust revalidates that a PHITS request matches the selected saved input and
+  workspace boundary, uses a supported PHITS root and official wrapper, and
+  does not conflict with an unresolved or duplicate run in the same folder.
 - Only App Server file-change/diff events establish that Codex edited a file.
   A Markdown patch in chat is display text.
 - Before/after snapshots and document revisions connect each edit to a review

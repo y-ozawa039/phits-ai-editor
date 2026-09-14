@@ -181,6 +181,33 @@ describe("CodexPanel", () => {
     expect(screen.getByText(/相談のみに制限します/)).toBeInTheDocument();
   });
 
+  it("shows an editor-owned PHITS run request without a shell command", () => {
+    render(<CodexPanel {...baseProps} approval={{
+      requestId: "run-1",
+      method: "phits/run/requestApproval",
+      kind: "phitsRun",
+      reason: "編集結果を検証します",
+      inputRelativePath: "case.inp",
+      cwd: "C:\\work",
+      phitsRoot: "C:\\phits",
+      phitsVersion: "3.370",
+      executionMode: "normal",
+      availableDecisions: ["accept", "decline"],
+      changes: [],
+    }} />);
+    expect(screen.getByText("PHITS通常実行の承認")).toBeInTheDocument();
+    expect(screen.getByText("case.inp")).toBeInTheDocument();
+    expect(screen.getByText("C:\\phits")).toBeInTheDocument();
+    expect(screen.getByText(/shell実行権限は渡しません/)).toBeInTheDocument();
+  });
+
+  it("explains the bounded autonomous workspace mode", () => {
+    const { container } = render(<CodexPanel {...baseProps} approvalMode="autonomousWorkspace" />);
+    const select = container.querySelector<HTMLSelectElement>(".approval-mode-label select")!;
+    expect(select.value).toBe("autonomousWorkspace");
+    expect(screen.getByText(/個別確認なしで許可します/)).toHaveTextContent("ネットワーク");
+  });
+
   it("shows the official PHITS setup guidance when the Codex pointer is missing", () => {
     render(<CodexPanel {...baseProps} phitsAgentSetup={{
       configured: false,
