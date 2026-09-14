@@ -1,7 +1,7 @@
 {
   "name": "phits-ai-editor",
   "private": true,
-  "version": "0.0.3-alpha",
+  "version": "0.0.4-alpha",
   "author": "Yohei Ozawa",
   "license": "Apache-2.0",
   "type": "module",

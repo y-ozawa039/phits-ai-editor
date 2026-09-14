@@ -51,7 +51,7 @@ try {
     clientInfo: {
       name: "phits_ai_editor_command_smoke",
       title: "PHITS AI Editor command smoke",
-      version: "0.0.3-alpha",
+      version: "0.0.4-alpha",
     },
   });
   child.stdin.write(`${JSON.stringify({ method: "initialized", params: {} })}\n`);

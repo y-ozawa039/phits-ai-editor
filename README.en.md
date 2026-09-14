@@ -10,11 +10,11 @@ Codex-assisted input editing in one interface.
 The current alpha release supports Windows 11 x64.
 
 - **Regular use (recommended):**
-  [Download the installer](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.3-alpha/PHITS-AI-Editor-v0.0.3-alpha-windows-x64-setup.exe)
+  [Download the installer](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.4-alpha/PHITS-AI-Editor-v0.0.4-alpha-windows-x64-setup.exe)
 - **Evaluation, portable use, or comparing versions:**
-  [Download the portable ZIP](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.3-alpha/PHITS-AI-Editor-v0.0.3-alpha-windows-x64-portable.zip)
+  [Download the portable ZIP](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.4-alpha/PHITS-AI-Editor-v0.0.4-alpha-windows-x64-portable.zip)
 - **Verify after downloading:**
-  [SHA-256 checksums](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.3-alpha/SHA256SUMS.txt)
+  [SHA-256 checksums](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.4-alpha/SHA256SUMS.txt)
 
 | Purpose | Choose | Why |
 |---|---|---|
@@ -71,7 +71,7 @@ for the detailed checks and troubleshooting steps.
 
 ## System requirements
 
-- Windows 11 x64 (distribution target for `0.0.3-alpha`)
+- Windows 11 x64 (distribution target for `0.0.4-alpha`)
 - A PHITS runtime environment when running input files (automatically detected
   from `PHITSPATH` or selected in Settings)
 - Codex CLI 0.153.1 or later when using AI assistance
@@ -121,7 +121,7 @@ This is not an official product developed, approved, sponsored, endorsed, or
 warranted by JAEA, the PHITS development team, OpenAI, or the author's
 affiliated institution.
 
-## Windows alpha release (`0.0.3-alpha`)
+## Windows alpha release (`0.0.4-alpha`)
 
 Implemented features include:
 
@@ -129,7 +129,7 @@ Implemented features include:
 - direct `.inp`/`.pht` opening from Explorer or drag-and-drop, forwarding to an
   already-open window, and restoration of the previous workspace and tabs
 - show/hide controls for Explorer, Codex, and Output panels, with saved font
-  sizes and Codex panel width
+  sizes and Explorer/Codex panel widths
 - preservation of UTF-8, UTF-8 BOM, Windows-31J, CRLF, and LF; safe replacement
   of saved files and a backup of the previous version
 - PHITS syntax highlighting, completion, and descriptions for supported fields
@@ -140,8 +140,9 @@ Implemented features include:
 - integration with ANGEL, DCHAIN, and PHIG-3D
 - Codex chat, thread resume/rename/delete, model selection, and compatibility
   status for available features
-- diagnostics for the PHITS Codex setup, details of checked files and reasons,
-  and generation or copying of an AI troubleshooting prompt based on the results
+- diagnostics for the PHITS Codex setup, command execution inside the Codex
+  sandbox, and workspace writes; details include reasons and the actual sandbox
+  implementation, with an AI troubleshooting prompt based on the results
 - Codex editing assistance using the current file, selection, and unsaved text,
   with configurable approval behavior
 - full diff review of Codex changes, change navigation, inline/side-by-side
@@ -161,5 +162,5 @@ development environment. See the
 Ubuntu support and Linux packages are possible future ports and are not
 currently available.
 
-See the [release notes](docs/release-notes-v0.0.3-alpha.en.md) and
-[known issues](docs/known-issues-v0.0.3-alpha.en.md).
+See the [release notes](docs/release-notes-v0.0.4-alpha.en.md) and
+[known issues](docs/known-issues-v0.0.4-alpha.en.md).

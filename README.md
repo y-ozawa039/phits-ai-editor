@@ -9,11 +9,11 @@ PHITS-Padに近い編集・実行機能と、CodexによるAI編集支援を一�
 現在のalpha版はWindows 11 x64専用です。
 
 - **通常利用（推奨）:**
-  [インストーラー版をダウンロード](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.3-alpha/PHITS-AI-Editor-v0.0.3-alpha-windows-x64-setup.exe)
+  [インストーラー版をダウンロード](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.4-alpha/PHITS-AI-Editor-v0.0.4-alpha-windows-x64-setup.exe)
 - **試用・持ち運び・複数版の比較:**
-  [ポータブル版をダウンロード](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.3-alpha/PHITS-AI-Editor-v0.0.3-alpha-windows-x64-portable.zip)
+  [ポータブル版をダウンロード](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.4-alpha/PHITS-AI-Editor-v0.0.4-alpha-windows-x64-portable.zip)
 - **ダウンロード後の確認:**
-  [SHA-256一覧](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.3-alpha/SHA256SUMS.txt)
+  [SHA-256一覧](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.4-alpha/SHA256SUMS.txt)
 
 | 目的 | 選ぶファイル | 選択理由 |
 |---|---|---|
@@ -66,7 +66,7 @@ Codex CLIへ次のように依頼してください。
 
 ## 動作環境
 
-- Windows 11 x64（`0.0.3-alpha`の配布対象）
+- Windows 11 x64（`0.0.4-alpha`の配布対象）
 - PHITS実行環境（入力ファイルを実行する場合。`PHITSPATH`からの自動検出または設定画面で指定）
 - Codex CLI 0.153.1以降（AI支援を使う場合）
 
@@ -108,20 +108,20 @@ IssueおよびPull Requestの方針は[CONTRIBUTING.md](CONTRIBUTING.md)を参�
 JAEA、PHITS開発チーム、OpenAIまたは著者の所属機関による開発・承認・後援・
 保証を受けた公式製品ではありません。
 
-## Windows alpha版（0.0.3-alpha）
+## Windows alpha版（0.0.4-alpha）
 
 実装済みの主な機能:
 
 - 複数タブでの編集、検索・置換、Undo／Redo、新規作成、保存、名前を付けて保存
 - Explorerの「プログラムから開く」やドラッグ＆ドロップによる`.inp`／`.pht`ファイルの直接起動、起動中のウィンドウへの受け渡し、および前回開いていたワークスペースとタブの復元
-- エクスプローラー／Codex／出力パネルの表示切替と、エクスプローラー・エディター・Codexの個別文字サイズおよびCodexパネル幅の調整・保存
+- エクスプローラー／Codex／出力パネルの表示切替と、エクスプローラー・エディター・Codexの個別文字サイズおよびエクスプローラー／Codexパネル幅の調整・保存
 - UTF-8／BOM付きUTF-8／Windows-31Jと改行形式（CRLF／LF）の保持、一時ファイルを介した安全な上書き保存、直前1世代のバックアップ
 - PHITS入力の構文強調、入力補完、および対応する項目の説明表示
 - PHITSの通常実行と、エディタおよびCodexを終了して計算用リソースを確保する計算優先実行
 - 複数の入力ファイルがある場合でも、選択した1件だけを実行する安全な実行対象管理と重複実行の防止
 - ANGEL、DCHAIN、PHIG-3Dとの連携
 - Codexとの会話、スレッドの再開・名前変更・削除、モデル選択、および利用可能な機能の互換性表示
-- PHITS用Codex設定の診断、「検査したファイルと理由」の表示、および診断結果に基づく「生成AIへの相談文」の作成・コピー
+- PHITS用Codex設定とCodexのSandbox内コマンド実行・ワークスペース書込みの診断、検査理由・実方式の表示、および診断結果に基づく「生成AIへの相談文」の作成・コピー
 - 現在のファイル・選択範囲・未保存内容をCodexへ渡す編集支援と、操作内容に応じた承認設定
 - Codexによる変更の全文差分表示、変更箇所間の移動、インライン／左右比較表示、変更の保持・復元
 - Codexによる変更後の再読み込み、競合防止、およびUndo／Redo
@@ -136,5 +136,5 @@ Windows 11 x64の開発環境および別端末で、インストール、ファ
 確認済みです。詳細は[Windows alpha試験報告](docs/windows-alpha-test-report.md)を参照してください。
 Ubuntu対応とLinux配布物は今後の移植候補であり、現在は提供していません。
 
-現在のalpha版の概要は[リリースノート](docs/release-notes-v0.0.3-alpha.md)、
-制限事項は[既知の問題](docs/known-issues-v0.0.3-alpha.md)を参照してください。
+現在のalpha版の概要は[リリースノート](docs/release-notes-v0.0.4-alpha.md)、
+制限事項は[既知の問題](docs/known-issues-v0.0.4-alpha.md)を参照してください。
