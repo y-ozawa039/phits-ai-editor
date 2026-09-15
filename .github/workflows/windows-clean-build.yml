@@ -61,7 +61,7 @@ jobs:
           Get-Content -LiteralPath (Join-Path $releaseDirectory "SHA256SUMS.txt")
 
       - name: Upload Windows release candidate
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: PHITS-AI-Editor-windows-x64-${{ github.sha }}
           path: ${{ env.RELEASE_CANDIDATE_DIR }}/*
