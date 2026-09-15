@@ -24,7 +24,7 @@ interface CodexPanelProps {
   onNewThread: () => string | null | Promise<string | null>; onResumeThread: (threadId: string) => void;
   onRenameThread: (threadId: string, title: string) => void; onDeleteThread: (threadId: string, title: string) => void;
   onRemoveContext: (id: string) => void; onSend: (text: string) => boolean | Promise<boolean>;
-  onInterrupt: () => void; onApproval: (decision: ApprovalDecision) => void;
+  onInterrupt: () => void; onApproval: (decision: ApprovalDecision, answers?: Record<string, string>) => void;
   onOpenDiff?: () => void; onResizeReset?: () => void;
   approvalCanAccept?: boolean;
 }

@@ -120,6 +120,14 @@ path, PHITS root, official wrapper, and run lock before invoking the existing
 Runner and returning the result to the same Codex turn. Global Codex settings
 are not modified.
 
+`codex_interaction.rs` validates and answers App Server MCP confirmation and tool
+input requests. An MCP approval matched to the recorded tool item and arguments
+in the same turn is forwarded to the editor's run review; other confirmations
+and questions use the existing approval queue. Unsupported requests record the
+method and identifiers and are distinguished from user declines. Rust validates
+question IDs, choices, form types and supported constraints before sending a
+response; invalid responses remain pending for correction.
+
 ## Compatibility strategy
 
 Codex CLI 0.153.1 App Server schemas are the minimum pinned contract. Startup

@@ -21,6 +21,8 @@ function approvalKind(method: string, value: unknown): ApprovalKind | null {
       ? "commandExecution"
       : method === "phits/run/requestApproval"
         ? "phitsRun"
+        : ["item/tool/requestUserInput", "tool/requestUserInput", "mcpServer/elicitation/request"].includes(method)
+          ? method === "mcpServer/elicitation/request" && value === "mcpToolApproval" ? "mcpToolApproval" : "toolUserInput"
       : null;
   if (!expected || (value !== undefined && value !== expected)) return null;
   return expected;
@@ -44,13 +46,14 @@ const SIMPLE_DECISIONS: ApprovalDecision[] = ["accept", "acceptForSession", "dec
 export function normalizeAvailableDecisions(value: unknown, kind: ApprovalKind): ApprovalDecision[] {
   const source = Array.isArray(value) ? value : [];
   const values = source.flatMap((entry): ApprovalDecision[] => {
+    if ((kind === "toolUserInput" || kind === "mcpToolApproval") && entry === "acceptForSession") return [];
     if (typeof entry === "string" && SIMPLE_DECISIONS.includes(entry as ApprovalDecision)) return [entry as ApprovalDecision];
     if (kind === "commandExecution" && typeof entry === "object" && entry !== null && "acceptWithExecpolicyAmendment" in entry) {
       return ["acceptWithExecPolicyAmendment"];
     }
     return [];
   });
-  const defaults: ApprovalDecision[] = kind === "phitsRun"
+  const defaults: ApprovalDecision[] = kind === "toolUserInput" ? ["accept", "cancel"] : kind === "mcpToolApproval" ? ["accept", "decline", "cancel"] : kind === "phitsRun"
     ? ["accept", "decline"]
     : ["accept", "acceptForSession", "decline", "cancel"];
   return Array.from(new Set(values.length ? values : defaults));
@@ -68,6 +71,13 @@ export function normalizeApprovalRequest(value: unknown): ApprovalRequest | null
   const method = typeof source.method === "string" ? source.method : "";
   const kind = approvalKind(method, source.kind);
   if (id === null || !method || !kind) return null;
+  if (kind === "toolUserInput" && (!Array.isArray(source.questions) || source.questions.some((value) => {
+    const question = record(value);
+    return !question || typeof question.id !== "string" || typeof question.header !== "string" || typeof question.question !== "string"
+      || (question.options != null && (!Array.isArray(question.options) || question.options.some((option) => {
+        const value = record(option); return !value || typeof value.label !== "string" || typeof value.description !== "string";
+      })));
+  }))) return null;
   return {
     requestId: id,
     method,
@@ -93,6 +103,10 @@ export function normalizeApprovalRequest(value: unknown): ApprovalRequest | null
     availableDecisions: normalizeAvailableDecisions(source.availableDecisions, kind),
     changes: normalizedChanges(source.changes),
     turnDiff: typeof source.turnDiff === "string" ? truncateDiff(source.turnDiff) : undefined,
+    questions: kind === "toolUserInput" ? source.questions as ApprovalRequest["questions"] : undefined,
+    serverName: optionalString(source.serverName) ?? undefined,
+    toolDescription: optionalString(source.toolDescription),
+    toolArguments: source.toolArguments,
   };
 }
 

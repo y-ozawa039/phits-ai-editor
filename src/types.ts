@@ -252,7 +252,14 @@ export interface DocumentRevisionV1 {
   dirty: boolean;
 }
 
-export type ApprovalKind = "fileChange" | "commandExecution" | "phitsRun";
+export type ApprovalKind = "fileChange" | "commandExecution" | "phitsRun" | "toolUserInput" | "mcpToolApproval";
+
+export interface ToolInputQuestion {
+  id: string; header: string; question: string;
+  options?: Array<{ label: string; description: string }> | null;
+  isOther?: boolean; isSecret?: boolean; required?: boolean;
+  inputType?: string;
+}
 
 export interface ApprovalFileChange {
   path: string;
@@ -285,6 +292,10 @@ export interface ApprovalRequest {
   availableDecisions?: ApprovalDecision[];
   changes: ApprovalFileChange[];
   turnDiff?: string | null;
+  questions?: ToolInputQuestion[];
+  serverName?: string;
+  toolDescription?: string | null;
+  toolArguments?: unknown;
 }
 
 export interface ApprovalResolvedEvent {

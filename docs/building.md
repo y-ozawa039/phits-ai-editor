@@ -41,6 +41,7 @@ pnpm test:licenses
 pnpm licenses:generate
 pnpm licenses:audit
 pnpm test:codex-schema
+pnpm test:codex-request-coverage
 pnpm build
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
@@ -56,6 +57,24 @@ node scripts/app-server-edit-smoke.mjs (Get-Command codex).Source .integration
 ```
 
 このsmoke testを研究データに対して実行しないでください。
+
+承認経路は、利用者の認証を使わない実App Server＋ローカル模擬AI・MCPで検査できます。
+ネイティブの`codex.exe`（Windows）またはCodex実行バイナリーを指定してください。
+
+```powershell
+node scripts/app-server-approval-smoke.mjs C:\path\to\codex.exe
+```
+
+空のMCP確認、文字列・選択肢・真偽値・整数・数値を含む入力フォーム、コマンド実行の
+許可・拒否・取消、およびネットワーク・ファイル・両方の追加権限を付与しない応答の
+計12ケースで、要求解決通知と結果返却も検査します。追加権限ツールの実験機能は一時環境だけで
+有効にします。一時Codex homeを生成してプラグイン同期・更新確認を無効にし、終了時に
+一時環境だけを削除します。コマンドは固定文字列の表示だけで、PHITSは実行しません。
+これは実CLIのプロトコル試験であり、エディタのUI試験・Rust境界試験・実環境での
+PHITS実行確認とは別です。最新版CLIの定期GitHub Actionsでも同じ試験を実行します。
+
+全要求名の分類と未対応形式の詳細は[Codex確認要求の対応範囲](codex-request-coverage.md)を
+参照してください。未分類の要求が新たに追加された場合はSchema検査を失敗させます。
 
 ## PHITS用Codex設定表示の手動確認
 

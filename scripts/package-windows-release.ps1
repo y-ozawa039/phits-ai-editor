@@ -63,6 +63,8 @@ try {
     @{ Source = "docs\installation.en.md"; Destination = "docs\installation.en.md" },
     @{ Source = "docs\building.md"; Destination = "docs\building.md" },
     @{ Source = "docs\building.en.md"; Destination = "docs\building.en.md" },
+    @{ Source = "docs\codex-request-coverage.md"; Destination = "docs\codex-request-coverage.md" },
+    @{ Source = "docs\codex-request-coverage.en.md"; Destination = "docs\codex-request-coverage.en.md" },
     @{ Source = "docs\known-issues-v$Version.md"; Destination = "docs\known-issues-v$Version.md" },
     @{ Source = "docs\known-issues-v$Version.en.md"; Destination = "docs\known-issues-v$Version.en.md" },
     @{ Source = "docs\release-notes-v$Version.md"; Destination = "docs\release-notes-v$Version.md" },

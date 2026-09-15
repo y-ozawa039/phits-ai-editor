@@ -51,6 +51,15 @@ describe("Codex approval normalization", () => {
     expect(normalizeAvailableDecisions(undefined, "phitsRun")).toEqual(["accept", "decline"]);
   });
 
+  it("distinguishes MCP confirmations from tool questions and rejects malformed questions", () => {
+    expect(normalizeApprovalRequest({requestId: 0, method: "mcpServer/elicitation/request", kind: "mcpToolApproval", serverName:"phits_ai_editor", questions:[], availableDecisions:["accept","decline","cancel"]})).toMatchObject({kind:"mcpToolApproval",requestId:0});
+    for (const method of ["item/tool/requestUserInput","tool/requestUserInput"]) {
+      expect(normalizeApprovalRequest({requestId: "input", method, kind:"toolUserInput", questions:[{id:"q",header:"Confirm",question:"Run?",options:[{label:"Accept",description:"Run"}]}]})).toMatchObject({kind:"toolUserInput"});
+      expect(normalizeApprovalRequest({requestId: "input", method, kind:"toolUserInput", questions:[{id:"q"}]})).toBeNull();
+    }
+    expect(normalizeApprovalRequest({requestId: 0, method:"unknown/method", kind:"mcpToolApproval"})).toBeNull();
+  });
+
   it("normalizes the editor-owned PHITS run approval without accepting a shell command", () => {
     expect(normalizeApprovalRequest({
       requestId: "run-1",

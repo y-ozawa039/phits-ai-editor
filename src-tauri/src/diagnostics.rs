@@ -61,6 +61,12 @@ const APPROVAL_SCHEMA_FILES: &[&str] = &[
     "FileChangeRequestApprovalResponse.json",
     "CommandExecutionRequestApprovalParams.json",
     "CommandExecutionRequestApprovalResponse.json",
+    "ToolRequestUserInputParams.json",
+    "ToolRequestUserInputResponse.json",
+    "McpServerElicitationRequestParams.json",
+    "McpServerElicitationRequestResponse.json",
+    "PermissionsRequestApprovalParams.json",
+    "PermissionsRequestApprovalResponse.json",
 ];
 const REQUIRED_APPROVAL_DECISIONS: &[&str] = &["accept", "acceptForSession", "decline", "cancel"];
 
@@ -492,7 +498,7 @@ fn evaluate_codex_schema_inventory(
         CodexFeatureId::Approvals,
         APPROVAL_SCHEMA_FILES,
         files,
-        "ファイル変更・コマンド承認に必要なSchemaを確認しました。",
+        "ファイル変更・コマンド承認・MCP確認・ツール入力に必要なSchemaを確認しました。",
     );
     if approvals.state == CodexFeatureState::Available {
         for response_name in [

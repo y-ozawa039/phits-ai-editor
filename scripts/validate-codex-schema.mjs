@@ -1,5 +1,6 @@
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
+import { classifyServerRequests } from "./codex-request-coverage.mjs";
 
 const [schemaArgument, reportArgument] = process.argv.slice(2);
 if (!schemaArgument) {
@@ -39,6 +40,12 @@ const requirements = {
     "FileChangeRequestApprovalResponse.json",
     "CommandExecutionRequestApprovalParams.json",
     "CommandExecutionRequestApprovalResponse.json",
+    "ToolRequestUserInputParams.json",
+    "ToolRequestUserInputResponse.json",
+    "McpServerElicitationRequestParams.json",
+    "McpServerElicitationRequestResponse.json",
+    "PermissionsRequestApprovalParams.json",
+    "PermissionsRequestApprovalResponse.json",
   ],
 };
 const requiredDecisions = ["accept", "acceptForSession", "decline", "cancel"];
@@ -76,6 +83,12 @@ const report = {
   compatible: features.every((feature) => feature.available),
   features,
 };
+try {
+  report.requestCoverage = classifyServerRequests(JSON.parse(await readFile(join(schemaDirectory, "ServerRequest.json"), "utf8")));
+} catch (error) {
+  report.requestCoverage = { compatible: false, error: error.message };
+}
+report.compatible &&= report.requestCoverage.compatible;
 const output = `${JSON.stringify(report, null, 2)}\n`;
 if (reportArgument) await writeFile(resolve(reportArgument), output, "utf8");
 process.stdout.write(output);

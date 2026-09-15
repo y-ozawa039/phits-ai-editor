@@ -121,6 +121,90 @@ describe("CodexPanel", () => {
     expect(scrollBody).not.toContainElement(screen.getByRole("button", { name: "許可" }));
   });
 
+  it("keeps proposed command tokens out of the additional permissions list", () => {
+    render(<CodexPanel {...baseProps} approval={{requestId: 1, method: "item/commandExecution/requestApproval", kind: "commandExecution",
+      command: "Get-Content -LiteralPath main.inp -Raw", proposedExecpolicyAmendment: ["Get-Content", "-LiteralPath", "main.inp", "-Raw"], changes: [], availableDecisions: ["accept", "acceptWithExecPolicyAmendment"]}} />);
+    expect(screen.queryByText("要求される追加権限")).not.toBeInTheDocument();
+    expect(screen.getByText("今後の承認を省略するコマンド規則（候補）")).toBeInTheDocument();
+    expect(screen.getByText(/指定したファイルの内容を読み取る/)).toBeInTheDocument();
+  });
+
+  it("requires an explicit tool answer and sends the original option label", () => {
+    const onApproval = vi.fn();
+    render(<CodexPanel {...baseProps} approval={{requestId: "tool-1", method: "item/tool/requestUserInput", kind: "toolUserInput", changes: [],
+      questions: [{id:"approval", header:"PHITS tool", question:"Run?", options:[{label:"Accept", description:"Run once"},{label:"Decline",description:"Do not run"}]}]}} onApproval={onApproval} />);
+    expect(screen.getByRole("button", {name:"回答を送信"})).toBeDisabled();
+    expect(onApproval).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("PHITS tool"), {target:{value:"Accept"}});
+    fireEvent.click(screen.getByRole("button", {name:"回答を送信"}));
+    expect(onApproval).toHaveBeenCalledWith("accept", {approval:"Accept"});
+    const body = document.querySelector(".approval-scroll-body")!;
+    expect(body).not.toContainElement(screen.getByRole("button", {name:"回答を送信"}));
+  });
+
+  it("shows MCP approval arguments and keeps all decisions outside the scrolling body", () => {
+    const onApproval=vi.fn();
+    render(<CodexPanel {...baseProps} approval={{requestId:0,method:"mcpServer/elicitation/request",kind:"mcpToolApproval",serverName:"phits_ai_editor",
+      reason:'Allow the phits_ai_editor MCP server to run tool "run_phits"?',toolArguments:{inputRelativePath:"main.inp"},changes:[],availableDecisions:["accept","decline","cancel"]}} onApproval={onApproval} />);
+    expect(screen.getByText("MCPツール利用の承認")).toBeInTheDocument();
+    expect(screen.getByText(/"inputRelativePath": "main.inp"/)).toBeInTheDocument();
+    for (const label of ["許可","拒否","中止"]) expect(document.querySelector(".approval-scroll-body")).not.toContainElement(screen.getByRole("button",{name:label}));
+    fireEvent.click(screen.getByRole("button",{name:"許可"}));
+    expect(onApproval).toHaveBeenCalledWith("accept");
+  });
+
+  it("collects a populated MCP form without preselecting or requiring optional fields", () => {
+    const onApproval = vi.fn();
+    render(<CodexPanel {...baseProps} onApproval={onApproval} approval={{requestId:"form-1",method:"mcpServer/elicitation/request",kind:"toolUserInput",serverName:"fixture",changes:[],
+      questions:[{id:"label",header:"名前",question:"検査名",required:true,inputType:"string"},
+        {id:"enabled",header:"有効化",question:"選択",required:true,inputType:"boolean",options:[{label:"true",description:"はい"},{label:"false",description:"いいえ"}]},
+        {id:"count",header:"回数",question:"整数",required:true,inputType:"integer"},
+        {id:"optional",header:"備考",question:"任意",required:false,inputType:"string"}]}} />);
+    const submit = screen.getByRole("button",{name:"回答を送信"});
+    expect(submit).toBeDisabled();
+    expect(screen.getByLabelText("有効化")).toHaveValue("");
+    fireEvent.change(screen.getByLabelText("名前の回答"),{target:{value:"検査"}});
+    fireEvent.change(screen.getByLabelText("有効化"),{target:{value:"false"}});
+    expect(submit).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("回数の回答"),{target:{value:"3"}});
+    expect(submit).toBeEnabled();
+    expect(onApproval).not.toHaveBeenCalled();
+    fireEvent.click(submit);
+    expect(onApproval).toHaveBeenCalledWith("accept",{label:"検査",enabled:"false",count:"3"});
+  });
+
+  it("closes a form without sending entered answers", () => {
+    const onApproval = vi.fn();
+    render(<CodexPanel {...baseProps} onApproval={onApproval} approval={{requestId:"form-cancel",method:"mcpServer/elicitation/request",kind:"toolUserInput",changes:[],
+      questions:[{id:"secret",header:"秘密値",question:"入力",isSecret:true,required:true}]}} />);
+    const input = screen.getByLabelText("秘密値の回答");
+    expect(input).toHaveAttribute("type","password");
+    fireEvent.change(input,{target:{value:"not-for-diagnostics"}});
+    fireEvent.click(screen.getByRole("button",{name:"回答せず閉じる"}));
+    expect(onApproval).toHaveBeenCalledExactlyOnceWith("cancel");
+  });
+
+  it("retains answers while the same request stays pending and resets them for another request", () => {
+    const onApproval = vi.fn();
+    const approval = {requestId:"form-pending",method:"mcpServer/elicitation/request",kind:"toolUserInput" as const,changes:[],
+      questions:[{id:"count",header:"回数",question:"整数",required:true}]};
+    const {rerender} = render(<CodexPanel {...baseProps} onApproval={onApproval} approval={approval} />);
+    fireEvent.change(screen.getByLabelText("回数の回答"),{target:{value:"invalid-number"}});
+    fireEvent.click(screen.getByRole("button",{name:"回答を送信"}));
+    rerender(<CodexPanel {...baseProps} onApproval={onApproval} approval={approval} busy />);
+    expect(screen.getByLabelText("回数の回答")).toHaveValue("invalid-number");
+    rerender(<CodexPanel {...baseProps} onApproval={onApproval} approval={{...approval,requestId:"form-next"}} />);
+    expect(screen.getByLabelText("回数の回答")).toHaveValue("");
+    expect(screen.getByRole("button",{name:"回答を送信"})).toBeDisabled();
+  });
+
+  it("displays a policy denial as system information without creating a user-refusal card", () => {
+    render(<CodexPanel {...baseProps} messages={[{id:"policy",role:"system",text:"[editorPolicyDenied] エディタの権限制限により追加権限を付与しませんでした。ユーザーによる拒否ではありません。method=item/permissions/requestApproval requestId=9"}]} />);
+    expect(screen.getByText(/ユーザーによる拒否ではありません/)).toBeInTheDocument();
+    expect(screen.queryByRole("button",{name:"拒否"})).not.toBeInTheDocument();
+    expect(screen.queryByRole("button",{name:"許可"})).not.toBeInTheDocument();
+  });
+
   it("renders Codex messages as Markdown and opens safe external links", () => {
     render(<CodexPanel {...baseProps} messages={[{
       id: "assistant-1",

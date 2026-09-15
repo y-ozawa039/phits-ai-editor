@@ -18,6 +18,7 @@ const userDocumentPairs = [
   ["docs/release-notes-v0.0.1-alpha.md", "docs/release-notes-v0.0.1-alpha.en.md"],
   ["docs/customizing-with-ai.md", "docs/customizing-with-ai.en.md"],
   ["docs/safety-boundaries.md", "docs/safety-boundaries.en.md"],
+  ["docs/codex-request-coverage.md", "docs/codex-request-coverage.en.md"],
 ];
 
 const problems = [];

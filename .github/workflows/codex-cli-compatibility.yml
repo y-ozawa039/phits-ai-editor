@@ -11,12 +11,16 @@ permissions:
 jobs:
   app-server-schema:
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - uses: dtolnay/rust-toolchain@stable
       - name: Install latest Codex CLI
         run: npm install --global @openai/codex@latest
       - name: Record Codex CLI version
@@ -26,16 +30,34 @@ jobs:
         run: |
           "CODEX_SCHEMA_DIR=$(Join-Path $env:RUNNER_TEMP 'codex-schema')" | Out-File -FilePath $env:GITHUB_ENV -Append
           "CODEX_REPORT=$(Join-Path $env:RUNNER_TEMP 'codex-compatibility.json')" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "CODEX_APPROVAL_REPORT=$(Join-Path $env:RUNNER_TEMP 'codex-approval-e2e.json')" | Out-File -FilePath $env:GITHUB_ENV -Append
       - name: Generate installed App Server schema
         shell: pwsh
         run: codex app-server generate-json-schema --out "$env:CODEX_SCHEMA_DIR"
       - name: Validate PHITS AI Editor feature contracts
         shell: pwsh
         run: node scripts/validate-codex-schema.mjs "$env:CODEX_SCHEMA_DIR" "$env:CODEX_REPORT"
+      - name: Install editor test dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Test approval UI and boundaries
+        run: |
+          pnpm test
+          pnpm test:codex-request-coverage
+          pnpm build
+          cargo test --manifest-path src-tauri/Cargo.toml codex_interaction
+      - name: Exercise real App Server approval lifecycle with loopback fixtures
+        shell: pwsh
+        run: |
+          $npmGlobal = npm root --global
+          $codexBinary = Get-ChildItem -LiteralPath (Join-Path $npmGlobal '@openai') -Filter codex.exe -Recurse | Select-Object -First 1
+          if (-not $codexBinary) { throw 'Native Codex CLI executable not found' }
+          node scripts/app-server-approval-smoke.mjs "$($codexBinary.FullName)" "$env:CODEX_APPROVAL_REPORT"
       - name: Upload compatibility report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: latest-codex-cli-compatibility
-          path: ${{ env.CODEX_REPORT }}
+          path: |
+            ${{ env.CODEX_REPORT }}
+            ${{ env.CODEX_APPROVAL_REPORT }}
           if-no-files-found: warn

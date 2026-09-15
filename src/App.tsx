@@ -1274,16 +1274,16 @@ export default function App() {
     try { await api.codexTurnInterrupt(threadId, turnId); } catch (error) { notify(`中断できませんでした: ${errorMessage(error)}`, "error"); }
   }, [notify, threadId, turnId]);
 
-  const resolveApproval = useCallback(async (decision: ApprovalDecision) => {
+  const resolveApproval = useCallback(async (decision: ApprovalDecision, answers?: Record<string, string>) => {
     const approval = approvals[0];
     if (!approval) return;
     const requestKey = approvalRequestKey(approval);
     const isAccepted = decision === "accept" || decision === "acceptForSession" || decision === "acceptWithExecPolicyAmendment";
     if (isAccepted) setDiffReview((current) => current?.requestKey === requestKey ? { ...current, status: "resolving" } : current);
     try {
-      await api.resolveApproval(approval, decision);
+      await api.resolveApproval(approval, decision, answers);
       if (decision === "acceptForSession") setSessionApprovalActive(true);
-      if (decision === "cancel") setCodexBusy(false);
+      if (decision === "cancel" && approval.kind !== "toolUserInput" && approval.kind !== "mcpToolApproval") setCodexBusy(false);
       setApprovals((current) => current.filter((entry) => approvalRequestKey(entry) !== requestKey));
       if (!isAccepted) setDiffReview((current) => current?.requestKey === requestKey ? null : current);
     }
@@ -1350,7 +1350,11 @@ export default function App() {
       setApprovals((current) => current.filter((entry) => !sameRequestId(entry.requestId, payload.requestId)));
     });
     void attach<RuntimeDiagnostics>(EVENT_NAMES.diagnostics, setDiagnostics);
-    void attach<string>(EVENT_NAMES.codexLog, (line) => setMessages((current) => [...current, { id: crypto.randomUUID(), role: "system", text: stripAnsi(line) }]));
+    void attach<string>(EVENT_NAMES.codexLog, (line) => {
+      const text = stripAnsi(line);
+      setMessages((current) => [...current, { id: crypto.randomUUID(), role: "system", text }]);
+      if (/^\[(?:editorUnsupported|editorPolicyDenied|editorToolGate|userDeclined|userCancelled|userApproved|userResponse)\]/.test(text)) appendOutput(text);
+    });
     void attach<unknown>(EVENT_NAMES.codexDisconnected, () => { setCodexConnected(false); setCodexBusy(false); setTurnId(null); setApprovals([]); setDiffReview(null); fileChangeBasesRef.current.clear(); turnDocumentBasesRef.current.clear(); turnDiffFilesRef.current.clear(); turnHistoryIdsRef.current.clear(); activeTurnIdRef.current = null; setSessionApprovalActive(false); });
     void attach<CodexFileChangeEvent>(EVENT_NAMES.codexFileChange, (event) => {
       if (!workspace) return;

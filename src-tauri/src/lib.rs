@@ -1,5 +1,6 @@
 mod codex;
 mod codex_history;
+mod codex_interaction;
 mod codex_mcp;
 mod contracts;
 mod diagnostics;

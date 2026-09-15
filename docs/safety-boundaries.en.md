@@ -48,6 +48,13 @@ support, or Codex integration is customized.
   Unknown decisions are rejected. Consultation-only file or permission requests
   are rejected by Rust.
 - Session approvals expire when the App Server connection ends.
+- Separate entry to an MCP tool from permission to run PHITS. Only a gate matched
+  to the `phits_ai_editor/run_phits` item and arguments in the same turn is
+  forwarded to the editor's run review. Runner checks and approval modes still
+  apply. Other confirmation/input requests are presented to the user.
+- Unsupported requests/form constraints are never automatically accepted.
+  Diagnostics show the method, identifiers, and reason, distinguish user declines
+  from editor policy denials/unsupported interactions, and exclude answers and credentials.
 - Rust revalidates that a PHITS request matches the selected saved input and
   workspace boundary, uses a supported PHITS root and official wrapper, and
   does not conflict with an unresolved or duplicate run in the same folder.

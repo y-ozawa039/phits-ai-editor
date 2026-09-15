@@ -27,7 +27,7 @@ export const api = {
   codexThreadDelete: (workspaceRoot: string, threadId: string) => invoke("codex_thread_delete", { workspaceRoot, threadId }),
   codexTurnStart: (threadId: string, text: string, context: EditorContextV1 | null, approvalMode: ApprovalMode, model?: string, reasoningEffort?: string, forceReadOnly = false) => invoke("codex_turn_start", { threadId, text, context, approvalMode, model, reasoningEffort, forceReadOnly }),
   codexTurnInterrupt: (threadId: string, turnId: string) => invoke("codex_turn_interrupt", { threadId, turnId }),
-  resolveApproval: (request: ApprovalRequest, decision: ApprovalDecision) => invoke("codex_approval_resolve", { requestId: request.requestId, method: request.method, decision }),
+  resolveApproval: (request: ApprovalRequest, decision: ApprovalDecision, answers?: Record<string, string>) => invoke("codex_approval_resolve", { requestId: request.requestId, method: request.method, decision, answers }),
   beginCodexChangeHistory: (workspaceRoot: string, threadId: string | undefined, turnId: string | undefined, itemId: string | undefined, changes: CodexHistoryChangeInput[]) => invoke<string>("codex_change_history_begin", { workspaceRoot, threadId, turnId, itemId, changes }),
   completeCodexChangeHistory: (workspaceRoot: string, historyId: string) => invoke<CodexChangeHistoryEntryV1>("codex_change_history_complete", { workspaceRoot, historyId }),
   abortCodexChangeHistory: (workspaceRoot: string, historyId: string) => invoke("codex_change_history_abort", { workspaceRoot, historyId }),

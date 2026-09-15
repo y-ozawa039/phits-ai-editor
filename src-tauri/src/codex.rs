@@ -65,6 +65,7 @@ fn editor_context_input(context: &EditorContextV1) -> AppResult<String> {
 struct PendingApproval {
     method: String,
     proposed_execpolicy_amendment: Option<Value>,
+    interaction_params: Option<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -475,7 +476,7 @@ async fn record_notification_state(connection: &CodexConnection, method: &str, p
             if let (Some(key), Some(item)) = (scoped_item_key(params), params.get("item"))
                 && matches!(
                     item.get("type").and_then(Value::as_str),
-                    Some("fileChange" | "commandExecution")
+                    Some("fileChange" | "commandExecution" | "mcpToolCall")
                 )
             {
                 connection
@@ -781,7 +782,7 @@ async fn reader_loop(
                     let _ = connection
                         .send_json(&json!({ "id": id, "result": { "decision": "decline" } }))
                         .await;
-                    let _ = app.emit("codex://log", reason);
+                    let _ = app.emit("codex://log", format!("[editorPolicyDenied] {reason} ユーザーによる拒否ではありません。method={method} requestId={id}"));
                     continue;
                 }
                 if autonomous_workspace && method == "item/fileChange/requestApproval" {
@@ -804,6 +805,7 @@ async fn reader_loop(
                         key,
                         PendingApproval {
                             method: method.to_string(),
+                            interaction_params: None,
                             proposed_execpolicy_amendment: params
                                 .get("proposedExecpolicyAmendment")
                                 .cloned(),
@@ -819,8 +821,88 @@ async fn reader_loop(
                     &connection.workspace_root,
                 );
                 let _ = app.emit("codex://approval", payload);
+            } else if crate::codex_interaction::is_interaction(method) {
+                let params = message.get("params").cloned().unwrap_or(Value::Null);
+                match crate::codex_interaction::questions(method, &params) {
+                    Ok(questions) => {
+                        let editor_gate =
+                            if method == "mcpServer/elicitation/request" {
+                                if let Some(turn_key) = scoped_turn_key(&params) {
+                                    let prefix = format!("{turn_key}\u{1f}");
+                                    connection.approval_items.lock().await.iter().any(
+                                        |(key, item)| {
+                                            key.starts_with(&prefix)
+                                                && crate::codex_interaction::is_editor_run_gate(
+                                                    &params, item,
+                                                )
+                                        },
+                                    )
+                                } else {
+                                    false
+                                }
+                            } else {
+                                false
+                            };
+                        if editor_gate {
+                            let _ = connection
+                                .send_json(
+                                    &json!({"id":id,"result":{"action":"accept","content":{}}}),
+                                )
+                                .await;
+                            let _ = app.emit("codex://log", "[editorToolGate] PHITS専用ツールの要求をエディタの実行審査へ転送しました。PHITS実行の許可ではありません。");
+                            continue;
+                        }
+                        if let Ok(key) = approval_key(id) {
+                            connection.approvals.lock().await.insert(
+                                key,
+                                PendingApproval {
+                                    method: method.into(),
+                                    proposed_execpolicy_amendment: None,
+                                    interaction_params: Some(params.clone()),
+                                },
+                            );
+                            let confirmation = method == "mcpServer/elicitation/request"
+                                && questions.as_array().is_some_and(|v| v.is_empty());
+                            let _ = app.emit("codex://approval", json!({"requestId":id,"method":method,
+                                "kind":if confirmation {"mcpToolApproval"} else {"toolUserInput"},"threadId":params["threadId"],"turnId":params["turnId"],
+                                "itemId":params["itemId"],"reason":params["message"],"serverName":params["serverName"],
+                                "toolDescription":params["_meta"]["tool_description"],"toolArguments":params["_meta"]["tool_params"],
+                                "questions":questions,"availableDecisions":if confirmation {json!(["accept","decline","cancel"])} else {json!(["accept","cancel"])},"changes":[]}));
+                        }
+                    }
+                    Err(reason) => {
+                        let log =
+                            crate::codex_interaction::diagnostic(id, method, &params, &reason);
+                        let _ = app.emit("codex://log", &log);
+                        let _ = connection
+                            .send_json(&json!({"id":id,"error":{"code":-32602,"message":log}}))
+                            .await;
+                    }
+                }
+            } else if method == "item/permissions/requestApproval" {
+                // Keep the existing sandbox boundary; this is a policy denial, not a user decline.
+                let result = crate::codex_interaction::permissions_response(
+                    message.get("params").unwrap_or(&Value::Null),
+                );
+                let _ = connection
+                    .send_json(&json!({"id":id,"result":result}))
+                    .await;
+                let _ = app.emit(
+                    "codex://log",
+                    crate::codex_interaction::permissions_diagnostic(id),
+                );
             } else {
-                let _ = connection.send_json(&json!({ "id": id, "error": { "code": -32601, "message": "This client does not support the requested interaction" } })).await;
+                let params = message.get("params").cloned().unwrap_or(Value::Null);
+                let log = crate::codex_interaction::diagnostic(
+                    id,
+                    method,
+                    &params,
+                    "未対応の要求種類です。",
+                );
+                let _ = app.emit("codex://log", &log);
+                let _ = connection
+                    .send_json(&json!({ "id": id, "error": { "code": -32601, "message": log } }))
+                    .await;
             }
             continue;
         }
@@ -2293,9 +2375,11 @@ pub async fn codex_turn_interrupt(thread_id: String, turn_id: String) -> AppResu
 
 #[tauri::command]
 pub async fn codex_approval_resolve(
+    app: AppHandle,
     request_id: Value,
     method: String,
     decision: String,
+    answers: Option<Value>,
 ) -> AppResult<()> {
     if !matches!(
         decision.as_str(),
@@ -2310,6 +2394,15 @@ pub async fn codex_approval_resolve(
             .resolve_approval(&request_id, &decision)
             .await?
         {
+            let outcome = if decision == "decline" {
+                "[userDeclined] ユーザーがPHITS実行を拒否しました。"
+            } else {
+                "[userApproved] ユーザーがPHITS実行を許可しました。"
+            };
+            let _ = app.emit(
+                "codex://log",
+                format!("{outcome} method={method} requestId={request_id}"),
+            );
             return Ok(());
         }
         return Err(AppError::Message(
@@ -2329,19 +2422,36 @@ pub async fn codex_approval_resolve(
     if expected.method != method {
         return Err(AppError::Message("Approval method mismatch".into()));
     }
-    let amendment = expected.proposed_execpolicy_amendment.clone();
-    approvals.remove(&key);
-    drop(approvals);
-    let wire_decision = if decision == "acceptWithExecPolicyAmendment" {
-        let amendment = amendment
+    let result = if let Some(params) = &expected.interaction_params {
+        crate::codex_interaction::response(&method, params, &decision, answers.as_ref())
+            .map_err(AppError::Message)?
+    } else if decision == "acceptWithExecPolicyAmendment" {
+        let amendment = expected
+            .proposed_execpolicy_amendment
+            .clone()
             .ok_or_else(|| AppError::Message("No command rule amendment was proposed".into()))?;
-        json!({ "acceptWithExecpolicyAmendment": { "execpolicy_amendment": amendment } })
+        json!({"decision":{ "acceptWithExecpolicyAmendment": { "execpolicy_amendment": amendment } }})
     } else {
-        Value::String(decision)
+        json!({"decision":decision})
     };
+    // Invalid responses leave the request pending so the user can correct them.
     connection
-        .send_json(&json!({ "id": request_id, "result": { "decision": wire_decision } }))
-        .await
+        .send_json(&json!({ "id": request_id, "result": result }))
+        .await?;
+    approvals.remove(&key);
+    let outcome = match decision.as_str() {
+        "decline" => "[userDeclined] ユーザーがこの操作を拒否しました。",
+        "cancel" => "[userCancelled] ユーザーが確認要求を中止しました。",
+        _ if crate::codex_interaction::is_interaction(&method) => {
+            "[userResponse] ユーザーの回答を要求元へ送信しました。"
+        }
+        _ => "[userApproved] ユーザーがこの操作を許可しました。",
+    };
+    let _ = app.emit(
+        "codex://log",
+        format!("{outcome} method={method} requestId={request_id}"),
+    );
+    Ok(())
 }
 
 #[cfg(test)]

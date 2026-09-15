@@ -42,6 +42,7 @@ pnpm test:licenses
 pnpm licenses:generate
 pnpm licenses:audit
 pnpm test:codex-schema
+pnpm test:codex-request-coverage
 pnpm build
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
@@ -94,6 +95,31 @@ pnpm release:package:windows
 
 Draft output is written below
 `src-tauri/target/release/release-candidate/v0.0.5-alpha/` and remains ignored.
+
+## Approval lifecycle test
+
+Test a real App Server with deterministic loopback model/MCP fixtures without
+using your account. Supply the native `codex.exe` on Windows or Codex binary:
+
+```powershell
+node scripts/app-server-approval-smoke.mjs C:\path\to\codex.exe
+```
+
+This checks 12 cases: accept/decline/cancel for empty MCP confirmations, populated
+forms (strings, choices, booleans, integers and numbers), and commands; plus
+no-grant responses to network, filesystem and combined permission requests.
+It also checks request-resolution notifications and result delivery. The
+experimental permission tool is enabled only in the temporary environment.
+It creates a temporary
+Codex home, disables plugin sync/update checks, and removes only the temporary
+environment afterwards. Commands only print a fixed marker; PHITS never runs.
+This real-CLI protocol test complements, but does not replace, editor UI tests,
+Rust boundary tests, or real-environment PHITS verification. Weekly latest-CLI
+GitHub Actions runs the same test.
+
+See [Codex confirmation request coverage](codex-request-coverage.en.md) for all
+method classifications and unsupported formats. New unclassified requests fail
+schema validation.
 
 ## PHITS detection
 
