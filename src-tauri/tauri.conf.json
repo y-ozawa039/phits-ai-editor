@@ -57,6 +57,8 @@
       "../docs/installation.en.md": "docs/installation.en.md",
       "../docs/building.md": "docs/building.md",
       "../docs/building.en.md": "docs/building.en.md",
+      "../docs/codex-request-coverage.md": "docs/codex-request-coverage.md",
+      "../docs/codex-request-coverage.en.md": "docs/codex-request-coverage.en.md",
       "../docs/known-issues-v0.0.5-alpha.md": "docs/known-issues-v0.0.5-alpha.md",
       "../docs/known-issues-v0.0.5-alpha.en.md": "docs/known-issues-v0.0.5-alpha.en.md",
       "../docs/release-notes-v0.0.5-alpha.md": "docs/release-notes-v0.0.5-alpha.md",

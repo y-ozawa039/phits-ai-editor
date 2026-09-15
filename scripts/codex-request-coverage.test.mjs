@@ -40,11 +40,13 @@ test("both language documents include all methods and format limitations", async
     for (const shape of ["openai/form", "autoResolutionMs", "url"]) assert.ok(contents.includes(`\`${shape}\``));
   }
 });
-test("release notes link to both versioned inventories and portable packaging includes them", async () => {
+test("release notes link to both versioned inventories and both packages include them", async () => {
   const packaging = await readFile(new URL("./package-windows-release.ps1", import.meta.url), "utf8");
+  const config = JSON.parse(await readFile(new URL("../src-tauri/tauri.conf.json", import.meta.url), "utf8"));
   for (const language of ["", ".en"]) {
     const notes = await readFile(new URL(`../docs/release-notes-v0.0.5-alpha${language}.md`, import.meta.url), "utf8");
     for (const inventoryLanguage of ["", ".en"]) assert.ok(notes.includes(`https://github.com/y-ozawa039/phits-ai-editor/blob/v0.0.5-alpha/docs/codex-request-coverage${inventoryLanguage}.md`));
     assert.ok(packaging.includes(`Source = "docs\\codex-request-coverage${language}.md"; Destination = "docs\\codex-request-coverage${language}.md"`));
+    assert.equal(config.bundle.resources[`../docs/codex-request-coverage${language}.md`], `docs/codex-request-coverage${language}.md`);
   }
 });
