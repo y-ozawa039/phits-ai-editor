@@ -106,6 +106,7 @@ describe("CodexPanel", () => {
       cwd: "C:\\work",
       command: "\u001b[31mpnpm test\u001b[0m",
       commandActions: [{ type: "read", path: "sample.inp" }],
+      availableDecisions: ["accept", "decline"],
       changes: [],
     }} />);
     expect(screen.getByText("コマンド実行の承認")).toBeInTheDocument();
@@ -114,6 +115,10 @@ describe("CodexPanel", () => {
     expect(screen.getByText("C:\\work")).toBeInTheDocument();
     expect(screen.getByText("読み取り: sample.inp")).toBeInTheDocument();
     expect(screen.queryByText(/requestId/)).not.toBeInTheDocument();
+    const scrollBody = document.querySelector<HTMLElement>(".approval-scroll-body")!;
+    expect(scrollBody).toContainElement(screen.getByText("pnpm test"));
+    expect(scrollBody).not.toContainElement(screen.getByRole("button", { name: "拒否" }));
+    expect(scrollBody).not.toContainElement(screen.getByRole("button", { name: "許可" }));
   });
 
   it("renders Codex messages as Markdown and opens safe external links", () => {

@@ -67,46 +67,48 @@ export function ApprovalCard({ approval, queuedCount, onDecision, onOpenDiff, al
         <div><strong>{approval.kind === "fileChange" ? "ファイル変更の承認" : approval.kind === "phitsRun" ? "PHITS通常実行の承認" : network ? "ネットワーク利用の承認" : "コマンド実行の承認"}</strong><small>{queuedCount > 1 ? `残り ${queuedCount} 件` : "内容を確認してください"}</small></div>
       </div>
 
-      {approval.reason && <p className="approval-reason">{stripAnsi(approval.reason)}</p>}
+      <div className="approval-scroll-body">
+        {approval.reason && <p className="approval-reason">{stripAnsi(approval.reason)}</p>}
 
-      {approval.kind === "fileChange" ? (
-        <div className="approval-diff">
-          {approval.changes.length > 1 && (
-            <div className="approval-file-tabs" aria-label="変更ファイル">
-              {approval.changes.map((change) => <button className={change.path === selectedChange?.path ? "active" : ""} key={change.path} onClick={() => setSelectedPath(change.path)}>{change.path}</button>)}
-            </div>
-          )}
-          {selectedChange ? (
-            <>
-              <div className="approval-file-heading"><strong>{selectedChange.path}</strong><span>{changeKindLabel(selectedChange.kind)}</span></div>
-              <div className="approval-diff-summary"><span>{approval.changes.length}ファイルの変更案</span>{onOpenDiff && <button className="secondary-button" onClick={onOpenDiff}>エディターで差分を確認</button>}</div>
-            </>
-          ) : approval.turnDiff ? (
-            <pre className="unified-diff-preview" aria-label="統合差分">{stripAnsi(approval.turnDiff)}</pre>
-          ) : (
-            <p className="approval-warning">個別差分を取得できませんでした。対象と理由を確認し、不明な場合は拒否してください。</p>
-          )}
-          {approval.grantRoot && <div className="approval-field"><span>書き込み許可範囲</span><code>{approval.grantRoot}</code></div>}
-        </div>
-      ) : approval.kind === "phitsRun" ? (
-        <div className="command-approval-details">
-          <div className="approval-field"><span>入力ファイル</span><code>{approval.inputRelativePath || "不明"}</code></div>
-          <div className="approval-field"><span>作業ディレクトリ</span><code>{approval.cwd || approval.workspaceRoot || "不明"}</code></div>
-          <div className="approval-field"><span>PHITSルート</span><code>{approval.phitsRoot || "不明"}</code></div>
-          <div className="approval-field"><span>PHITSバージョン</span><code>{approval.phitsVersion || "取得できませんでした"}</code></div>
-          <p className="approval-warning">エディタが検証済みの公式ラッパーを使って通常実行します。Codexへshell実行権限は渡しません。</p>
-        </div>
-      ) : (
-        <div className="command-approval-details">
-          <div className="approval-field"><span>コマンド</span><code>{stripAnsi(approval.command || "コマンド詳細なし")}</code></div>
-          <div className="approval-field"><span>作業ディレクトリ</span><code>{approval.cwd || approval.workspaceRoot || "不明"}</code></div>
-          {!!actions.length && <div className="approval-field"><span>想定される操作</span><ul>{actions.map((line, index) => <li key={`${index}-${line}`}>{line}</li>)}</ul></div>}
-          {network && <div className="approval-field"><span>ネットワーク接続先</span><code>{String(network.protocol ?? "network")}://{String(network.host ?? "不明")}</code></div>}
-          {!!permissions.length && <div className="approval-field"><span>要求される追加権限</span><ul>{permissions.map((line, index) => <li key={`${index}-${line}`}>{line}</li>)}</ul></div>}
-        </div>
-      )}
+        {approval.kind === "fileChange" ? (
+          <div className="approval-diff">
+            {approval.changes.length > 1 && (
+              <div className="approval-file-tabs" aria-label="変更ファイル">
+                {approval.changes.map((change) => <button className={change.path === selectedChange?.path ? "active" : ""} key={change.path} onClick={() => setSelectedPath(change.path)}>{change.path}</button>)}
+              </div>
+            )}
+            {selectedChange ? (
+              <>
+                <div className="approval-file-heading"><strong>{selectedChange.path}</strong><span>{changeKindLabel(selectedChange.kind)}</span></div>
+                <div className="approval-diff-summary"><span>{approval.changes.length}ファイルの変更案</span>{onOpenDiff && <button className="secondary-button" onClick={onOpenDiff}>エディターで差分を確認</button>}</div>
+              </>
+            ) : approval.turnDiff ? (
+              <pre className="unified-diff-preview" aria-label="統合差分">{stripAnsi(approval.turnDiff)}</pre>
+            ) : (
+              <p className="approval-warning">個別差分を取得できませんでした。対象と理由を確認し、不明な場合は拒否してください。</p>
+            )}
+            {approval.grantRoot && <div className="approval-field"><span>書き込み許可範囲</span><code>{approval.grantRoot}</code></div>}
+          </div>
+        ) : approval.kind === "phitsRun" ? (
+          <div className="command-approval-details">
+            <div className="approval-field"><span>入力ファイル</span><code>{approval.inputRelativePath || "不明"}</code></div>
+            <div className="approval-field"><span>作業ディレクトリ</span><code>{approval.cwd || approval.workspaceRoot || "不明"}</code></div>
+            <div className="approval-field"><span>PHITSルート</span><code>{approval.phitsRoot || "不明"}</code></div>
+            <div className="approval-field"><span>PHITSバージョン</span><code>{approval.phitsVersion || "取得できませんでした"}</code></div>
+            <p className="approval-warning">エディタが検証済みの公式ラッパーを使って通常実行します。Codexへshell実行権限は渡しません。</p>
+          </div>
+        ) : (
+          <div className="command-approval-details">
+            <div className="approval-field"><span>コマンド</span><code>{stripAnsi(approval.command || "コマンド詳細なし")}</code></div>
+            <div className="approval-field"><span>作業ディレクトリ</span><code>{approval.cwd || approval.workspaceRoot || "不明"}</code></div>
+            {!!actions.length && <div className="approval-field"><span>想定される操作</span><ul>{actions.map((line, index) => <li key={`${index}-${line}`}>{line}</li>)}</ul></div>}
+            {network && <div className="approval-field"><span>ネットワーク接続先</span><code>{String(network.protocol ?? "network")}://{String(network.host ?? "不明")}</code></div>}
+            {!!permissions.length && <div className="approval-field"><span>要求される追加権限</span><ul>{permissions.map((line, index) => <li key={`${index}-${line}`}>{line}</li>)}</ul></div>}
+          </div>
+        )}
 
-      <details className="approval-scope"><summary>要求の識別情報</summary><dl><dt>スレッド</dt><dd title={approval.threadId}>{shortId(approval.threadId)}</dd><dt>ターン</dt><dd title={approval.turnId}>{shortId(approval.turnId)}</dd><dt>項目</dt><dd title={approval.itemId}>{shortId(approval.itemId)}</dd></dl></details>
+        <details className="approval-scope"><summary>要求の識別情報</summary><dl><dt>スレッド</dt><dd title={approval.threadId}>{shortId(approval.threadId)}</dd><dt>ターン</dt><dd title={approval.turnId}>{shortId(approval.turnId)}</dd><dt>項目</dt><dd title={approval.itemId}>{shortId(approval.itemId)}</dd></dl></details>
+      </div>
 
       <div className="approval-actions">
         {approval.availableDecisions?.includes("cancel") && <button className="danger-ghost-button" onClick={() => onDecision("cancel")} title="拒否して現在のターンも中断します">中止</button>}
