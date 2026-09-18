@@ -66,7 +66,7 @@ describe("CodexCompatibilityStatus", () => {
         { id: "appServer", state: "available", detail: "ok" },
         { id: "windowsSandbox", state: "available", detail: "ok" },
         { id: "commandExecution", state: "available", detail: "ok" },
-        { id: "workspaceWrite", state: "available", detail: "ok" },
+        { id: "workspaceCreate", state: "available", detail: "ok" },
       ],
       messages: [],
       supportPrompt: "",
@@ -87,11 +87,11 @@ describe("CodexCompatibilityStatus", () => {
 
     const windowsSandbox = container.querySelector(".codex-feature-row-wide");
     expect(windowsSandbox).toHaveClass("codex-feature-row-wide");
-    expect(windowsSandbox).toHaveTextContent("Sandbox利用可能");
+    expect(windowsSandbox).toHaveTextContent("Sandbox準備利用可能");
     expect(container.querySelectorAll(".codex-feature-spacer")).toHaveLength(1);
     expect(screen.getByText("Sandbox方式")).toBeTruthy();
     expect(screen.getAllByText("unelevated")).toHaveLength(2);
     expect(screen.getByText("コマンド実行")).toBeTruthy();
-    expect(screen.getAllByText("ファイル編集")).toHaveLength(2);
+    expect(screen.getByText("直下へ作成")).toBeTruthy();
   });
 });

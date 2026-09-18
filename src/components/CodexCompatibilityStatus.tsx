@@ -11,9 +11,12 @@ const FEATURE_LABELS: Record<CodexFeatureId, string> = {
 
 const SANDBOX_LABELS: Record<CodexSandboxCheckId, string> = {
   appServer: "App Server",
-  windowsSandbox: "Sandbox",
+  windowsSandbox: "Sandbox準備",
   commandExecution: "コマンド実行",
-  workspaceWrite: "ファイル編集",
+  workspaceCreate: "直下へ作成",
+  existingFileWrite: "既存相当を変更",
+  childDirectoryWrite: "子階層へ作成",
+  workspacePermissions: "アクセス規則",
 };
 
 function overallLabel(report: CodexCompatibilityReport) {
@@ -53,7 +56,7 @@ function combinedLabel(
   const state = combinedState(report, sandbox, setup);
   if (state === "compatible") return "Codex編集環境：確認済み";
   if (state === "limited") return "Codex編集環境：要確認";
-  return "Codex編集環境：編集不可";
+  return "Codex編集環境：書込み未確認";
 }
 
 export function CodexCompatibilityStatus({

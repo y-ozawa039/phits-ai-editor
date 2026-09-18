@@ -431,7 +431,7 @@ describe("CodexPanel", () => {
       checkedAt: "2026-09-13T00:00:00Z",
       readiness: "ready",
       allowedImplementations: [],
-      checks: [{ id: "workspaceWrite", state: "available", detail: "書込みを確認しました。" }],
+      checks: [{ id: "workspaceCreate", state: "available", detail: "書込みを確認しました。" }],
       messages: [],
       supportPrompt: "",
     }} />);
@@ -455,20 +455,42 @@ describe("CodexPanel", () => {
       allowedImplementations: ["elevated"],
       checks: [
         { id: "windowsSandbox", state: "unavailable", detail: "CodexのSandboxが未設定です。" },
-        { id: "workspaceWrite", state: "unavailable", detail: "書込みを確認できませんでした。" },
+        { id: "workspaceCreate", state: "unavailable", detail: "書込みを確認できませんでした。" },
       ],
       messages: [],
       supportPrompt: "統合診断の相談文",
     }} />);
     const alert = screen.getByRole("alert");
-    expect(alert).toHaveTextContent("Codexからファイルを編集できません");
+    expect(alert).toHaveTextContent("このワークスペースで書込みを確認できません");
     fireEvent.click(screen.getByText("診断項目と検査理由"));
     expect(alert).toHaveTextContent("PHITS参照設定");
     expect(alert).toHaveTextContent("Sandbox");
     expect(alert).toHaveTextContent("Sandbox方式");
     expect(alert).toHaveTextContent("elevated");
     expect(alert).not.toHaveTextContent("Windows Sandbox");
-    expect(alert).toHaveTextContent("ワークスペース編集");
+    expect(alert).toHaveTextContent("ワークスペース直下への作成");
+  });
+
+  it("offers an explicit Sandbox setup retry only for setup failures", () => {
+    const onSandboxSetup = vi.fn();
+    render(<CodexPanel {...baseProps} onSandboxSetup={onSandboxSetup} sandboxReport={{
+      state: "unavailable",
+      workspaceRoot: "C:\\work",
+      checkedAt: "2026-09-18T00:00:00Z",
+      readiness: "ready",
+      implementation: "elevated",
+      allowedImplementations: ["elevated"],
+      failureCategory: "sandboxSetup",
+      setupRecommended: true,
+      checks: [{ id: "workspaceCreate", state: "unavailable", detail: "setup refresh had errors" }],
+      messages: [],
+      supportPrompt: "",
+    }} />);
+
+    const retry = screen.getByRole("button", { name: "Sandboxを再セットアップ" });
+    fireEvent.click(retry);
+    expect(onSandboxSetup).toHaveBeenCalledOnce();
+    expect(screen.getByRole("alert")).toHaveTextContent("完了後に自動で再診断します");
   });
 
   it("follows streaming messages while the transcript is at the latest position", () => {

@@ -48,6 +48,11 @@ support, or Codex integration is customized.
   Unknown decisions are rejected. Consultation-only file or permission requests
   are rejected by Rust.
 - Session approvals expire when the App Server connection ends.
+- Access-rule diagnostics for the Codex editing environment are read-only. A
+  sandbox setup retry is offered only for a classified setup failure and uses
+  the official App Server request after explicit user action and confirmation.
+  It never recursively resets access rules, takes ownership, disables the
+  sandbox, or switches to full access.
 - Separate entry to an MCP tool from permission to run PHITS. Only a gate matched
   to the `phits_ai_editor/run_phits` item and arguments in the same turn is
   forwarded to the editor's run review. Runner checks and approval modes still

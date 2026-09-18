@@ -118,7 +118,8 @@ export interface CodexCompatibilityReport {
 }
 
 export type CodexSandboxProbeState = "available" | "limited" | "unavailable";
-export type CodexSandboxCheckId = "appServer" | "windowsSandbox" | "commandExecution" | "workspaceWrite";
+export type CodexSandboxCheckId = "appServer" | "windowsSandbox" | "commandExecution" | "workspaceCreate" | "existingFileWrite" | "childDirectoryWrite" | "workspacePermissions";
+export type CodexSandboxFailureCategory = "sandboxSetup" | "workspacePermissions" | "commandLaunch" | "verification" | "unknown";
 
 export interface CodexSandboxCheck {
   id: CodexSandboxCheckId;
@@ -133,9 +134,17 @@ export interface CodexSandboxProbeReport {
   readiness: string | null;
   implementation?: string | null;
   allowedImplementations: string[];
+  failureCategory?: CodexSandboxFailureCategory | null;
+  setupRecommended?: boolean;
   checks: CodexSandboxCheck[];
   messages: string[];
   supportPrompt: string;
+}
+
+export interface CodexSandboxSetupResult {
+  mode: string;
+  success: boolean;
+  error?: string | null;
 }
 
 export interface CodexEvent {

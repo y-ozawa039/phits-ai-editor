@@ -140,9 +140,11 @@ Implemented features include:
 - integration with ANGEL, DCHAIN, and PHIG-3D
 - Codex chat, thread resume/rename/delete, model selection, and compatibility
   status for available features
-- diagnostics for the PHITS Codex setup, command execution inside the Codex
-  sandbox, and workspace writes; details include reasons and the actual sandbox
-  implementation, with an AI troubleshooting prompt based on the results
+- staged diagnostics for the PHITS Codex setup and editing environment, covering
+  command execution, file creation at the workspace root, modification of an
+  editor-created file, creation below a child folder, and access rules; details
+  include reasons and the actual sandbox implementation, with an explicit
+  sandbox-setup retry and an AI troubleshooting prompt based on the results
 - Codex editing assistance using the current file, selection, and unsaved text,
   with configurable approval behavior
 - four approval levels: Confirm first, Consultation only, Confirm when needed,

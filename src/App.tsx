@@ -214,6 +214,7 @@ export default function App() {
   const [phitsAgentSetup, setPhitsAgentSetup] = useState<PhitsAgentSetupStatus | null>(null);
   const [codexSandboxReport, setCodexSandboxReport] = useState<CodexSandboxProbeReport | null>(null);
   const [codexSandboxBusy, setCodexSandboxBusy] = useState(false);
+  const [codexSandboxSetupBusy, setCodexSandboxSetupBusy] = useState(false);
   const [codexConnectionError, setCodexConnectionError] = useState<string | null>(null);
   const [codexProbeBusy, setCodexProbeBusy] = useState(false);
   const [output, setOutput] = useState<string[]>([]);
@@ -482,6 +483,36 @@ export default function App() {
       setCodexSandboxBusy(false);
     }
   }, [notify]);
+
+  const setupCodexSandbox = useCallback(async () => {
+    if (!workspace || codexSandboxSetupBusy) return;
+    const configuredMode = codexSandboxReport?.implementation;
+    const allowedModes = codexSandboxReport?.allowedImplementations ?? [];
+    const mode = configuredMode === "elevated" || configuredMode === "unelevated"
+      ? configuredMode
+      : allowedModes.includes("elevated") || allowedModes.length === 0
+        ? "elevated"
+        : "unelevated";
+    const warning = mode === "elevated"
+      ? "CodexのSandbox設定を再構築します。Windowsの確認画面や管理者権限の確認が表示される場合があります。研究ファイルのアクセス許可をエディタが直接変更する操作ではありません。続行しますか？"
+      : "CodexのSandbox設定を再確認します。完了後、このワークスペースの書込み検査をやり直します。続行しますか？";
+    if (!window.confirm(warning)) return;
+    setCodexSandboxSetupBusy(true);
+    try {
+      const result = await api.codexSandboxSetup(workspace.root, mode);
+      if (result.success) {
+        notify("Sandboxの再セットアップが完了しました。実動作を再診断します。", "success");
+      } else {
+        notify(`Sandboxを再セットアップできませんでした: ${result.error ?? "理由を取得できませんでした。"}`, "error");
+      }
+      await probeCodexSandbox(workspace.root);
+    } catch (error) {
+      notify(`Sandboxを再セットアップできませんでした: ${errorMessage(error)}`, "error");
+      await probeCodexSandbox(workspace.root);
+    } finally {
+      setCodexSandboxSetupBusy(false);
+    }
+  }, [codexSandboxReport, codexSandboxSetupBusy, notify, probeCodexSandbox, workspace]);
 
   const updateDiagnostics = useCallback(async (root?: string) => {
     if (!isTauri()) return;
@@ -1797,7 +1828,7 @@ export default function App() {
           <OutputPanel lines={output} collapsed={outputCollapsed} height={outputHeight} onToggle={() => setOutputCollapsed((value) => !value)} onClear={() => setOutput([])} onResizeStart={startHorizontalResize}/>
         </main>
 
-        <CodexPanel open={codexOpen} width={codexWidth} fontSize={codexFontSize} connected={codexConnected} connectionError={codexUnavailableReason} troubleshootingPrompt={codexTroubleshootingPrompt} busy={codexBusy} models={models} model={model} reasoning={reasoning} approvalMode={approvalMode} sessionApprovalActive={sessionApprovalActive} threadId={threadId} threads={threadLinks} chatAvailable={codexFeatureAvailable(codexCompatibility, "chat")} threadsAvailable={codexFeatureAvailable(codexCompatibility, "threads")} writableAvailable={codexFeatureAvailable(codexCompatibility, "fileEditing") && codexFeatureAvailable(codexCompatibility, "approvals")} phitsAgentSetup={phitsAgentSetup} sandboxReport={codexSandboxReport} sandboxBusy={codexSandboxBusy} messages={messages} approval={currentApproval} approvalCount={approvals.length} approvalCanAccept={approvalCanAccept} contextChips={contextChips} draftRequest={draftRequest} onToggle={() => setCodexOpen((value) => !value)} onResizeStart={startVerticalResize} onResizeReset={() => setCodexPanelRatio(DEFAULT_CODEX_PANEL_RATIO)} onOpenDiff={() => { if (!currentApproval) return; setDiffReview((current) => current?.requestKey === approvalRequestKey(currentApproval) ? { ...current, selectedFileIndex: 0 } : current); }} onConnect={connectCodex} onDisconnect={disconnectCodex} onModelChange={setModel} onReasoningChange={setReasoning} onApprovalModeChange={setApprovalMode} onNewThread={startThread} onResumeThread={resumeThread} onRenameThread={renameThread} onDeleteThread={deleteThread} onRemoveContext={removeContext} onSend={sendCodex} onInterrupt={interruptCodex} onApproval={resolveApproval}/>
+        <CodexPanel open={codexOpen} width={codexWidth} fontSize={codexFontSize} connected={codexConnected} connectionError={codexUnavailableReason} troubleshootingPrompt={codexTroubleshootingPrompt} busy={codexBusy} models={models} model={model} reasoning={reasoning} approvalMode={approvalMode} sessionApprovalActive={sessionApprovalActive} threadId={threadId} threads={threadLinks} chatAvailable={codexFeatureAvailable(codexCompatibility, "chat")} threadsAvailable={codexFeatureAvailable(codexCompatibility, "threads")} writableAvailable={codexFeatureAvailable(codexCompatibility, "fileEditing") && codexFeatureAvailable(codexCompatibility, "approvals")} phitsAgentSetup={phitsAgentSetup} sandboxReport={codexSandboxReport} sandboxBusy={codexSandboxBusy} sandboxSetupBusy={codexSandboxSetupBusy} messages={messages} approval={currentApproval} approvalCount={approvals.length} approvalCanAccept={approvalCanAccept} contextChips={contextChips} draftRequest={draftRequest} onToggle={() => setCodexOpen((value) => !value)} onResizeStart={startVerticalResize} onResizeReset={() => setCodexPanelRatio(DEFAULT_CODEX_PANEL_RATIO)} onOpenDiff={() => { if (!currentApproval) return; setDiffReview((current) => current?.requestKey === approvalRequestKey(currentApproval) ? { ...current, selectedFileIndex: 0 } : current); }} onConnect={connectCodex} onDisconnect={disconnectCodex} onModelChange={setModel} onReasoningChange={setReasoning} onApprovalModeChange={setApprovalMode} onNewThread={startThread} onResumeThread={resumeThread} onRenameThread={renameThread} onDeleteThread={deleteThread} onRemoveContext={removeContext} onSend={sendCodex} onInterrupt={interruptCodex} onApproval={resolveApproval} onSandboxSetup={() => void setupCodexSandbox()}/>
       </div>
 
       {settingsSection && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsSection(null); }}>

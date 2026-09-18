@@ -96,6 +96,18 @@ insert it into the Codex composer. If connection is unavailable, the same prompt
 can be copied to a local Codex task in ChatGPT desktop. It is never sent
 automatically and remains editable so paths can be reviewed first.
 
+The Codex editing-environment probe uses the same `workspaceWrite` policy as a
+real turn and separately checks a command that does not write, creation at the
+workspace root, modification of an editor-created existing-file equivalent,
+and creation inside an editor-created child directory. Access-rule inspection
+is read-only and reports protected inheritance, explicit deny entries, and
+reparse points; those observations alone do not produce a warning when all
+functional write checks pass. Failures are classified as sandbox setup,
+workspace access rules, command launch, or result verification. Only a sandbox
+setup failure offers an explicit, confirmed App Server
+`windowsSandbox/setupStart` action followed by automatic re-diagnosis. The
+editor never automatically changes access rules, ownership, or sandbox mode.
+
 App Server `fileChange` and diff events identify real edits. Before a change,
 the backend validates paths and records before snapshots. After completion it
 records after snapshots and emits a reviewable multi-file history group. The UI

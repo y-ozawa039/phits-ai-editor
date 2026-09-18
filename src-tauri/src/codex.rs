@@ -32,8 +32,9 @@ use crate::{
     contracts::{
         ApprovalMode, CodexCompatibilityReport, CodexConnectResult, CodexFeatureId,
         CodexFeatureState, CodexModel, CodexSandboxCheck, CodexSandboxCheckId,
-        CodexSandboxProbeReport, CodexSandboxProbeState, CodexThreadLink, EditorContextV1,
-        PhitsAgentSetupCheck, PhitsAgentSetupState, PhitsAgentSetupStatus,
+        CodexSandboxFailureCategory, CodexSandboxProbeReport, CodexSandboxProbeState,
+        CodexSandboxSetupResult, CodexThreadLink, EditorContextV1, PhitsAgentSetupCheck,
+        PhitsAgentSetupState, PhitsAgentSetupStatus,
     },
     diagnostics::{codex_compatibility_probe, resolve_codex_executable, resolve_phits_root},
     error::{AppError, AppResult},
@@ -84,6 +85,7 @@ struct CodexConnection {
     thread_modes: Mutex<HashMap<String, ApprovalMode>>,
     thread_revisions: Mutex<HashMap<String, DiskRevision>>,
     change_histories: Mutex<HashMap<String, String>>,
+    sandbox_setup_waiters: Mutex<HashMap<String, oneshot::Sender<CodexSandboxSetupResult>>>,
     mcp_host: McpHost,
     next_id: AtomicU64,
     workspace_root: PathBuf,
@@ -101,13 +103,13 @@ fn approval_policy(mode: ApprovalMode) -> &'static str {
     }
 }
 
-fn sandbox_policy(mode: ApprovalMode, workspace_root: &Path) -> Value {
+fn sandbox_policy(mode: ApprovalMode, _workspace_root: &Path) -> Value {
     match mode {
         ApprovalMode::ConsultationOnly => json!({ "type": "readOnly" }),
         ApprovalMode::ConfirmFirst
         | ApprovalMode::OnRequest
         | ApprovalMode::AutonomousWorkspace => json!({
-            "type": "workspaceWrite", "writableRoots": [workspace_root], "networkAccess": false
+            "type": "workspaceWrite", "networkAccess": false
         }),
     }
 }
@@ -538,6 +540,29 @@ async fn record_notification_state(connection: &CodexConnection, method: &str, p
     }
 }
 
+async fn resolve_sandbox_setup_notification(connection: &CodexConnection, params: &Value) {
+    let Some(mode) = params.get("mode").and_then(Value::as_str) else {
+        return;
+    };
+    let result = CodexSandboxSetupResult {
+        mode: mode.to_owned(),
+        success: params
+            .get("success")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        error: params
+            .get("error")
+            .filter(|value| !value.is_null())
+            .map(|value| match value.as_str() {
+                Some(message) => message.to_owned(),
+                None => value.to_string(),
+            }),
+    };
+    if let Some(waiter) = connection.sandbox_setup_waiters.lock().await.remove(mode) {
+        let _ = waiter.send(result);
+    }
+}
+
 fn file_change_event(method: &str, params: &Value) -> Option<Value> {
     if !matches!(method, "item/started" | "item/completed") {
         return None;
@@ -908,6 +933,9 @@ async fn reader_loop(
         }
         if let Some(method) = message.get("method").and_then(Value::as_str) {
             let raw_params = message.get("params").cloned().unwrap_or(Value::Null);
+            if method == "windowsSandbox/setupCompleted" {
+                resolve_sandbox_setup_notification(&connection, &raw_params).await;
+            }
             let params = match normalize_file_change_params(&connection.workspace_root, &raw_params)
             {
                 Ok(params) => params,
@@ -1542,6 +1570,7 @@ async fn start_connection(
         thread_modes: Mutex::new(HashMap::new()),
         thread_revisions: Mutex::new(HashMap::new()),
         change_histories: Mutex::new(HashMap::new()),
+        sandbox_setup_waiters: Mutex::new(HashMap::new()),
         mcp_host,
         next_id: AtomicU64::new(1),
         workspace_root,
@@ -1601,14 +1630,16 @@ fn sandbox_probe_state(checks: &[CodexSandboxCheck]) -> CodexSandboxProbeState {
             check.id,
             CodexSandboxCheckId::AppServer
                 | CodexSandboxCheckId::CommandExecution
-                | CodexSandboxCheckId::WorkspaceWrite
+                | CodexSandboxCheckId::WorkspaceCreate
+                | CodexSandboxCheckId::ExistingFileWrite
+                | CodexSandboxCheckId::ChildDirectoryWrite
         ) && check.state == CodexSandboxProbeState::Unavailable
     }) {
         CodexSandboxProbeState::Unavailable
-    } else if checks
-        .iter()
-        .any(|check| check.state != CodexSandboxProbeState::Available)
-    {
+    } else if checks.iter().any(|check| {
+        check.id != CodexSandboxCheckId::WorkspacePermissions
+            && check.state != CodexSandboxProbeState::Available
+    }) {
         CodexSandboxProbeState::Limited
     } else {
         CodexSandboxProbeState::Available
@@ -1621,6 +1652,7 @@ fn sandbox_support_prompt(
     readiness: Option<&str>,
     implementation: Option<&str>,
     allowed_implementations: &[String],
+    failure_category: Option<CodexSandboxFailureCategory>,
 ) -> String {
     let check_lines = checks
         .iter()
@@ -1628,8 +1660,11 @@ fn sandbox_support_prompt(
         .collect::<Vec<_>>()
         .join("\n");
     format!(
-        "PHITS AI EditorのCodex編集環境診断で問題が見つかりました。次の診断結果を確認し、原因を特定してください。必要な変更を提案する前に、CodexのSandbox、Codex CLI設定、組織ポリシーのどこで失敗しているかを切り分けてください。Windows標準機能の『Windows Sandbox』が必要だとは決めつけず、Codexが現在使用している方式と実動作検査の結果を優先してください。セキュリティ制限を一括解除せず、PHITSワークスペース内の編集に必要な最小限の修正を提案してください。\n\nワークスペース: {}\nSandbox readiness: {}\n現在のSandbox方式: {}\n組織ポリシーで許可された方式: {}\n診断結果:\n{}",
+        "PHITS AI EditorのCodex編集環境診断で問題が見つかりました。次の診断結果を確認し、原因を特定してください。必要な変更を提案する前に、CodexのSandbox、Codex CLI設定、組織ポリシー、ワークスペース固有のアクセス規則のどこで失敗しているかを切り分けてください。Windows標準機能の『Windows Sandbox』が必要だとは決めつけず、Codexが現在使用している方式と実動作検査の結果を優先してください。セキュリティ制限を一括解除せず、所有権取得やアクセス規則の再帰的初期化も自動実行せず、PHITSワークスペース内の編集に必要な最小限の修正を提案してください。\n\nワークスペース: {}\n推定分類: {}\nSandbox readiness: {}\n現在のSandbox方式: {}\n組織ポリシーで許可された方式: {}\n診断結果:\n{}",
         workspace_root.display(),
+        failure_category
+            .map(|value| format!("{value:?}"))
+            .unwrap_or_else(|| "問題を特定できませんでした".to_string()),
         readiness.unwrap_or("取得できませんでした"),
         implementation.unwrap_or("取得できませんでした"),
         if allowed_implementations.is_empty() {
@@ -1639,6 +1674,12 @@ fn sandbox_support_prompt(
         },
         check_lines
     )
+}
+
+#[derive(Debug)]
+struct SandboxCommandAttempt {
+    success: bool,
+    detail: String,
 }
 
 #[cfg(windows)]
@@ -1657,17 +1698,31 @@ fn workspace_write_probe_command(marker_path: &Path, marker: &str) -> Vec<String
     ]
 }
 
-fn workspace_write_probe_policies(workspace: &Path) -> [Value; 2] {
-    [
-        json!({
-            "type": "workspaceWrite",
-            "writableRoots": [workspace],
-            "networkAccess": false
-        }),
-        json!({
-            "type": "workspaceWrite",
-            "networkAccess": false
-        }),
+fn workspace_write_probe_policy() -> Value {
+    json!({
+        "type": "workspaceWrite",
+        "networkAccess": false
+    })
+}
+
+#[cfg(windows)]
+fn command_execution_probe_command() -> Vec<String> {
+    vec![
+        "powershell.exe".to_string(),
+        "-NoLogo".to_string(),
+        "-NoProfile".to_string(),
+        "-NonInteractive".to_string(),
+        "-Command".to_string(),
+        "[Console]::Out.Write('PHITS_AI_EDITOR_COMMAND_PROBE')".to_string(),
+    ]
+}
+
+#[cfg(not(windows))]
+fn command_execution_probe_command() -> Vec<String> {
+    vec![
+        "/bin/sh".to_string(),
+        "-c".to_string(),
+        "exit 0".to_string(),
     ]
 }
 
@@ -1681,6 +1736,231 @@ fn workspace_write_probe_command(marker_path: &Path, marker: &str) -> Vec<String
         marker.to_string(),
         path_to_string(marker_path),
     ]
+}
+
+async fn run_sandbox_command_probe(
+    connection: &CodexConnection,
+    workspace: &Path,
+    command: Vec<String>,
+) -> SandboxCommandAttempt {
+    match connection
+        .request(
+            "command/exec",
+            json!({
+                "command": command,
+                "cwd": workspace,
+                "sandboxPolicy": workspace_write_probe_policy(),
+                "timeoutMs": 10_000
+            }),
+        )
+        .await
+    {
+        Ok(result) if result.get("exitCode").and_then(Value::as_i64) == Some(0) => {
+            SandboxCommandAttempt {
+                success: true,
+                detail: "通常編集と同じワークスペース境界で実行できました。".to_string(),
+            }
+        }
+        Ok(result) => {
+            let exit_code = result.get("exitCode").and_then(Value::as_i64);
+            let stderr = result
+                .get("stderr")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            SandboxCommandAttempt {
+                success: false,
+                detail: format!("終了コード {:?}: {}", exit_code, short_probe_error(stderr)),
+            }
+        }
+        Err(error) => SandboxCommandAttempt {
+            success: false,
+            detail: format!("開始できませんでした: {}", short_probe_error(error)),
+        },
+    }
+}
+
+async fn run_workspace_write_probe(
+    connection: &CodexConnection,
+    workspace: &Path,
+    marker_path: &Path,
+    marker: &str,
+) -> SandboxCommandAttempt {
+    let attempt = run_sandbox_command_probe(
+        connection,
+        workspace,
+        workspace_write_probe_command(marker_path, marker),
+    )
+    .await;
+    if !attempt.success {
+        return attempt;
+    }
+    match std::fs::read_to_string(marker_path) {
+        Ok(content) if content == marker => attempt,
+        Ok(_) => SandboxCommandAttempt {
+            success: false,
+            detail: "検査ファイルは作成されましたが、内容が一致しませんでした。".to_string(),
+        },
+        Err(error) => SandboxCommandAttempt {
+            success: false,
+            detail: format!(
+                "検査ファイルを確認できませんでした: {}",
+                short_probe_error(error)
+            ),
+        },
+    }
+}
+
+fn probe_check(
+    id: CodexSandboxCheckId,
+    success_detail: &str,
+    failure_detail: &str,
+    attempt: SandboxCommandAttempt,
+) -> CodexSandboxCheck {
+    sandbox_check(
+        id,
+        if attempt.success {
+            CodexSandboxProbeState::Available
+        } else {
+            CodexSandboxProbeState::Unavailable
+        },
+        if attempt.success {
+            format!("{success_detail} {}", attempt.detail)
+        } else {
+            format!("{failure_detail}: {}", attempt.detail)
+        },
+    )
+}
+
+#[cfg(windows)]
+async fn workspace_permissions_check(workspace: &Path) -> CodexSandboxCheck {
+    use std::os::windows::fs::MetadataExt;
+
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+    let reparse_point = std::fs::symlink_metadata(workspace)
+        .map(|metadata| metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0)
+        .unwrap_or(false);
+    let script = "$acl=Get-Acl -LiteralPath $args[0];$deny=@($acl.Access|Where-Object{(-not $_.IsInherited)-and $_.AccessControlType -eq 'Deny'}).Count;[pscustomobject]@{inheritanceProtected=$acl.AreAccessRulesProtected;explicitDenyCount=$deny}|ConvertTo-Json -Compress";
+    let output = Command::new("powershell.exe")
+        .args([
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            script,
+        ])
+        .arg(workspace)
+        .output()
+        .await;
+    let Ok(output) = output else {
+        return sandbox_check(
+            CodexSandboxCheckId::WorkspacePermissions,
+            CodexSandboxProbeState::Limited,
+            "フォルダーのアクセス規則を読み取れませんでした。",
+        );
+    };
+    if !output.status.success() {
+        return sandbox_check(
+            CodexSandboxCheckId::WorkspacePermissions,
+            CodexSandboxProbeState::Limited,
+            format!(
+                "フォルダーのアクセス規則を確認できませんでした: {}",
+                short_probe_error(String::from_utf8_lossy(&output.stderr))
+            ),
+        );
+    }
+    let parsed = serde_json::from_slice::<Value>(&output.stdout).ok();
+    let inheritance_protected = parsed
+        .as_ref()
+        .and_then(|value| value.get("inheritanceProtected"))
+        .and_then(Value::as_bool);
+    let explicit_deny_count = parsed
+        .as_ref()
+        .and_then(|value| value.get("explicitDenyCount"))
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let mut findings = Vec::new();
+    if inheritance_protected == Some(true) {
+        findings.push("アクセス許可の継承が無効です".to_string());
+    }
+    if explicit_deny_count > 0 {
+        findings.push(format!("明示的な拒否規則が{explicit_deny_count}件あります"));
+    }
+    if reparse_point {
+        findings.push("junctionまたはシンボリックリンク等の特殊なフォルダーです".to_string());
+    }
+    sandbox_check(
+        CodexSandboxCheckId::WorkspacePermissions,
+        if findings.is_empty() {
+            CodexSandboxProbeState::Available
+        } else {
+            CodexSandboxProbeState::Limited
+        },
+        if findings.is_empty() {
+            "継承停止・明示的な拒否・特殊なフォルダー属性は検出されませんでした。".to_string()
+        } else {
+            format!("フォルダー固有の確認事項: {}。", findings.join("、"))
+        },
+    )
+}
+
+#[cfg(not(windows))]
+async fn workspace_permissions_check(_workspace: &Path) -> CodexSandboxCheck {
+    sandbox_check(
+        CodexSandboxCheckId::WorkspacePermissions,
+        CodexSandboxProbeState::Limited,
+        "Windows以外ではこのアクセス規則検査を行いません。",
+    )
+}
+
+fn sandbox_failure_category(
+    checks: &[CodexSandboxCheck],
+    readiness: Option<&str>,
+) -> Option<CodexSandboxFailureCategory> {
+    let has_functional_failure = checks.iter().any(|check| {
+        matches!(
+            check.id,
+            CodexSandboxCheckId::AppServer
+                | CodexSandboxCheckId::CommandExecution
+                | CodexSandboxCheckId::WorkspaceCreate
+                | CodexSandboxCheckId::ExistingFileWrite
+                | CodexSandboxCheckId::ChildDirectoryWrite
+        ) && check.state != CodexSandboxProbeState::Available
+    });
+    if !has_functional_failure {
+        return None;
+    }
+    let failed_detail = checks
+        .iter()
+        .filter(|check| {
+            check.state != CodexSandboxProbeState::Available
+                && check.id != CodexSandboxCheckId::WorkspacePermissions
+        })
+        .map(|check| check.detail.to_ascii_lowercase())
+        .collect::<Vec<_>>()
+        .join(" ");
+    if matches!(readiness, Some("notConfigured" | "updateRequired"))
+        || failed_detail.contains("setup refresh")
+        || failed_detail.contains("helper_unknown_error")
+    {
+        Some(CodexSandboxFailureCategory::SandboxSetup)
+    } else if checks.iter().any(|check| {
+        check.id == CodexSandboxCheckId::CommandExecution
+            && check.state == CodexSandboxProbeState::Unavailable
+    }) {
+        Some(CodexSandboxFailureCategory::CommandLaunch)
+    } else if failed_detail.contains("access is denied")
+        || failed_detail.contains("access denied")
+        || failed_detail.contains("unauthorizedaccessexception")
+        || failed_detail.contains("アクセスが拒否")
+        || failed_detail.contains("アクセス許可")
+    {
+        Some(CodexSandboxFailureCategory::WorkspacePermissions)
+    } else if failed_detail.contains("内容が一致") || failed_detail.contains("確認できませんでした")
+    {
+        Some(CodexSandboxFailureCategory::Verification)
+    } else {
+        Some(CodexSandboxFailureCategory::Unknown)
+    }
 }
 
 fn unavailable_sandbox_report(workspace_root: &Path, detail: String) -> CodexSandboxProbeReport {
@@ -1701,7 +1981,7 @@ fn unavailable_sandbox_report(workspace_root: &Path, detail: String) -> CodexSan
             "App Serverへ接続できないため検査できませんでした。",
         ),
         sandbox_check(
-            CodexSandboxCheckId::WorkspaceWrite,
+            CodexSandboxCheckId::WorkspaceCreate,
             CodexSandboxProbeState::Unavailable,
             "App Serverへ接続できないため検査できませんでした。",
         ),
@@ -1713,8 +1993,17 @@ fn unavailable_sandbox_report(workspace_root: &Path, detail: String) -> CodexSan
         readiness: None,
         implementation: None,
         allowed_implementations: Vec::new(),
+        failure_category: Some(CodexSandboxFailureCategory::CommandLaunch),
+        setup_recommended: false,
         messages: vec![detail],
-        support_prompt: sandbox_support_prompt(workspace_root, &checks, None, None, &[]),
+        support_prompt: sandbox_support_prompt(
+            workspace_root,
+            &checks,
+            None,
+            None,
+            &[],
+            Some(CodexSandboxFailureCategory::CommandLaunch),
+        ),
         checks,
     }
 }
@@ -1831,113 +2120,91 @@ pub async fn codex_sandbox_probe(
                 .map(str::to_string)
         });
 
-    match tempfile::Builder::new()
-        .prefix(".phits-editor-codex-probe-")
-        .tempdir_in(&workspace)
-    {
-        Ok(directory) => {
-            let marker = format!("PHITS_AI_EDITOR_SANDBOX_PROBE:{}", Uuid::new_v4());
-            let marker_path = directory.path().join("workspace-write.txt");
-            let mut attempt_errors = Vec::new();
-            let mut command_executed = false;
-            let mut workspace_write_confirmed = false;
-            for (index, sandbox_policy) in workspace_write_probe_policies(&workspace)
-                .into_iter()
-                .enumerate()
-            {
-                let _ = std::fs::remove_file(&marker_path);
-                match connection
-                    .request(
-                        "command/exec",
-                        json!({
-                            "command": workspace_write_probe_command(&marker_path, &marker),
-                            "cwd": workspace,
-                            "sandboxPolicy": sandbox_policy,
-                            "timeoutMs": 10_000
-                        }),
-                    )
-                    .await
-                {
-                    Ok(result) => {
-                        let exit_code = result.get("exitCode").and_then(Value::as_i64);
-                        if exit_code != Some(0) {
-                            let stderr = result
-                                .get("stderr")
-                                .and_then(Value::as_str)
-                                .unwrap_or_default();
-                            attempt_errors.push(format!(
-                                "方式{}は終了コード {:?}: {}",
-                                index + 1,
-                                exit_code,
-                                short_probe_error(stderr)
-                            ));
-                            continue;
-                        }
-                        command_executed = true;
-                        match std::fs::read_to_string(&marker_path) {
-                            Ok(content) if content == marker => {
-                                workspace_write_confirmed = true;
-                                break;
-                            }
-                            Ok(_) => attempt_errors
-                                .push(format!("方式{}は検査内容が一致しませんでした。", index + 1)),
-                            Err(error) => attempt_errors.push(format!(
-                                "方式{}は検査ファイルを確認できませんでした: {}",
-                                index + 1,
-                                short_probe_error(error)
-                            )),
-                        }
-                    }
-                    Err(error) => attempt_errors.push(format!(
-                        "方式{}を開始できませんでした: {}",
-                        index + 1,
-                        short_probe_error(error)
-                    )),
-                }
-            }
+    let probe_id = Uuid::new_v4();
+    let root_create_path = workspace.join(format!(".phits-editor-codex-create-{probe_id}.tmp"));
+    let existing_path = workspace.join(format!(".phits-editor-codex-existing-{probe_id}.tmp"));
+    let child_path = workspace.join(format!(".phits-editor-codex-child-{probe_id}"));
+    let child_marker_path = child_path.join("workspace-write.txt");
 
-            let attempt_detail = attempt_errors.join(" / ");
-            checks.push(sandbox_check(
-                CodexSandboxCheckId::CommandExecution,
-                if command_executed {
-                    CodexSandboxProbeState::Available
-                } else {
-                    CodexSandboxProbeState::Unavailable
-                },
-                if command_executed {
-                    "Sandbox内で検査コマンドを実行できました。".to_string()
-                } else {
-                    format!("Sandbox内で検査コマンドを実行できませんでした: {attempt_detail}")
-                },
-            ));
-            checks.push(sandbox_check(
-                CodexSandboxCheckId::WorkspaceWrite,
-                if workspace_write_confirmed {
-                    CodexSandboxProbeState::Available
-                } else {
-                    CodexSandboxProbeState::Unavailable
-                },
-                if workspace_write_confirmed {
-                    "ワークスペース内で検査ファイルを作成し、内容を確認できました。".to_string()
-                } else {
-                    format!("ワークスペースへの書込みを確認できませんでした: {attempt_detail}")
-                },
-            ));
-        }
-        Err(error) => {
-            let detail = short_probe_error(error);
-            checks.push(sandbox_check(
-                CodexSandboxCheckId::CommandExecution,
-                CodexSandboxProbeState::Limited,
-                "検査用フォルダーを作成できないため、コマンド検査を省略しました。",
-            ));
-            checks.push(sandbox_check(
-                CodexSandboxCheckId::WorkspaceWrite,
-                CodexSandboxProbeState::Unavailable,
-                format!("ワークスペースに検査用フォルダーを作成できませんでした: {detail}"),
+    let command_attempt =
+        run_sandbox_command_probe(&connection, &workspace, command_execution_probe_command()).await;
+    checks.push(probe_check(
+        CodexSandboxCheckId::CommandExecution,
+        "Sandbox内で書込みを伴わない検査コマンドを実行できました。",
+        "Sandbox内で検査コマンドを実行できませんでした",
+        command_attempt,
+    ));
+
+    let root_marker = format!("PHITS_AI_EDITOR_CREATE_PROBE:{probe_id}");
+    let _ = std::fs::remove_file(&root_create_path);
+    let root_attempt =
+        run_workspace_write_probe(&connection, &workspace, &root_create_path, &root_marker).await;
+    checks.push(probe_check(
+        CodexSandboxCheckId::WorkspaceCreate,
+        "ワークスペース直下へ新規ファイルを作成できました。",
+        "ワークスペース直下へ新規ファイルを作成できませんでした",
+        root_attempt,
+    ));
+
+    let existing_marker = format!("PHITS_AI_EDITOR_EXISTING_PROBE:{probe_id}");
+    match std::fs::write(&existing_path, "PHITS_AI_EDITOR_HOST_CREATED") {
+        Ok(()) => {
+            let attempt = run_workspace_write_probe(
+                &connection,
+                &workspace,
+                &existing_path,
+                &existing_marker,
+            )
+            .await;
+            checks.push(probe_check(
+                CodexSandboxCheckId::ExistingFileWrite,
+                "エディタが作成した既存相当の検査ファイルを変更できました。",
+                "既存相当の検査ファイルを変更できませんでした",
+                attempt,
             ));
         }
+        Err(error) => checks.push(sandbox_check(
+            CodexSandboxCheckId::ExistingFileWrite,
+            CodexSandboxProbeState::Unavailable,
+            format!(
+                "エディタが既存相当の検査ファイルを準備できませんでした: {}",
+                short_probe_error(error)
+            ),
+        )),
     }
+
+    match std::fs::create_dir(&child_path) {
+        Ok(()) => {
+            let child_marker = format!("PHITS_AI_EDITOR_CHILD_PROBE:{probe_id}");
+            let attempt = run_workspace_write_probe(
+                &connection,
+                &workspace,
+                &child_marker_path,
+                &child_marker,
+            )
+            .await;
+            checks.push(probe_check(
+                CodexSandboxCheckId::ChildDirectoryWrite,
+                "エディタが作成した子フォルダーへファイルを作成できました。",
+                "子フォルダーへファイルを作成できませんでした",
+                attempt,
+            ));
+        }
+        Err(error) => checks.push(sandbox_check(
+            CodexSandboxCheckId::ChildDirectoryWrite,
+            CodexSandboxProbeState::Unavailable,
+            format!(
+                "エディタが検査用子フォルダーを準備できませんでした: {}",
+                short_probe_error(error)
+            ),
+        )),
+    }
+    checks.push(workspace_permissions_check(&workspace).await);
+
+    let _ = std::fs::remove_file(&root_create_path);
+    let _ = std::fs::remove_file(&existing_path);
+    let _ = std::fs::remove_file(&child_marker_path);
+    let _ = std::fs::remove_dir(&child_path);
 
     if temporary && let Err(error) = close_connection(&connection).await {
         messages.push(format!(
@@ -1947,12 +2214,15 @@ pub async fn codex_sandbox_probe(
     }
 
     let state = sandbox_probe_state(&checks);
+    let failure_category = sandbox_failure_category(&checks, readiness.as_deref());
+    let setup_recommended = failure_category == Some(CodexSandboxFailureCategory::SandboxSetup);
     let support_prompt = sandbox_support_prompt(
         &workspace,
         &checks,
         readiness.as_deref(),
         implementation.as_deref(),
         &allowed_implementations,
+        failure_category,
     );
     Ok(CodexSandboxProbeReport {
         state,
@@ -1961,10 +2231,98 @@ pub async fn codex_sandbox_probe(
         readiness,
         implementation,
         allowed_implementations,
+        failure_category,
+        setup_recommended,
         checks,
         messages,
         support_prompt,
     })
+}
+
+#[tauri::command]
+pub async fn codex_sandbox_setup(
+    app: AppHandle,
+    workspace_root: String,
+    mode: String,
+) -> AppResult<CodexSandboxSetupResult> {
+    if !matches!(mode.as_str(), "elevated" | "unelevated") {
+        return Err(AppError::Message(
+            "Unsupported Windows Sandbox setup mode".into(),
+        ));
+    }
+    let workspace = canonical_workspace(&workspace_root)?;
+    let compatibility = codex_compatibility_probe(false).await?;
+    let existing = connection_slot().lock().await.clone();
+    let (connection, temporary) = match existing {
+        Some(connection) if connection.workspace_root == workspace => (connection, false),
+        _ => (
+            start_connection(app, workspace.clone(), compatibility).await?,
+            true,
+        ),
+    };
+
+    let (sender, receiver) = oneshot::channel();
+    let already_running = {
+        let mut waiters = connection.sandbox_setup_waiters.lock().await;
+        if waiters.contains_key(&mode) {
+            true
+        } else {
+            waiters.insert(mode.clone(), sender);
+            false
+        }
+    };
+    if already_running {
+        if temporary {
+            let _ = close_connection(&connection).await;
+        }
+        return Err(AppError::Message("Sandbox setup is already running".into()));
+    }
+
+    let start_result = connection
+        .request("windowsSandbox/setupStart", json!({ "mode": mode.clone() }))
+        .await;
+    let result = match start_result {
+        Ok(value) if value.get("started").and_then(Value::as_bool) == Some(true) => {
+            match timeout(Duration::from_secs(180), receiver).await {
+                Ok(Ok(result)) => result,
+                Ok(Err(_)) => CodexSandboxSetupResult {
+                    mode: mode.clone(),
+                    success: false,
+                    error: Some("Sandboxセットアップの完了通知を受け取れませんでした。".into()),
+                },
+                Err(_) => {
+                    connection.sandbox_setup_waiters.lock().await.remove(&mode);
+                    CodexSandboxSetupResult {
+                        mode: mode.clone(),
+                        success: false,
+                        error: Some(
+                            "Sandboxセットアップの完了を待機中に時間切れになりました。".into(),
+                        ),
+                    }
+                }
+            }
+        }
+        Ok(_) => {
+            connection.sandbox_setup_waiters.lock().await.remove(&mode);
+            CodexSandboxSetupResult {
+                mode: mode.clone(),
+                success: false,
+                error: Some("Codex App ServerがSandboxセットアップを開始しませんでした。".into()),
+            }
+        }
+        Err(error) => {
+            connection.sandbox_setup_waiters.lock().await.remove(&mode);
+            CodexSandboxSetupResult {
+                mode: mode.clone(),
+                success: false,
+                error: Some(short_probe_error(error)),
+            }
+        }
+    };
+    if temporary {
+        let _ = close_connection(&connection).await;
+    }
+    Ok(result)
 }
 
 #[tauri::command]
@@ -2478,19 +2836,12 @@ mod tests {
     }
 
     #[test]
-    fn workspace_probe_retries_without_explicit_roots_but_never_without_a_sandbox() {
-        let policies = workspace_write_probe_policies(Path::new("D:\\workspace"));
-        assert_eq!(policies[0]["type"], "workspaceWrite");
-        assert_eq!(policies[0]["writableRoots"][0], "D:\\workspace");
-        assert_eq!(policies[0]["networkAccess"], false);
-        assert_eq!(policies[1]["type"], "workspaceWrite");
-        assert!(policies[1].get("writableRoots").is_none());
-        assert_eq!(policies[1]["networkAccess"], false);
-        assert!(
-            policies
-                .iter()
-                .all(|policy| policy["type"] != "dangerFullAccess")
-        );
+    fn workspace_probe_matches_normal_turn_policy_and_never_disables_the_sandbox() {
+        let policy = workspace_write_probe_policy();
+        assert_eq!(policy["type"], "workspaceWrite");
+        assert!(policy.get("writableRoots").is_none());
+        assert_eq!(policy["networkAccess"], false);
+        assert_ne!(policy["type"], "dangerFullAccess");
     }
 
     #[test]
@@ -2521,7 +2872,7 @@ mod tests {
                 "ok",
             ),
             sandbox_check(
-                CodexSandboxCheckId::WorkspaceWrite,
+                CodexSandboxCheckId::WorkspaceCreate,
                 CodexSandboxProbeState::Unavailable,
                 "failed",
             ),
@@ -2551,7 +2902,7 @@ mod tests {
                 "ok",
             ),
             sandbox_check(
-                CodexSandboxCheckId::WorkspaceWrite,
+                CodexSandboxCheckId::WorkspaceCreate,
                 CodexSandboxProbeState::Available,
                 "ok",
             ),
@@ -2560,6 +2911,93 @@ mod tests {
             sandbox_probe_state(&checks),
             CodexSandboxProbeState::Limited
         );
+    }
+
+    #[test]
+    fn sandbox_probe_classifies_setup_refresh_before_access_denial() {
+        let checks = vec![sandbox_check(
+            CodexSandboxCheckId::WorkspaceCreate,
+            CodexSandboxProbeState::Unavailable,
+            "helper_unknown_error: setup refresh had errors / UnauthorizedAccessException",
+        )];
+        assert_eq!(
+            sandbox_failure_category(&checks, Some("ready")),
+            Some(CodexSandboxFailureCategory::SandboxSetup)
+        );
+    }
+
+    #[test]
+    fn sandbox_probe_classifies_folder_access_denial() {
+        let checks = vec![sandbox_check(
+            CodexSandboxCheckId::ExistingFileWrite,
+            CodexSandboxProbeState::Unavailable,
+            "パスへのアクセスが拒否されました。",
+        )];
+        assert_eq!(
+            sandbox_failure_category(&checks, Some("ready")),
+            Some(CodexSandboxFailureCategory::WorkspacePermissions)
+        );
+    }
+
+    #[test]
+    fn sandbox_probe_classifies_command_failure_before_acl_notes() {
+        let checks = vec![
+            sandbox_check(
+                CodexSandboxCheckId::CommandExecution,
+                CodexSandboxProbeState::Unavailable,
+                "プロセスを開始できませんでした。",
+            ),
+            sandbox_check(
+                CodexSandboxCheckId::WorkspacePermissions,
+                CodexSandboxProbeState::Limited,
+                "アクセス許可の継承が無効です。",
+            ),
+        ];
+        assert_eq!(
+            sandbox_failure_category(&checks, Some("ready")),
+            Some(CodexSandboxFailureCategory::CommandLaunch)
+        );
+    }
+
+    #[test]
+    fn workspace_permission_notes_do_not_warn_after_functional_checks_pass() {
+        let checks = vec![
+            sandbox_check(
+                CodexSandboxCheckId::AppServer,
+                CodexSandboxProbeState::Available,
+                "ok",
+            ),
+            sandbox_check(
+                CodexSandboxCheckId::CommandExecution,
+                CodexSandboxProbeState::Available,
+                "ok",
+            ),
+            sandbox_check(
+                CodexSandboxCheckId::WorkspaceCreate,
+                CodexSandboxProbeState::Available,
+                "ok",
+            ),
+            sandbox_check(
+                CodexSandboxCheckId::ExistingFileWrite,
+                CodexSandboxProbeState::Available,
+                "ok",
+            ),
+            sandbox_check(
+                CodexSandboxCheckId::ChildDirectoryWrite,
+                CodexSandboxProbeState::Available,
+                "ok",
+            ),
+            sandbox_check(
+                CodexSandboxCheckId::WorkspacePermissions,
+                CodexSandboxProbeState::Limited,
+                "継承が停止しています。",
+            ),
+        ];
+        assert_eq!(
+            sandbox_probe_state(&checks),
+            CodexSandboxProbeState::Available
+        );
+        assert_eq!(sandbox_failure_category(&checks, Some("ready")), None);
     }
 
     #[test]
@@ -2652,6 +3090,11 @@ mod tests {
         assert_eq!(
             sandbox_policy(ApprovalMode::AutonomousWorkspace, Path::new(r"C:\work"))["type"],
             "workspaceWrite"
+        );
+        assert!(
+            sandbox_policy(ApprovalMode::AutonomousWorkspace, Path::new(r"C:\work"))
+                .get("writableRoots")
+                .is_none()
         );
         assert_eq!(
             sandbox_policy(ApprovalMode::AutonomousWorkspace, Path::new(r"C:\work"))["networkAccess"],

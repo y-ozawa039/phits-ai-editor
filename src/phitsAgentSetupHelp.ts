@@ -38,7 +38,10 @@ const sandboxCheckLabels = {
   appServer: "Codex App Server",
   windowsSandbox: "Sandbox",
   commandExecution: "Sandbox内コマンド実行",
-  workspaceWrite: "ワークスペース編集",
+  workspaceCreate: "ワークスペース直下への作成",
+  existingFileWrite: "既存相当ファイルの変更",
+  childDirectoryWrite: "子フォルダーへの作成",
+  workspacePermissions: "フォルダーのアクセス規則",
 } as const;
 
 const sandboxStateLabels = {
