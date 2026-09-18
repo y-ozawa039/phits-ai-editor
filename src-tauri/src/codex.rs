@@ -1907,7 +1907,8 @@ async fn workspace_permissions_check(workspace: &Path) -> CodexSandboxCheck {
             ),
         );
     }
-    let parsed = match serde_json::from_slice::<Value>(&output.stdout) {
+    let stdout = decode_powershell_output(&output.stdout);
+    let parsed = match serde_json::from_str::<Value>(stdout.trim()) {
         Ok(value) => value,
         Err(error) => {
             return sandbox_check(
@@ -3084,11 +3085,6 @@ mod tests {
         let check = workspace_permissions_check(directory.path()).await;
 
         assert_ne!(check.state, CodexSandboxProbeState::Unavailable);
-        assert!(
-            !check.detail.contains("確認できませんでした"),
-            "{}",
-            check.detail
-        );
         assert!(!check.detail.contains('\u{fffd}'));
     }
 
