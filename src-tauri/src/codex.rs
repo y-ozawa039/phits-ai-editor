@@ -1612,6 +1612,44 @@ fn short_probe_error(error: impl std::fmt::Display) -> String {
     message.chars().take(800).collect()
 }
 
+#[cfg(windows)]
+fn decode_powershell_output(bytes: &[u8]) -> String {
+    if let Ok(text) = std::str::from_utf8(bytes) {
+        return text.trim_start_matches('\u{feff}').to_string();
+    }
+
+    let (utf16_bytes, little_endian) = if bytes.starts_with(&[0xff, 0xfe]) {
+        (&bytes[2..], true)
+    } else if bytes.starts_with(&[0xfe, 0xff]) {
+        (&bytes[2..], false)
+    } else {
+        let pairs = bytes.len() / 2;
+        let odd_zeroes = bytes
+            .iter()
+            .skip(1)
+            .step_by(2)
+            .filter(|byte| **byte == 0)
+            .count();
+        let even_zeroes = bytes.iter().step_by(2).filter(|byte| **byte == 0).count();
+        if pairs > 0 && odd_zeroes * 2 >= pairs {
+            (bytes, true)
+        } else if pairs > 0 && even_zeroes * 2 >= pairs {
+            (bytes, false)
+        } else {
+            let (decoded, _, _) = encoding_rs::SHIFT_JIS.decode(bytes);
+            return decoded.into_owned();
+        }
+    };
+    let units = utf16_bytes.chunks_exact(2).map(|pair| {
+        if little_endian {
+            u16::from_le_bytes([pair[0], pair[1]])
+        } else {
+            u16::from_be_bytes([pair[0], pair[1]])
+        }
+    });
+    String::from_utf16_lossy(&units.collect::<Vec<_>>())
+}
+
 fn sandbox_check(
     id: CodexSandboxCheckId,
     state: CodexSandboxProbeState,
@@ -1839,7 +1877,7 @@ async fn workspace_permissions_check(workspace: &Path) -> CodexSandboxCheck {
     let reparse_point = std::fs::symlink_metadata(workspace)
         .map(|metadata| metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0)
         .unwrap_or(false);
-    let script = "$acl=Get-Acl -LiteralPath $args[0];$deny=@($acl.Access|Where-Object{(-not $_.IsInherited)-and $_.AccessControlType -eq 'Deny'}).Count;[pscustomobject]@{inheritanceProtected=$acl.AreAccessRulesProtected;explicitDenyCount=$deny}|ConvertTo-Json -Compress";
+    let script = "$ErrorActionPreference='Stop';[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false);try{$acl=Get-Acl -LiteralPath $env:PHITS_AI_EDITOR_PROBE_WORKSPACE;$deny=@($acl.Access|Where-Object{(-not $_.IsInherited)-and $_.AccessControlType -eq 'Deny'}).Count;[pscustomobject]@{ok=$true;inheritanceProtected=$acl.AreAccessRulesProtected;explicitDenyCount=$deny;error=$null}|ConvertTo-Json -Compress}catch{[pscustomobject]@{ok=$false;inheritanceProtected=$null;explicitDenyCount=0;error=$_.Exception.Message}|ConvertTo-Json -Compress}";
     let output = Command::new("powershell.exe")
         .args([
             "-NoLogo",
@@ -1848,7 +1886,7 @@ async fn workspace_permissions_check(workspace: &Path) -> CodexSandboxCheck {
             "-Command",
             script,
         ])
-        .arg(workspace)
+        .env("PHITS_AI_EDITOR_PROBE_WORKSPACE", workspace.as_os_str())
         .output()
         .await;
     let Ok(output) = output else {
@@ -1864,18 +1902,40 @@ async fn workspace_permissions_check(workspace: &Path) -> CodexSandboxCheck {
             CodexSandboxProbeState::Limited,
             format!(
                 "フォルダーのアクセス規則を確認できませんでした: {}",
-                short_probe_error(String::from_utf8_lossy(&output.stderr))
+                short_probe_error(decode_powershell_output(&output.stderr))
             ),
         );
     }
-    let parsed = serde_json::from_slice::<Value>(&output.stdout).ok();
-    let inheritance_protected = parsed
-        .as_ref()
-        .and_then(|value| value.get("inheritanceProtected"))
-        .and_then(Value::as_bool);
+    let parsed = match serde_json::from_slice::<Value>(&output.stdout) {
+        Ok(value) => value,
+        Err(error) => {
+            return sandbox_check(
+                CodexSandboxCheckId::WorkspacePermissions,
+                CodexSandboxProbeState::Limited,
+                format!(
+                    "フォルダーのアクセス規則の応答を解析できませんでした: {}",
+                    short_probe_error(error)
+                ),
+            );
+        }
+    };
+    if parsed.get("ok").and_then(Value::as_bool) == Some(false) {
+        let error = parsed
+            .get("error")
+            .and_then(Value::as_str)
+            .unwrap_or("詳細を取得できませんでした");
+        return sandbox_check(
+            CodexSandboxCheckId::WorkspacePermissions,
+            CodexSandboxProbeState::Limited,
+            format!(
+                "フォルダーのアクセス規則を確認できませんでした: {}",
+                short_probe_error(error)
+            ),
+        );
+    }
+    let inheritance_protected = parsed.get("inheritanceProtected").and_then(Value::as_bool);
     let explicit_deny_count = parsed
-        .as_ref()
-        .and_then(|value| value.get("explicitDenyCount"))
+        .get("explicitDenyCount")
         .and_then(Value::as_u64)
         .unwrap_or(0);
     let mut findings = Vec::new();
@@ -3011,6 +3071,30 @@ mod tests {
             CodexSandboxProbeState::Available
         );
         assert_eq!(sandbox_failure_category(&checks, Some("ready")), None);
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn workspace_permission_probe_accepts_unicode_path_without_mojibake() {
+        let directory = tempfile::Builder::new()
+            .prefix("phits-editor-診断-")
+            .tempdir()
+            .expect("temporary workspace");
+        let check = workspace_permissions_check(directory.path()).await;
+
+        assert_eq!(check.state, CodexSandboxProbeState::Available);
+        assert!(!check.detail.contains('\u{fffd}'));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn powershell_output_decoder_handles_windows_31j_errors() {
+        let (encoded, _, _) = encoding_rs::SHIFT_JIS.encode("パスへのアクセスが拒否されました。");
+
+        assert_eq!(
+            decode_powershell_output(&encoded),
+            "パスへのアクセスが拒否されました。"
+        );
     }
 
     #[test]

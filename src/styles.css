@@ -116,7 +116,7 @@ svg { width: 18px; height: 18px; flex: none; }
 .empty-folder svg { width: 25px; height: 25px; }
 .workspace-empty strong { color: #455a66; font-size: 12px; }
 .workspace-empty p { margin: 7px 0 14px; font-size: 12px; line-height: 1.5; }
-.diagnostics-card { margin: 8px; padding: 9px; background: #fff; border: 1px solid #d8e2e7; border-radius: 7px; box-shadow: 0 2px 8px rgb(26 65 83 / 4%); }
+.diagnostics-card { max-height: min(60%, 650px); min-height: 0; margin: 8px; padding: 9px; overflow-y: auto; overscroll-behavior: contain; background: #fff; border: 1px solid #d8e2e7; border-radius: 7px; box-shadow: 0 2px 8px rgb(26 65 83 / 4%); }
 .diagnostics-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; color: #70818b; font-size: 12px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
 .diagnostics-heading button { width: 22px; height: 22px; display: grid; place-items: center; color: #6b7d87; background: transparent; border: 0; border-radius: 4px; cursor: pointer; }
 .diagnostics-heading svg { width: 13px; }
@@ -434,7 +434,7 @@ kbd, .text-button, .output-content { color: #555555; }
 .approval-mode-label select { width: 100%; min-height: 32px; padding: 4px 7px; color: #2f2f2f; background: #fff; border: 1px solid #cfcfcf; border-radius: 4px; font-size: var(--codex-font-size, 14px); }
 .session-grant-note { margin-top: 5px; color: #555; font-size: 12px; }
 .codex-compatibility-note { margin-top: 6px; padding: 7px 8px; color: #664d1f; background: #fff7e7; border: 1px solid #ead8af; border-radius: 5px; font-size: 12px; line-height: 1.45; }
-.codex-agent-setup-note { display: grid; gap: 3px; margin-bottom: 8px; }
+.codex-agent-setup-note { max-height: min(45vh, 520px); display: grid; gap: 3px; margin-bottom: 8px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 .codex-agent-setup-note strong { color: #5c4315; }
 .codex-agent-setup-note.partial { color: #315a6b; background: #eef8fb; border-color: #bfdae4; }
 .codex-agent-setup-note.partial strong { color: #244a5a; }
