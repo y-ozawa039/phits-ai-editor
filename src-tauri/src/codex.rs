@@ -1640,7 +1640,8 @@ fn decode_powershell_output(bytes: &[u8]) -> String {
             return decoded.into_owned();
         }
     };
-    let units = utf16_bytes.chunks_exact(2).map(|pair| {
+    let (utf16_pairs, _) = utf16_bytes.as_chunks::<2>();
+    let units = utf16_pairs.iter().map(|pair| {
         if little_endian {
             u16::from_le_bytes([pair[0], pair[1]])
         } else {
