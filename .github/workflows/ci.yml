@@ -31,6 +31,10 @@ jobs:
       - run: pnpm test:codex-schema
       - run: pnpm test:codex-request-coverage
       - run: pnpm build
+      - name: Validate Sandbox diagnostic fixtures
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/preview-sandbox-diagnostics.ps1 -ValidateFixturesOnly
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
       - run: cargo test --manifest-path src-tauri/Cargo.toml

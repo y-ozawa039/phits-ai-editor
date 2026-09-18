@@ -1943,11 +1943,6 @@ fn sandbox_failure_category(
         || failed_detail.contains("helper_unknown_error")
     {
         Some(CodexSandboxFailureCategory::SandboxSetup)
-    } else if checks.iter().any(|check| {
-        check.id == CodexSandboxCheckId::CommandExecution
-            && check.state == CodexSandboxProbeState::Unavailable
-    }) {
-        Some(CodexSandboxFailureCategory::CommandLaunch)
     } else if failed_detail.contains("access is denied")
         || failed_detail.contains("access denied")
         || failed_detail.contains("unauthorizedaccessexception")
@@ -1955,6 +1950,11 @@ fn sandbox_failure_category(
         || failed_detail.contains("アクセス許可")
     {
         Some(CodexSandboxFailureCategory::WorkspacePermissions)
+    } else if checks.iter().any(|check| {
+        check.id == CodexSandboxCheckId::CommandExecution
+            && check.state == CodexSandboxProbeState::Unavailable
+    }) {
+        Some(CodexSandboxFailureCategory::CommandLaunch)
     } else if failed_detail.contains("内容が一致") || failed_detail.contains("確認できませんでした")
     {
         Some(CodexSandboxFailureCategory::Verification)
@@ -2956,6 +2956,19 @@ mod tests {
         assert_eq!(
             sandbox_failure_category(&checks, Some("ready")),
             Some(CodexSandboxFailureCategory::CommandLaunch)
+        );
+    }
+
+    #[test]
+    fn sandbox_probe_treats_command_access_denial_as_workspace_permissions() {
+        let checks = vec![sandbox_check(
+            CodexSandboxCheckId::CommandExecution,
+            CodexSandboxProbeState::Unavailable,
+            "作業フォルダーへのアクセスが拒否されました。",
+        )];
+        assert_eq!(
+            sandbox_failure_category(&checks, Some("ready")),
+            Some(CodexSandboxFailureCategory::WorkspacePermissions)
         );
     }
 

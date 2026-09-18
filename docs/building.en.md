@@ -75,6 +75,35 @@ authenticated environment, and the inspection-home override is compiled only
 into debug builds. Use `-Case Partial` for one state or
 `-PrepareOnly -KeepFixtures` to create fixtures without launching the app.
 
+## Manually preview Codex editing-environment diagnostics
+
+Exercise the Sandbox diagnostic against five temporary workspace patterns
+without modifying a research folder:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/preview-sandbox-diagnostics.ps1 -Executable C:\path\to\phits-ai-editor.exe
+```
+
+| Case | What it checks |
+|---|---|
+| `HealthyExisting` | A normal non-empty workspace with a child directory |
+| `ProtectedInheritance` | ACL inheritance is protected but functional writes still succeed |
+| `OwnerOnly` | An ACL limited to the current user; this may reproduce a workspace-specific issue under `elevated`, while `unelevated` may remain available |
+| `ExplicitWriteDeny` | An explicit write deny that should be classified as workspace permissions |
+| `UnicodePath` | A path containing spaces and Japanese characters |
+
+In each window, connect to Codex, refresh the runtime environment once, and
+inspect the expanded details. Closing the editor advances to the next case.
+Use a single case such as `-Case OwnerOnly` when needed.
+`-ValidateFixturesOnly` checks the fixture ACLs and paths without launching the
+editor.
+
+The script creates a random dedicated folder below
+`.integration/sandbox-diagnostic-preview`. On exit it resets modified ACLs to
+inherit from their parent, checks both the absolute path and a safety marker,
+and removes only that dedicated folder. It does not run PHITS or modify research
+data, Codex configuration, or ACLs on a real workspace.
+
 ## Release build
 
 ```powershell

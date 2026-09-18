@@ -37,6 +37,10 @@ jobs:
       - name: Run frontend, documentation, schema, and license checks
         run: pnpm check
 
+      - name: Validate Sandbox diagnostic fixtures
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/preview-sandbox-diagnostics.ps1 -ValidateFixturesOnly
+
       - name: Run Rust checks
         run: |
           cargo fmt --manifest-path src-tauri/Cargo.toml -- --check

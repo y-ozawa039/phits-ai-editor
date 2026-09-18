@@ -90,6 +90,32 @@ App Serverは通常の認証済み環境を使用し、検査専用homeを参照
 だけ含まれます。`-Case Partial`で1状態だけ、`-PrepareOnly -KeepFixtures`で起動せずに
 fixtureだけを生成できます。
 
+## Codex編集環境診断の手動確認
+
+実際の研究フォルダーを変更せず、Sandbox診断を5種類の一時ワークスペースで順番に
+確認できます。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/preview-sandbox-diagnostics.ps1 -Executable C:\path\to\phits-ai-editor.exe
+```
+
+| ケース | 確認内容 |
+|---|---|
+| `HealthyExisting` | ファイルと子フォルダーが存在する通常のワークスペース |
+| `ProtectedInheritance` | ACL継承は停止しているが、実際の書込みは可能なワークスペース |
+| `OwnerOnly` | 現在の利用者だけに限定したACL。`elevated`ではフォルダー固有問題を再現できる可能性があり、`unelevated`では利用可能になる場合があります |
+| `ExplicitWriteDeny` | 明示的な書込み拒否があり、ワークスペース権限として分類されるケース |
+| `UnicodePath` | 空白と日本語を含むパス |
+
+各画面でCodexへ接続し、実行環境の更新を1回行って詳細を確認してください。Editorを
+閉じると次のケースが起動します。`-Case OwnerOnly`のように1ケースだけ指定できます。
+`-ValidateFixturesOnly`はEditorを起動せず、fixtureのACLとパスを検査します。
+
+スクリプトは`.integration/sandbox-diagnostic-preview`の下へランダムな専用フォルダーを
+作成します。終了時は変更したACLを親からの継承状態へ戻し、安全マーカーと絶対パスを
+確認してから、その専用フォルダーだけを削除します。PHITSは実行せず、研究データ、
+Codex設定、実ワークスペースのACLは変更しません。
+
 ## リリースビルド
 
 ```powershell
