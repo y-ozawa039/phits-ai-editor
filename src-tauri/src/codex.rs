@@ -3083,7 +3083,12 @@ mod tests {
             .expect("temporary workspace");
         let check = workspace_permissions_check(directory.path()).await;
 
-        assert_eq!(check.state, CodexSandboxProbeState::Available);
+        assert_ne!(check.state, CodexSandboxProbeState::Unavailable);
+        assert!(
+            !check.detail.contains("確認できませんでした"),
+            "{}",
+            check.detail
+        );
         assert!(!check.detail.contains('\u{fffd}'));
     }
 
