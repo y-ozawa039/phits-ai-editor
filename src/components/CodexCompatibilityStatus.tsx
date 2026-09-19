@@ -11,13 +11,19 @@ const FEATURE_LABELS: Record<CodexFeatureId, string> = {
 
 const SANDBOX_LABELS: Record<CodexSandboxCheckId, string> = {
   appServer: "App Server",
-  windowsSandbox: "Sandbox準備",
+  windowsSandbox: "Sandbox",
   commandExecution: "コマンド実行",
-  workspaceCreate: "直下へ作成",
-  existingFileWrite: "既存相当を変更",
-  childDirectoryWrite: "子階層へ作成",
+  workspaceCreate: "直下への作成",
+  existingFileWrite: "既存ファイルの変更",
+  childDirectoryWrite: "子階層への作成",
   workspacePermissions: "アクセス規則",
 };
+
+const WORKSPACE_EDIT_CHECKS = new Set<CodexSandboxCheckId>([
+  "workspaceCreate",
+  "existingFileWrite",
+  "childDirectoryWrite",
+]);
 
 function overallLabel(report: CodexCompatibilityReport) {
   if (report.state === "compatible") return "互換性確認済み";
@@ -30,6 +36,18 @@ function featureLabel(state: CodexCompatibilityReport["features"][number]["state
   if (state === "available") return "利用可能";
   if (state === "limited") return "制限あり";
   return "利用不可";
+}
+
+function sandboxStateLabel(state: CodexSandboxProbeReport["checks"][number]["state"]) {
+  if (state === "available") return "利用可能";
+  if (state === "limited") return "要確認";
+  return "利用不可";
+}
+
+function combinedSandboxState(checks: CodexSandboxProbeReport["checks"]) {
+  if (checks.some((check) => check.state === "unavailable")) return "unavailable" as const;
+  if (checks.some((check) => check.state === "limited")) return "limited" as const;
+  return "available" as const;
 }
 
 function combinedState(
@@ -83,11 +101,17 @@ export function CodexCompatibilityStatus({
   const label = combinedLabel(report, sandbox, setup);
   const displayLabel = busy || sandboxBusy ? "Codex編集環境：確認中…" : label;
   const windowsSandboxCheck = sandbox?.checks.find((check) => check.id === "windowsSandbox");
-  const remainingSandboxChecks = sandbox?.checks.filter((check) => check.id !== "appServer" && check.id !== "windowsSandbox") ?? [];
-  const renderSandboxCheck = (check: CodexSandboxProbeReport["checks"][number]) => <div className={`codex-feature-row${check.id === "windowsSandbox" ? " codex-feature-row-wide" : ""}`} key={check.id} title={check.detail}>
+  const commandExecutionCheck = sandbox?.checks.find((check) => check.id === "commandExecution");
+  const workspacePermissionCheck = sandbox?.checks.find((check) => check.id === "workspacePermissions");
+  const workspaceEditChecks = sandbox?.checks.filter((check) => WORKSPACE_EDIT_CHECKS.has(check.id)) ?? [];
+  const workspaceEditState = combinedSandboxState(workspaceEditChecks);
+  const workspaceEditDetail = workspaceEditChecks
+    .map((check) => `${SANDBOX_LABELS[check.id]}: ${check.detail}`)
+    .join("\n");
+  const renderSandboxCheck = (check: CodexSandboxProbeReport["checks"][number]) => <div className="codex-feature-row" key={check.id} title={check.detail}>
     <span className={`diagnostic-dot ${check.state === "available" ? "ok" : check.state === "limited" ? "warn" : "bad"}`} />
     <span>{SANDBOX_LABELS[check.id]}</span>
-    <small>{check.state === "available" ? "利用可能" : check.state === "limited" ? "要確認" : "利用不可"}</small>
+    <small>{sandboxStateLabel(check.state)}</small>
   </div>;
   return <section className={`codex-compatibility ${state}`} aria-label="Codex機能の互換性と編集環境">
     <button
@@ -112,19 +136,19 @@ export function CodexCompatibilityStatus({
         <span>PHITS参照設定</span>
         <small>{setup.configured ? "確認済み" : "要確認"}</small>
       </div>}
-      {setup && windowsSandboxCheck && <span className="codex-feature-spacer" aria-hidden="true" />}
       {windowsSandboxCheck && renderSandboxCheck(windowsSandboxCheck)}
-      {remainingSandboxChecks.map(renderSandboxCheck)}
-      {sandbox && <div className="codex-feature-row codex-feature-row-wide" title="Codexが現在使用するSandbox方式">
+      {commandExecutionCheck && renderSandboxCheck(commandExecutionCheck)}
+      {workspaceEditChecks.length > 0 && <div className="codex-feature-row" title={workspaceEditDetail}>
+        <span className={`diagnostic-dot ${workspaceEditState === "available" ? "ok" : workspaceEditState === "limited" ? "warn" : "bad"}`} />
+        <span>ワークスペース編集</span>
+        <small>{sandboxStateLabel(workspaceEditState)}</small>
+      </div>}
+      {workspacePermissionCheck && renderSandboxCheck(workspacePermissionCheck)}
+      {sandbox && <div className="codex-feature-row" title="Codexが現在使用するSandbox方式">
         <span className="diagnostic-dot" />
         <span>Sandbox方式</span>
         <small>{sandbox.implementation ?? "取得不可"}</small>
       </div>}
-      {sandbox?.allowedImplementations.length ? <div className="codex-feature-row codex-feature-row-wide" title="組織ポリシーで許可されたSandbox方式">
-        <span className="diagnostic-dot" />
-        <span>許可方式</span>
-        <small>{sandbox.allowedImplementations.join(", ")}</small>
-      </div> : null}
     </div>}
     {report.messages.slice(0, 1).map((message) => <p className="diagnostic-message" key={message}>{message}</p>)}
   </section>;

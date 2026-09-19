@@ -138,9 +138,9 @@ svg { width: 18px; height: 18px; flex: none; }
 .codex-probe-summary .diagnostic-dot { width: 6px; height: 6px; box-shadow: none; }
 .codex-probe-chevron { grid-column: 3; justify-self: end; width: 14px; transition: transform .16s ease; }
 .codex-probe-summary[aria-expanded="true"] .codex-probe-chevron { transform: rotate(180deg); }
-.codex-feature-list { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 8px; margin-top: 4px; }
+.codex-feature-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; margin-top: 4px; }
 .codex-feature-row { min-width: 0; display: grid; grid-template-columns: 7px minmax(0, 1fr) auto; align-items: center; gap: 6px; min-height: 24px; color: #444; font-size: 12px; }
-.codex-feature-row-wide { grid-column: 1 / -1; grid-template-columns: 7px max-content max-content minmax(0, 1fr); }
+.codex-feature-row > span:nth-child(2) { min-width: 0; white-space: nowrap; }
 .codex-feature-row small { color: #777; font-size: 12px; white-space: nowrap; }
 .codex-feature-row .diagnostic-dot { width: 6px; height: 6px; box-shadow: none; }
 .explorer-panel .panel-title, .explorer-panel .workspace-name, .explorer-panel .file-item, .explorer-panel .explorer-empty { font-size: var(--explorer-font-size, 12px); }

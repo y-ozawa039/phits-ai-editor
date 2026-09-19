@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { CodexCompatibilityStatus } from "./CodexCompatibilityStatus";
 import type { CodexCompatibilityReport, CodexSandboxProbeReport, PhitsAgentSetupStatus } from "../types";
@@ -67,6 +67,9 @@ describe("CodexCompatibilityStatus", () => {
         { id: "windowsSandbox", state: "available", detail: "ok" },
         { id: "commandExecution", state: "available", detail: "ok" },
         { id: "workspaceCreate", state: "available", detail: "ok" },
+        { id: "existingFileWrite", state: "available", detail: "ok" },
+        { id: "childDirectoryWrite", state: "available", detail: "ok" },
+        { id: "workspacePermissions", state: "limited", detail: "継承停止" },
       ],
       messages: [],
       supportPrompt: "",
@@ -85,13 +88,46 @@ describe("CodexCompatibilityStatus", () => {
 
     fireEvent.click(summary);
 
-    const windowsSandbox = container.querySelector(".codex-feature-row-wide");
-    expect(windowsSandbox).toHaveClass("codex-feature-row-wide");
-    expect(windowsSandbox).toHaveTextContent("Sandbox準備利用可能");
-    expect(container.querySelectorAll(".codex-feature-spacer")).toHaveLength(1);
+    expect(container.querySelector(".codex-feature-list")).toBeTruthy();
+    expect(screen.getByText("Sandbox")).toBeTruthy();
     expect(screen.getByText("Sandbox方式")).toBeTruthy();
-    expect(screen.getAllByText("unelevated")).toHaveLength(2);
+    expect(screen.getByText("unelevated")).toBeTruthy();
     expect(screen.getByText("コマンド実行")).toBeTruthy();
-    expect(screen.getByText("直下へ作成")).toBeTruthy();
+    expect(screen.getByText("ワークスペース編集")).toBeTruthy();
+    expect(screen.getByText("アクセス規則")).toBeTruthy();
+    expect(screen.queryByText("直下への作成")).toBeNull();
+    expect(screen.queryByText("既存ファイルの変更")).toBeNull();
+    expect(screen.queryByText("子階層への作成")).toBeNull();
+    expect(screen.queryByText("許可方式")).toBeNull();
+  });
+
+  it("summarizes workspace write checks using the most restrictive result", () => {
+    const compatibleReport: CodexCompatibilityReport = {
+      ...report,
+      state: "compatible",
+      features: report.features.map((feature) => ({ ...feature, state: "available" })),
+    };
+    const sandbox: CodexSandboxProbeReport = {
+      state: "unavailable",
+      workspaceRoot: "C:\\work",
+      checkedAt: "2026-09-13T00:00:00Z",
+      readiness: "ready",
+      implementation: "elevated",
+      allowedImplementations: ["elevated"],
+      checks: [
+        { id: "workspaceCreate", state: "available", detail: "直下は利用可能" },
+        { id: "existingFileWrite", state: "limited", detail: "既存ファイルは要確認" },
+        { id: "childDirectoryWrite", state: "unavailable", detail: "子階層は利用不可" },
+      ],
+      messages: [],
+      supportPrompt: "",
+    };
+
+    const { container } = render(<CodexCompatibilityStatus report={compatibleReport} busy={false} sandbox={sandbox} />);
+    fireEvent.click(within(container).getByRole("button", { name: "Codex編集環境：書込み未確認" }));
+
+    const workspaceEditing = within(container).getByText("ワークスペース編集").closest(".codex-feature-row");
+    expect(workspaceEditing).toHaveTextContent("利用不可");
+    expect(workspaceEditing).toHaveAttribute("title", expect.stringContaining("子階層への作成: 子階層は利用不可"));
   });
 });
