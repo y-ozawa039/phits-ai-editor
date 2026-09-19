@@ -2,7 +2,7 @@
 
 [日本語](installation.md) | English
 
-This guide covers the `0.0.5-alpha` distribution for Windows 11 x64. PHITS AI
+This guide covers the `0.0.6-alpha` distribution for Windows 11 x64. PHITS AI
 Editor is an independently developed alpha application. Back up important
 input files before use.
 
@@ -10,8 +10,8 @@ input files before use.
 
 | Artifact | Recommended for | Windows integration |
 | --- | --- | --- |
-| `PHITS-AI-Editor-v0.0.5-alpha-windows-x64-setup.exe` | Normal use | Yes |
-| `PHITS-AI-Editor-v0.0.5-alpha-windows-x64-portable.zip` | Evaluation, side-by-side versions, development, and investigation | No |
+| `PHITS-AI-Editor-v0.0.6-alpha-windows-x64-setup.exe` | Normal use | Yes |
+| `PHITS-AI-Editor-v0.0.6-alpha-windows-x64-portable.zip` | Evaluation, side-by-side versions, development, and investigation | No |
 
 We recommend the installer for normal use. GitHub's automatically generated
 `Source code (zip)` is not the portable Windows application. Although a bare
@@ -98,6 +98,23 @@ insert it into the in-editor Codex composer or copy it. If Codex cannot connect,
 open a local Codex task in ChatGPT desktop on this PC and paste the prompt there.
 A Cloud task may be unable to inspect local files.
 
+For the workspace location, the editor checks drive and file-system type, UNC,
+special folders, the read-only attribute, path length, and OneDrive scope without
+recursively scanning the workspace. Existing diagnostic results and the generated
+AI troubleshooting prompt remain available in the Codex panel. Save a diagnostic
+report from a warning or **Help > Save diagnostic report...**. The default option
+redacts known workspace, PHITS, Codex CLI, and user-profile paths; an explicit
+option preserves them. Error text and folder names may still contain personal
+information, so review the contents carefully before sharing them externally.
+
+Diagnostic results are not cached in the workspace or settings. Required checks
+run again at application start, workspace changes, Codex connection, and manual
+refresh. A size-limited startup log is stored at the location shown as **Startup
+log** in the diagnostic report. It intentionally excludes input-file contents
+and credentials and is never reused to decide feature availability.
+Use **Help > Diagnostic information details...** to see the log location, the
+256 KiB limit, and the single rotated generation.
+
 ## 6. Open `.inp` and `.pht` files directly
 
 With the installer edition, double-click a file in Explorer or select PHITS AI
@@ -112,7 +129,7 @@ With the portable edition, you can:
 
 ## 7. SmartScreen warning
 
-`0.0.5-alpha` is not code-signed, so Windows SmartScreen may show a warning.
+`0.0.6-alpha` is not code-signed, so Windows SmartScreen may show a warning.
 Do not run a file obtained outside the official GitHub Release or a file whose
 SHA-256 does not match. Continue only after verifying the source and hash and
 reading the warning yourself.
@@ -120,7 +137,7 @@ reading the warning yourself.
 Use PowerShell to verify an artifact:
 
 ```powershell
-Get-FileHash .\PHITS-AI-Editor-v0.0.5-alpha-windows-x64-setup.exe -Algorithm SHA256
+Get-FileHash .\PHITS-AI-Editor-v0.0.6-alpha-windows-x64-setup.exe -Algorithm SHA256
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -151,7 +168,7 @@ release.
 
 ## 10. Before reporting a problem
 
-- Review the [known issues](known-issues-v0.0.5-alpha.en.md).
+- Review the [known issues](known-issues-v0.0.6-alpha.en.md).
 - Record the application version, Windows version, reproduction steps,
   expected result, and actual result.
 - Do not post credentials, personal information, unpublished research data, or

@@ -10,6 +10,7 @@ mod language;
 mod runner;
 mod settings;
 mod startup;
+mod startup_log;
 mod state;
 mod workspace;
 
@@ -40,9 +41,11 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(AppState::default())
         .setup(|app| {
+            startup_log::initialize(app.handle());
             let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
             let requests = startup::requests_from_os_args(std::env::args_os(), &cwd);
             app.state::<AppState>().queue_open_requests(requests);
+            startup_log::append("application setup completed; main webview configured");
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -53,6 +56,8 @@ pub fn run() {
             documents::document_save,
             documents::document_save_as,
             diagnostics::runtime_diagnose,
+            diagnostics::workspace_environment_diagnose,
+            diagnostics::diagnostic_report_save,
             diagnostics::codex_compatibility_probe,
             settings::phits_settings_get,
             settings::phits_settings_set,

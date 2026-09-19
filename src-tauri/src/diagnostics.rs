@@ -3,7 +3,6 @@ use std::{
     env, fs,
     path::{Path, PathBuf},
     process::Command,
-    sync::OnceLock,
 };
 
 use chrono::Utc;
@@ -11,17 +10,18 @@ use regex::Regex;
 use tauri::AppHandle;
 use tokio::{
     process::Command as TokioCommand,
-    sync::Mutex as AsyncMutex,
     time::{Duration, timeout},
 };
 
 use crate::{
     contracts::{
         CodexCompatibilityReport, CodexCompatibilityState, CodexFeatureId, CodexFeatureState,
-        CodexFeatureStatus, Compatibility, PhitsPathSource, RuntimeDiagnostics,
+        CodexFeatureStatus, Compatibility, PhitsPathSource, RuntimeDiagnostics, WorkspaceDriveKind,
+        WorkspaceEnvironmentReport, WorkspaceEnvironmentState,
     },
     error::{AppError, AppResult},
     settings::app_phits_root,
+    startup_log,
 };
 
 const SUPPORTED_PHITS_VERSION: f64 = 3.37;
@@ -70,18 +70,12 @@ const APPROVAL_SCHEMA_FILES: &[&str] = &[
 ];
 const REQUIRED_APPROVAL_DECISIONS: &[&str] = &["accept", "acceptForSession", "decline", "cancel"];
 
-type CodexProbeCache = Option<(String, String, CodexCompatibilityReport)>;
-static CODEX_PROBE_CACHE: OnceLock<AsyncMutex<CodexProbeCache>> = OnceLock::new();
-
-fn codex_probe_cache() -> &'static AsyncMutex<CodexProbeCache> {
-    CODEX_PROBE_CACHE.get_or_init(|| AsyncMutex::new(None))
-}
-
 #[tauri::command]
 pub fn runtime_diagnose(
     app: AppHandle,
     workspace_root: Option<String>,
 ) -> AppResult<RuntimeDiagnostics> {
+    startup_log::append("runtime diagnostics started");
     let workspace = workspace_root
         .as_deref()
         .map(Path::new)
@@ -90,6 +84,7 @@ pub fn runtime_diagnose(
     let mut messages = Vec::new();
 
     let configured_root = app_phits_root(&app)?;
+    startup_log::append("application settings read completed");
     let resolved = resolve_phits_root(
         workspace.as_deref(),
         configured_root.as_deref(),
@@ -161,7 +156,7 @@ pub fn runtime_diagnose(
 
     let (codex_path, codex_version, codex_compatible) = diagnose_codex(&mut messages);
 
-    Ok(RuntimeDiagnostics {
+    let report = RuntimeDiagnostics {
         phits_root: phits_root.map(|path| path.to_string_lossy().into_owned()),
         phits_path_source,
         phits_version,
@@ -172,8 +167,296 @@ pub fn runtime_diagnose(
         codex_path,
         codex_version,
         codex_compatible,
+        startup_log: startup_log::path().map(|path| path.to_string_lossy().into_owned()),
+        messages,
+    };
+    startup_log::append("runtime diagnostics completed");
+    Ok(report)
+}
+
+#[tauri::command]
+pub fn workspace_environment_diagnose(
+    workspace_root: String,
+) -> AppResult<WorkspaceEnvironmentReport> {
+    let workspace = canonical_directory(Path::new(&workspace_root))?;
+    let metadata = fs::symlink_metadata(&workspace)?;
+    let is_reparse_point = workspace_is_reparse_point(&metadata);
+    let read_only = metadata.permissions().readonly();
+    let path_text = workspace.to_string_lossy().into_owned();
+    let path_length = path_text.encode_utf16().count();
+    let long_path_risk = path_length >= 240;
+    let is_unc = path_text.starts_with(r"\\");
+    let (drive_kind, file_system) = workspace_storage_details(&workspace);
+    let sync_provider = workspace_sync_provider(&workspace);
+    let mut messages = Vec::new();
+
+    if drive_kind == WorkspaceDriveKind::Network || is_unc {
+        messages.push("ネットワーク上のワークスペースです。接続状態やサーバー側のアクセス規則により、ローカルフォルダーとは動作が異なる場合があります。".into());
+    }
+    if drive_kind == WorkspaceDriveKind::Removable {
+        messages.push("取り外し可能なドライブ上のワークスペースです。編集中はドライブを取り外さないでください。".into());
+    }
+    if is_reparse_point {
+        messages.push("junction、シンボリックリンク、または同期機能等が使用する特殊なフォルダーです。実際の保存先のアクセス規則も影響する場合があります。".into());
+    }
+    if long_path_risk {
+        messages.push(format!(
+            "ワークスペースのパスが長くなっています（{path_length}文字）。深い子フォルダーではWindowsアプリのパス長制限に達する可能性があります。"
+        ));
+    }
+    if let Some(provider) = sync_provider.as_deref() {
+        messages.push(format!(
+            "{provider}の同期対象内です。同期待ち、オンラインのみのファイル、競合コピーに注意してください。"
+        ));
+    }
+
+    let state = if !messages.is_empty() {
+        WorkspaceEnvironmentState::Attention
+    } else if drive_kind == WorkspaceDriveKind::Unknown {
+        WorkspaceEnvironmentState::Unknown
+    } else {
+        WorkspaceEnvironmentState::Normal
+    };
+    startup_log::append(match state {
+        WorkspaceEnvironmentState::Normal => {
+            "workspace environment diagnostics completed; state=normal"
+        }
+        WorkspaceEnvironmentState::Attention => {
+            "workspace environment diagnostics completed; state=attention"
+        }
+        WorkspaceEnvironmentState::Unknown => {
+            "workspace environment diagnostics completed; state=unknown"
+        }
+    });
+    Ok(WorkspaceEnvironmentReport {
+        state,
+        workspace_root: path_text,
+        checked_at: Utc::now().to_rfc3339(),
+        drive_kind,
+        file_system,
+        is_unc,
+        is_reparse_point,
+        read_only,
+        path_length,
+        long_path_risk,
+        sync_provider,
         messages,
     })
+}
+
+#[cfg(windows)]
+fn workspace_is_reparse_point(metadata: &fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+    metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+}
+
+#[cfg(not(windows))]
+fn workspace_is_reparse_point(metadata: &fs::Metadata) -> bool {
+    metadata.file_type().is_symlink()
+}
+
+fn workspace_sync_provider(workspace: &Path) -> Option<String> {
+    let workspace = normalized_path_prefix(workspace);
+    [
+        ("OneDrive", "OneDrive"),
+        ("OneDrive (個人用)", "OneDriveConsumer"),
+        ("OneDrive (組織用)", "OneDriveCommercial"),
+    ]
+    .into_iter()
+    .find_map(|(label, variable)| {
+        let root = env::var_os(variable).map(PathBuf::from)?;
+        path_is_within_normalized(&workspace, &normalized_path_prefix(&root)).then(|| label.into())
+    })
+}
+
+fn normalized_path_prefix(path: &Path) -> String {
+    path.to_string_lossy()
+        .replace('/', "\\")
+        .trim_end_matches('\\')
+        .to_lowercase()
+}
+
+fn path_is_within_normalized(path: &str, root: &str) -> bool {
+    !root.is_empty()
+        && (path == root
+            || path
+                .strip_prefix(root)
+                .is_some_and(|remaining| remaining.starts_with('\\')))
+}
+
+#[cfg(windows)]
+fn workspace_storage_details(path: &Path) -> (WorkspaceDriveKind, Option<String>) {
+    use std::{ffi::OsStr, os::windows::ffi::OsStrExt, ptr::null_mut};
+    use windows_sys::Win32::{
+        Storage::FileSystem::{GetDriveTypeW, GetVolumeInformationW},
+        System::WindowsProgramming::{
+            DRIVE_CDROM, DRIVE_FIXED, DRIVE_RAMDISK, DRIVE_REMOTE, DRIVE_REMOVABLE,
+        },
+    };
+
+    let path_text = path.to_string_lossy();
+    if path_text.starts_with(r"\\") {
+        return (WorkspaceDriveKind::Network, None);
+    }
+    let Some(root) = windows_volume_root(path) else {
+        return (WorkspaceDriveKind::Unknown, None);
+    };
+    let wide: Vec<u16> = OsStr::new(&root).encode_wide().chain(Some(0)).collect();
+    let drive_kind = match unsafe { GetDriveTypeW(wide.as_ptr()) } {
+        DRIVE_FIXED => WorkspaceDriveKind::Fixed,
+        DRIVE_REMOVABLE => WorkspaceDriveKind::Removable,
+        DRIVE_REMOTE => WorkspaceDriveKind::Network,
+        DRIVE_CDROM => WorkspaceDriveKind::Optical,
+        DRIVE_RAMDISK => WorkspaceDriveKind::RamDisk,
+        _ => WorkspaceDriveKind::Unknown,
+    };
+    if drive_kind == WorkspaceDriveKind::Network {
+        return (drive_kind, None);
+    }
+    let mut file_system = [0_u16; 64];
+    let ok = unsafe {
+        GetVolumeInformationW(
+            wide.as_ptr(),
+            null_mut(),
+            0,
+            null_mut(),
+            null_mut(),
+            null_mut(),
+            file_system.as_mut_ptr(),
+            file_system.len() as u32,
+        )
+    };
+    let file_system = (ok != 0).then(|| {
+        let length = file_system
+            .iter()
+            .position(|value| *value == 0)
+            .unwrap_or(file_system.len());
+        String::from_utf16_lossy(&file_system[..length])
+    });
+    (drive_kind, file_system.filter(|value| !value.is_empty()))
+}
+
+#[cfg(windows)]
+fn windows_volume_root(path: &Path) -> Option<String> {
+    let value = path.to_string_lossy().replace('/', "\\");
+    if let Some(unc) = value.strip_prefix(r"\\") {
+        let mut parts = unc.split('\\').filter(|part| !part.is_empty());
+        return Some(format!(r"\\{}\{}\", parts.next()?, parts.next()?));
+    }
+    let mut chars = value.chars();
+    let drive = chars.next()?;
+    (chars.next()? == ':').then(|| format!("{}:\\", drive.to_ascii_uppercase()))
+}
+
+#[cfg(not(windows))]
+fn workspace_storage_details(_path: &Path) -> (WorkspaceDriveKind, Option<String>) {
+    (WorkspaceDriveKind::Unknown, None)
+}
+
+#[tauri::command]
+pub fn diagnostic_report_save(
+    target_path: String,
+    report: String,
+    anonymize: bool,
+    workspace_root: Option<String>,
+    phits_root: Option<String>,
+    codex_path: Option<String>,
+) -> AppResult<String> {
+    const MAX_REPORT_BYTES: usize = 1024 * 1024;
+    if report.len() > MAX_REPORT_BYTES {
+        return Err(AppError::Message(
+            "診断レポートが上限（1 MiB）を超えています。".into(),
+        ));
+    }
+    if !report.starts_with("PHITS AI Editor 診断レポート\n") {
+        return Err(AppError::Message(
+            "診断レポートとして認識できない内容です。".into(),
+        ));
+    }
+    let target = PathBuf::from(target_path);
+    if !target.is_absolute() {
+        return Err(AppError::Message(
+            "保存先は絶対パスで指定してください。".into(),
+        ));
+    }
+    let extension = target
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default();
+    if !matches!(extension.to_ascii_lowercase().as_str(), "txt" | "md") {
+        return Err(AppError::Message(
+            "診断レポートは.txtまたは.mdで保存してください。".into(),
+        ));
+    }
+    target
+        .parent()
+        .filter(|value| value.is_dir())
+        .ok_or_else(|| AppError::Message("保存先フォルダーがありません。".into()))?;
+    let content = if anonymize {
+        anonymize_diagnostic_report(
+            report,
+            workspace_root.as_deref(),
+            phits_root.as_deref(),
+            codex_path.as_deref(),
+        )
+    } else {
+        report
+    };
+    fs::write(&target, content.as_bytes())?;
+    startup_log::append(if anonymize {
+        "an anonymized diagnostic report was saved"
+    } else {
+        "a diagnostic report was saved without anonymization"
+    });
+    Ok(target.to_string_lossy().into_owned())
+}
+
+fn anonymize_diagnostic_report(
+    mut report: String,
+    workspace_root: Option<&str>,
+    phits_root: Option<&str>,
+    codex_path: Option<&str>,
+) -> String {
+    let mut replacements = vec![
+        (workspace_root, "<WORKSPACE>"),
+        (phits_root, "<PHITS_ROOT>"),
+        (codex_path, "<CODEX_CLI>"),
+    ];
+    let environment_replacements = [
+        ("USERPROFILE", "<USERPROFILE>"),
+        ("LOCALAPPDATA", "<LOCALAPPDATA>"),
+        ("APPDATA", "<APPDATA>"),
+        ("CODEX_HOME", "<CODEX_HOME>"),
+        ("HOME", "<HOME>"),
+    ];
+    let environment_values: Vec<_> = environment_replacements
+        .into_iter()
+        .filter_map(|(name, replacement)| env::var(name).ok().map(|value| (value, replacement)))
+        .collect();
+    let mut owned: Vec<(String, &str)> = replacements
+        .drain(..)
+        .filter_map(|(value, replacement)| value.map(|value| (value.to_owned(), replacement)))
+        .chain(environment_values)
+        .filter(|(value, _)| !value.trim().is_empty())
+        .collect();
+    owned.sort_by_key(|(value, _)| std::cmp::Reverse(value.len()));
+    for (value, replacement) in owned {
+        report = replace_path_case_insensitive(&report, &value, replacement);
+        let alternate = if value.contains('\\') {
+            value.replace('\\', "/")
+        } else {
+            value.replace('/', "\\")
+        };
+        report = replace_path_case_insensitive(&report, &alternate, replacement);
+    }
+    report
+}
+
+fn replace_path_case_insensitive(source: &str, value: &str, replacement: &str) -> String {
+    Regex::new(&format!("(?i){}", regex::escape(value)))
+        .map(|pattern| pattern.replace_all(source, replacement).into_owned())
+        .unwrap_or_else(|_| source.to_owned())
 }
 
 pub(crate) struct ResolvedPhitsRoot {
@@ -556,6 +839,16 @@ fn codex_probe_report(
     features: Vec<CodexFeatureStatus>,
     messages: Vec<String>,
 ) -> CodexCompatibilityReport {
+    startup_log::append(match state {
+        CodexCompatibilityState::Compatible => {
+            "Codex compatibility probe completed; state=compatible"
+        }
+        CodexCompatibilityState::Limited => "Codex compatibility probe completed; state=limited",
+        CodexCompatibilityState::Incompatible => {
+            "Codex compatibility probe completed; state=incompatible"
+        }
+        CodexCompatibilityState::Checking => "Codex compatibility probe completed; state=checking",
+    });
     CodexCompatibilityReport {
         state,
         codex_path,
@@ -568,7 +861,8 @@ fn codex_probe_report(
 }
 
 #[tauri::command]
-pub async fn codex_compatibility_probe(force: bool) -> AppResult<CodexCompatibilityReport> {
+pub async fn codex_compatibility_probe() -> AppResult<CodexCompatibilityReport> {
+    startup_log::append("Codex compatibility probe started");
     let Some(executable) = resolve_codex_executable() else {
         return Ok(codex_probe_report(
             CodexCompatibilityState::Incompatible,
@@ -604,16 +898,6 @@ pub async fn codex_compatibility_probe(force: bool) -> AppResult<CodexCompatibil
             vec!["Codex CLIのバージョンを解釈できません。".into()],
         ));
     };
-
-    if !force {
-        let cache = codex_probe_cache().lock().await;
-        if let Some((cached_path, cached_version, report)) = cache.as_ref()
-            && cached_path == &codex_path
-            && cached_version == &version_text
-        {
-            return Ok(report.clone());
-        }
-    }
 
     if version < VERIFIED_CODEX_VERSION {
         return Ok(codex_probe_report(
@@ -671,22 +955,13 @@ pub async fn codex_compatibility_probe(force: bool) -> AppResult<CodexCompatibil
     let mut files = HashMap::new();
     collect_schema_files(temporary.path(), &mut files)?;
     let (state, features, messages) = evaluate_codex_schema_inventory(&files)?;
-    let report = codex_probe_report(
+    Ok(codex_probe_report(
         state,
         Some(codex_path),
         Some(version_text),
         features,
         messages,
-    );
-    if report.state != CodexCompatibilityState::Incompatible {
-        let mut cache = codex_probe_cache().lock().await;
-        *cache = Some((
-            report.codex_path.clone().unwrap_or_default(),
-            report.codex_version.clone().unwrap_or_default(),
-            report.clone(),
-        ));
-    }
-    Ok(report)
+    ))
 }
 
 pub(crate) fn resolve_codex_executable() -> Option<PathBuf> {
@@ -767,6 +1042,40 @@ mod tests {
     #[test]
     fn extracts_codex_semver_from_cli_output() {
         assert_eq!(parse_semver("codex-cli 0.153.1"), Some((0, 153, 1)));
+    }
+
+    #[test]
+    fn anonymizes_workspace_and_profile_paths() {
+        let workspace = r"C:\Users\researcher\project";
+        let report = format!("workspace={workspace}\nfile={workspace}\\input.inp");
+        let redacted = anonymize_diagnostic_report(report, Some(workspace), None, None);
+        assert!(!redacted.contains(workspace));
+        assert!(redacted.contains("<WORKSPACE>"));
+    }
+
+    #[test]
+    fn normalized_prefix_requires_a_path_boundary() {
+        assert!(path_is_within_normalized(
+            r"c:\users\name\onedrive\project",
+            r"c:\users\name\onedrive"
+        ));
+        assert!(!path_is_within_normalized(
+            r"c:\users\name\onedrive-old",
+            r"c:\users\name\onedrive"
+        ));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn extracts_windows_volume_roots() {
+        assert_eq!(
+            windows_volume_root(Path::new(r"D:\research\case")),
+            Some(r"D:\".into())
+        );
+        assert_eq!(
+            windows_volume_root(Path::new(r"\\server\share\case")),
+            Some(r"\\server\share\".into())
+        );
     }
 
     fn pinned_codex_schema_inventory() -> HashMap<String, PathBuf> {

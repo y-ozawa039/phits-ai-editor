@@ -108,6 +108,21 @@ setup failure offers an explicit, confirmed App Server
 `windowsSandbox/setupStart` action followed by automatic re-diagnosis. The
 editor never automatically changes access rules, ownership, or sandbox mode.
 
+After a workspace opens, a non-recursive check reports drive and file-system
+type, UNC paths, reparse points, the read-only attribute, path length, and
+OneDrive scope. Results remain only in the current process and are not cached
+in the workspace or settings. Saved results from Codex schema and sandbox
+functional probes are likewise never reused for availability decisions. Only
+simultaneous requests share the operation that is already in progress.
+
+The startup log is size-limited under AppData with one rotated generation. It
+records startup, basic diagnostic, and Codex-connection stages and failure
+categories, but not workspace paths, input contents, or credentials. A
+diagnostic report is generated only when the user saves one. Its save dialog
+defaults to redacting known local paths and also offers an explicit path-preserving
+option. Report actions stay out of the compact runtime panel and are opened from
+warnings or the Help menu.
+
 App Server `fileChange` and diff events identify real edits. Before a change,
 the backend validates paths and records before snapshots. After completion it
 records after snapshots and emits a reviewable multi-file history group. The UI

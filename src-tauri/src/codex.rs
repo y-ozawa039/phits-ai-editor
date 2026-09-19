@@ -2076,28 +2076,29 @@ pub async fn codex_sandbox_probe(
     workspace_root: String,
 ) -> AppResult<CodexSandboxProbeReport> {
     let workspace = canonical_workspace(&workspace_root)?;
-    let compatibility = match codex_compatibility_probe(false).await {
-        Ok(report) => report,
-        Err(error) => {
-            return Ok(unavailable_sandbox_report(
-                &workspace,
-                short_probe_error(error),
-            ));
-        }
-    };
-
     let existing = connection_slot().lock().await.clone();
     let (connection, temporary) = match existing {
         Some(connection) if connection.workspace_root == workspace => (connection, false),
-        _ => match start_connection(app, workspace.clone(), compatibility).await {
-            Ok(connection) => (connection, true),
-            Err(error) => {
-                return Ok(unavailable_sandbox_report(
-                    &workspace,
-                    short_probe_error(error),
-                ));
+        _ => {
+            let compatibility = match codex_compatibility_probe().await {
+                Ok(report) => report,
+                Err(error) => {
+                    return Ok(unavailable_sandbox_report(
+                        &workspace,
+                        short_probe_error(error),
+                    ));
+                }
+            };
+            match start_connection(app, workspace.clone(), compatibility).await {
+                Ok(connection) => (connection, true),
+                Err(error) => {
+                    return Ok(unavailable_sandbox_report(
+                        &workspace,
+                        short_probe_error(error),
+                    ));
+                }
             }
-        },
+        }
     };
 
     let mut checks = vec![sandbox_check(
@@ -2313,14 +2314,16 @@ pub async fn codex_sandbox_setup(
         ));
     }
     let workspace = canonical_workspace(&workspace_root)?;
-    let compatibility = codex_compatibility_probe(false).await?;
     let existing = connection_slot().lock().await.clone();
     let (connection, temporary) = match existing {
         Some(connection) if connection.workspace_root == workspace => (connection, false),
-        _ => (
-            start_connection(app, workspace.clone(), compatibility).await?,
-            true,
-        ),
+        _ => {
+            let compatibility = codex_compatibility_probe().await?;
+            (
+                start_connection(app, workspace.clone(), compatibility).await?,
+                true,
+            )
+        }
     };
 
     let (sender, receiver) = oneshot::channel();
@@ -2392,9 +2395,24 @@ pub async fn codex_connect(
     app: AppHandle,
     workspace_root: String,
 ) -> AppResult<CodexConnectResult> {
+    let result = codex_connect_inner(app, workspace_root).await;
+    match &result {
+        Ok(_) => crate::startup_log::append("Codex App Server connection completed"),
+        Err(error) => crate::startup_log::append(&format!(
+            "Codex App Server connection failed; category={}",
+            codex_connection_failure_category(&error.to_string())
+        )),
+    }
+    result
+}
+
+async fn codex_connect_inner(
+    app: AppHandle,
+    workspace_root: String,
+) -> AppResult<CodexConnectResult> {
     let workspace = canonical_workspace(&workspace_root)?;
     let phits_agent_setup = inspect_phits_agent_setup(&app, &workspace);
-    let compatibility = codex_compatibility_probe(false).await?;
+    let compatibility = codex_compatibility_probe().await?;
     require_codex_feature(&compatibility, CodexFeatureId::Chat, "chat")?;
     let connection = if let Some(connection) = connection_slot().lock().await.clone() {
         ensure_workspace(&connection, &workspace_root).await?;
@@ -2430,6 +2448,40 @@ pub async fn codex_connect(
         compatibility: connection.compatibility.clone(),
         phits_agent_setup,
     })
+}
+
+fn codex_connection_failure_category(message: &str) -> &'static str {
+    let message = message.to_ascii_lowercase();
+    if message.contains("authentication")
+        || message.contains("unauthorized")
+        || message.contains("not logged in")
+        || message.contains("401")
+        || message.contains("token")
+    {
+        "authentication"
+    } else if message.contains("proxy")
+        || message.contains("certificate")
+        || message.contains("tls")
+        || message.contains("dns")
+        || message.contains("network")
+    {
+        "network"
+    } else if message.contains("schema") || message.contains("互換") {
+        "compatibility"
+    } else if message.contains("failed to start")
+        || message.contains("cannot find")
+        || message.contains("見つかりません")
+        || message.contains("起動できません")
+    {
+        "cli-start"
+    } else if message.contains("app server")
+        || message.contains("initialize")
+        || message.contains("json-rpc")
+    {
+        "app-server"
+    } else {
+        "unknown"
+    }
 }
 
 pub async fn disconnect_internal() -> AppResult<()> {
@@ -3600,6 +3652,22 @@ mod tests {
             .is_some()
         );
         assert!(prohibited_command_reason(&json!({ "command": "cargo test" }), None).is_none());
+    }
+
+    #[test]
+    fn classifies_connection_failures_without_logging_details() {
+        assert_eq!(
+            codex_connection_failure_category("401 Unauthorized"),
+            "authentication"
+        );
+        assert_eq!(
+            codex_connection_failure_category("TLS certificate failed"),
+            "network"
+        );
+        assert_eq!(
+            codex_connection_failure_category("Failed to start Codex App Server"),
+            "cli-start"
+        );
     }
 
     #[test]

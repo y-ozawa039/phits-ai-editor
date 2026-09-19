@@ -101,6 +101,7 @@ pub struct RuntimeDiagnostics {
     pub codex_path: Option<String>,
     pub codex_version: Option<String>,
     pub codex_compatible: bool,
+    pub startup_log: Option<String>,
     pub messages: Vec<String>,
 }
 
@@ -264,6 +265,42 @@ pub struct CodexCompatibilityReport {
     pub baseline_version: String,
     pub checked_at: String,
     pub features: Vec<CodexFeatureStatus>,
+    pub messages: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum WorkspaceEnvironmentState {
+    Normal,
+    Attention,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum WorkspaceDriveKind {
+    Fixed,
+    Removable,
+    Network,
+    Optical,
+    RamDisk,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceEnvironmentReport {
+    pub state: WorkspaceEnvironmentState,
+    pub workspace_root: String,
+    pub checked_at: String,
+    pub drive_kind: WorkspaceDriveKind,
+    pub file_system: Option<String>,
+    pub is_unc: bool,
+    pub is_reparse_point: bool,
+    pub read_only: bool,
+    pub path_length: usize,
+    pub long_path_risk: bool,
+    pub sync_provider: Option<String>,
     pub messages: Vec<String>,
 }
 

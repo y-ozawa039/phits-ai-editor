@@ -1,6 +1,6 @@
 [package]
 name = "phits-ai-editor"
-version = "0.0.5-alpha"
+version = "0.0.6-alpha"
 description = "A PHITS editor with Codex integration"
 authors = ["Yohei Ozawa"]
 license = "Apache-2.0"
@@ -31,7 +31,7 @@ dunce = "1"
 tempfile = "3"
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.60", features = ["Win32_Foundation", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Threading"] }
+windows-sys = { version = "0.60", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Threading", "Win32_System_WindowsProgramming"] }
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-single-instance = "2"

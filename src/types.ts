@@ -42,6 +42,7 @@ export interface RuntimeDiagnostics {
   codexPath: string | null;
   codexVersion: string | null;
   codexCompatible: boolean;
+  startupLog?: string | null;
   messages: string[];
 }
 
@@ -114,6 +115,24 @@ export interface CodexCompatibilityReport {
   baselineVersion: string;
   checkedAt: string;
   features: CodexFeatureStatus[];
+  messages: string[];
+}
+
+export type WorkspaceEnvironmentState = "normal" | "attention" | "unknown";
+export type WorkspaceDriveKind = "fixed" | "removable" | "network" | "optical" | "ramDisk" | "unknown";
+
+export interface WorkspaceEnvironmentReport {
+  state: WorkspaceEnvironmentState;
+  workspaceRoot: string;
+  checkedAt: string;
+  driveKind: WorkspaceDriveKind;
+  fileSystem: string | null;
+  isUnc: boolean;
+  isReparsePoint: boolean;
+  readOnly: boolean;
+  pathLength: number;
+  longPathRisk: boolean;
+  syncProvider: string | null;
   messages: string[];
 }
 

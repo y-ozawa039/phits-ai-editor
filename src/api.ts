@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { ApprovalDecision, ApprovalMode, ApprovalRequest, CodexChangeGroupV1, CodexChangeHistoryEntryV1, CodexCompatibilityReport, CodexConnectResult, CodexHistoryChangeInput, CodexHistoryPreview, CodexSandboxProbeReport, CodexSandboxSetupResult, DocumentData, EditorContextV1, PhitsAgentSetupStatus, PhitsAppSettings, RuntimeDiagnostics, StartupOpenRequest, UtilityKind, WorkspaceInfo } from "./types";
+import type { ApprovalDecision, ApprovalMode, ApprovalRequest, CodexChangeGroupV1, CodexChangeHistoryEntryV1, CodexCompatibilityReport, CodexConnectResult, CodexHistoryChangeInput, CodexHistoryPreview, CodexSandboxProbeReport, CodexSandboxSetupResult, DocumentData, EditorContextV1, PhitsAgentSetupStatus, PhitsAppSettings, RuntimeDiagnostics, StartupOpenRequest, UtilityKind, WorkspaceEnvironmentReport, WorkspaceInfo } from "./types";
 
 export const api = {
   openWorkspace: (path: string, restoreRunState = true, preferredInput?: string) => invoke<WorkspaceInfo>("workspace_open", { path, restoreRunState, preferredInput }),
@@ -9,7 +9,9 @@ export const api = {
   saveDocument: (workspaceRoot: string, document: DocumentData, content: string) => invoke<DocumentData>("document_save", { workspaceRoot, document, content }),
   saveDocumentAs: (workspaceRoot: string, targetPath: string, content: string, sourceDocument?: DocumentData | null) => invoke<DocumentData>("document_save_as", { workspaceRoot, targetPath, content, sourceDocument: sourceDocument ?? null }),
   diagnostics: (workspaceRoot?: string) => invoke<RuntimeDiagnostics>("runtime_diagnose", { workspaceRoot }),
-  codexCompatibilityProbe: (force = false) => invoke<CodexCompatibilityReport>("codex_compatibility_probe", { force }),
+  workspaceEnvironmentDiagnostics: (workspaceRoot: string) => invoke<WorkspaceEnvironmentReport>("workspace_environment_diagnose", { workspaceRoot }),
+  saveDiagnosticReport: (targetPath: string, report: string, anonymize: boolean, workspaceRoot?: string | null, phitsRoot?: string | null, codexPath?: string | null) => invoke<string>("diagnostic_report_save", { targetPath, report, anonymize, workspaceRoot: workspaceRoot ?? null, phitsRoot: phitsRoot ?? null, codexPath: codexPath ?? null }),
+  codexCompatibilityProbe: () => invoke<CodexCompatibilityReport>("codex_compatibility_probe"),
   codexSandboxProbe: (workspaceRoot: string) => invoke<CodexSandboxProbeReport>("codex_sandbox_probe", { workspaceRoot }),
   codexSandboxSetup: (workspaceRoot: string, mode: string) => invoke<CodexSandboxSetupResult>("codex_sandbox_setup", { workspaceRoot, mode }),
   getPhitsSettings: () => invoke<PhitsAppSettings>("phits_settings_get"),

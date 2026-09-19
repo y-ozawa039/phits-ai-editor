@@ -52,6 +52,18 @@ describe("CodexPanel", () => {
     expect(onSend).toHaveBeenCalledWith("入力を確認して");
   });
 
+  it("offers the shared diagnostic report dialog only from a problem notice", () => {
+    const onSaveDiagnosticReport = vi.fn();
+    render(<CodexPanel
+      {...baseProps}
+      phitsAgentSetup={{ configured: false, state: "missing", sourcePath: null, message: "設定がありません。", checks: [] }}
+      onSaveDiagnosticReport={onSaveDiagnosticReport}
+    />);
+
+    fireEvent.click(screen.getByRole("button", { name: "診断レポートを保存…" }));
+    expect(onSaveDiagnosticReport).toHaveBeenCalledTimes(1);
+  });
+
   it("explains how to enable chat when no thread is selected", () => {
     render(<CodexPanel {...baseProps} threadId={null} threads={[]} />);
     const input = screen.getByPlaceholderText("[新しいスレッド]をクリックするか、既存スレッドを選択してください");
@@ -256,10 +268,10 @@ describe("CodexPanel", () => {
     expect(onRemoveContext).toHaveBeenCalledWith("selection");
   });
 
-  it("disables connection when the chat protocol is unavailable", () => {
+  it("allows a fresh connection probe when the previous chat protocol check was unavailable", () => {
     render(<CodexPanel {...baseProps} connected={false} threadId={null} chatAvailable={false} />);
-    expect(screen.getByRole("button", { name: "Codexに接続" })).toBeDisabled();
-    expect(screen.getByText(/会話機能に互換性がありません/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Codexに接続" })).toBeEnabled();
+    expect(screen.getByText(/接続時にもう一度検査します/)).toBeInTheDocument();
   });
 
   it("falls back to consultation-only when editing or approvals are unavailable", () => {

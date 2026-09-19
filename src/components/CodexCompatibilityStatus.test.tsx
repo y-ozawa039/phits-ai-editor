@@ -130,4 +130,30 @@ describe("CodexCompatibilityStatus", () => {
     expect(workspaceEditing).toHaveTextContent("利用不可");
     expect(workspaceEditing).toHaveAttribute("title", expect.stringContaining("子階層への作成: 子階層は利用不可"));
   });
+
+  it("shows storage context without adding report actions to the compact panel", () => {
+    const { container } = render(<CodexCompatibilityStatus
+      report={report}
+      busy={false}
+      workspaceEnvironment={{
+        state: "attention",
+        workspaceRoot: "C:\\Users\\name\\OneDrive\\case",
+        checkedAt: "2026-09-19T00:00:00Z",
+        driveKind: "fixed",
+        fileSystem: "NTFS",
+        isUnc: false,
+        isReparsePoint: true,
+        readOnly: false,
+        pathLength: 31,
+        longPathRisk: false,
+        syncProvider: "OneDrive",
+        messages: ["同期対象です。"],
+      }}
+    />);
+    const panel = within(container);
+    fireEvent.click(panel.getByRole("button", { name: "一部機能のみ利用可能" }));
+    expect(panel.getByText("保存場所")).toBeInTheDocument();
+    expect(panel.getByText("ローカル / NTFS")).toBeInTheDocument();
+    expect(panel.queryByRole("button", { name: /診断レポート/ })).not.toBeInTheDocument();
+  });
 });

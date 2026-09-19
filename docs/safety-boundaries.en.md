@@ -73,6 +73,12 @@ support, or Codex integration is customized.
 
 - Never package `.integration`, `.phits-editor`, user settings, logs, credentials,
   PHITS files, or research data.
+- Do not cache diagnostic results in workspaces or settings, and never reuse a
+  saved diagnostic report or startup log to decide availability. Startup logs
+  must not contain workspace paths, input contents, or credentials.
+- Diagnostic-report redaction replaces known local paths, but error text and
+  folder names may still contain personal information. Users must review the
+  contents before sharing them externally.
 - A release executable and installer must be built from the commit carrying the
   matching version/tag. Publish hashes and do not replace assets under an
   existing tag.

@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import type { CodexCompatibilityReport, CodexFeatureId, CodexSandboxCheckId, CodexSandboxProbeReport, PhitsAgentSetupStatus } from "../types";
+import type { CodexCompatibilityReport, CodexFeatureId, CodexSandboxCheckId, CodexSandboxProbeReport, PhitsAgentSetupStatus, WorkspaceDriveKind, WorkspaceEnvironmentReport } from "../types";
 import { Icon } from "./Icons";
 
 const FEATURE_LABELS: Record<CodexFeatureId, string> = {
@@ -24,6 +24,15 @@ const WORKSPACE_EDIT_CHECKS = new Set<CodexSandboxCheckId>([
   "existingFileWrite",
   "childDirectoryWrite",
 ]);
+
+const DRIVE_LABELS: Record<WorkspaceDriveKind, string> = {
+  fixed: "ローカル",
+  removable: "取り外し可能",
+  network: "ネットワーク",
+  optical: "光学ドライブ",
+  ramDisk: "RAMディスク",
+  unknown: "種別不明",
+};
 
 function overallLabel(report: CodexCompatibilityReport) {
   if (report.state === "compatible") return "互換性確認済み";
@@ -83,12 +92,14 @@ export function CodexCompatibilityStatus({
   sandbox = null,
   sandboxBusy = false,
   setup = null,
+  workspaceEnvironment = null,
 }: {
   report: CodexCompatibilityReport | null;
   busy: boolean;
   sandbox?: CodexSandboxProbeReport | null;
   sandboxBusy?: boolean;
   setup?: PhitsAgentSetupStatus | null;
+  workspaceEnvironment?: WorkspaceEnvironmentReport | null;
 }) {
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();
@@ -144,6 +155,11 @@ export function CodexCompatibilityStatus({
         <small>{sandboxStateLabel(workspaceEditState)}</small>
       </div>}
       {workspacePermissionCheck && renderSandboxCheck(workspacePermissionCheck)}
+      {workspaceEnvironment && <div className="codex-feature-row" title={workspaceEnvironment.messages.join("\n") || "保存場所に明確な注意事項はありません。"}>
+        <span className={`diagnostic-dot ${workspaceEnvironment.state === "normal" ? "ok" : workspaceEnvironment.state === "attention" ? "warn" : "muted"}`} />
+        <span>保存場所</span>
+        <small>{DRIVE_LABELS[workspaceEnvironment.driveKind]}{workspaceEnvironment.fileSystem ? ` / ${workspaceEnvironment.fileSystem}` : ""}</small>
+      </div>}
       {sandbox && <div className="codex-feature-row" title="Codexが現在使用するSandbox方式">
         <span className="diagnostic-dot" />
         <span>Sandbox方式</span>

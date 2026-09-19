@@ -1,5 +1,5 @@
 import packageMetadata from "../package.json";
-import type { CodexCompatibilityReport, CodexSandboxProbeReport, PhitsAgentSetupStatus, RuntimeDiagnostics } from "./types";
+import type { CodexCompatibilityReport, CodexSandboxProbeReport, PhitsAgentSetupStatus, RuntimeDiagnostics, WorkspaceEnvironmentReport } from "./types";
 
 interface PhitsAgentSetupHelpInput {
   workspaceRoot: string;
@@ -8,6 +8,7 @@ interface PhitsAgentSetupHelpInput {
   compatibility: CodexCompatibilityReport | null;
   sandbox: CodexSandboxProbeReport | null;
   connectionError: string | null;
+  workspaceEnvironment?: WorkspaceEnvironmentReport | null;
 }
 
 const setupStateLabels = {
@@ -62,6 +63,19 @@ export function buildPhitsAgentSetupHelp(input: PhitsAgentSetupHelpInput): strin
   const sandboxLines = input.sandbox?.checks.map((check) =>
     `- ${sandboxCheckLabels[check.id]}: ${sandboxStateLabels[check.state]} (${check.detail})`,
   ) ?? ["- Codex編集環境: 実動作検査なし"];
+  const workspaceEnvironmentLines = input.workspaceEnvironment
+    ? [
+        `- 状態: ${input.workspaceEnvironment.state}`,
+        `- ドライブ種別: ${input.workspaceEnvironment.driveKind}`,
+        `- ファイルシステム: ${input.workspaceEnvironment.fileSystem ?? "不明"}`,
+        `- UNC: ${input.workspaceEnvironment.isUnc ? "はい" : "いいえ"}`,
+        `- 特殊フォルダー: ${input.workspaceEnvironment.isReparsePoint ? "はい" : "いいえ"}`,
+        `- 読み取り専用属性: ${input.workspaceEnvironment.readOnly ? "あり" : "なし"}`,
+        `- パス長: ${input.workspaceEnvironment.pathLength}`,
+        `- 同期サービス: ${input.workspaceEnvironment.syncProvider ?? "検出なし"}`,
+        ...input.workspaceEnvironment.messages.map((message) => `- ${message}`),
+      ]
+    : ["- ワークスペース保存場所: 検査結果なし"];
   const connectionSection = input.connectionError
     ? [
         "Editor内のCodexへ接続できなかったため、ChatGPTデスクトップ版のローカルCodexタスクから調査しています。",
@@ -95,6 +109,9 @@ export function buildPhitsAgentSetupHelp(input: PhitsAgentSetupHelpInput): strin
     ...(input.sandbox?.allowedImplementations.length
       ? [`- 組織ポリシーで許可されたSandbox方式: ${input.sandbox.allowedImplementations.join(", ")}`]
       : []),
+    "",
+    "ワークスペース保存場所:",
+    ...workspaceEnvironmentLines,
     "",
     "依頼:",
     "1. 上記結果から考えられる原因を、確定事項と推測に分けて説明してください。",

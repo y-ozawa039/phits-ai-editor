@@ -134,7 +134,7 @@ pnpm tauri build --bundles nsis
 pnpm release:package:windows
 ```
 
-draftは`src-tauri/target/release/release-candidate/v0.0.5-alpha/`以下へ出力され、
+draftは`src-tauri/target/release/release-candidate/v0.0.6-alpha/`以下へ出力され、
 Gitの追跡対象外です。
 
 ## PHITSの検出

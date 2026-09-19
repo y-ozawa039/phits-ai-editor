@@ -10,11 +10,11 @@ Codex-assisted input editing in one interface.
 The current alpha release supports Windows 11 x64.
 
 - **Regular use (recommended):**
-  [Download the installer](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.5-alpha/PHITS-AI-Editor-v0.0.5-alpha-windows-x64-setup.exe)
+  [Download the installer](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.6-alpha/PHITS-AI-Editor-v0.0.6-alpha-windows-x64-setup.exe)
 - **Evaluation, portable use, or comparing versions:**
-  [Download the portable ZIP](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.5-alpha/PHITS-AI-Editor-v0.0.5-alpha-windows-x64-portable.zip)
+  [Download the portable ZIP](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.6-alpha/PHITS-AI-Editor-v0.0.6-alpha-windows-x64-portable.zip)
 - **Verify after downloading:**
-  [SHA-256 checksums](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.5-alpha/SHA256SUMS.txt)
+  [SHA-256 checksums](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.6-alpha/SHA256SUMS.txt)
 
 | Purpose | Choose | Why |
 |---|---|---|
@@ -71,7 +71,7 @@ for the detailed checks and troubleshooting steps.
 
 ## System requirements
 
-- Windows 11 x64 (distribution target for `0.0.5-alpha`)
+- Windows 11 x64 (distribution target for `0.0.6-alpha`)
 - A PHITS runtime environment when running input files (automatically detected
   from `PHITSPATH` or selected in Settings)
 - Codex CLI 0.153.1 or later when using AI assistance
@@ -121,7 +121,7 @@ This is not an official product developed, approved, sponsored, endorsed, or
 warranted by JAEA, the PHITS development team, OpenAI, or the author's
 affiliated institution.
 
-## Windows alpha release (`0.0.5-alpha`)
+## Windows alpha release (`0.0.6-alpha`)
 
 Implemented features include:
 
@@ -140,11 +140,12 @@ Implemented features include:
 - integration with ANGEL, DCHAIN, and PHIG-3D
 - Codex chat, thread resume/rename/delete, model selection, and compatibility
   status for available features
-- staged diagnostics for the PHITS Codex setup and editing environment, covering
-  command execution, file creation at the workspace root, modification of an
-  editor-created file, creation below a child folder, and access rules; details
+- staged diagnostics for the PHITS Codex setup, workspace storage, and editing
+  environment, covering drive and file-system type, long and synchronized paths,
+  command execution, workspace writes, and access rules; details
   include reasons and the actual sandbox implementation, with an explicit
-  sandbox-setup retry and an AI troubleshooting prompt based on the results
+  sandbox-setup retry, an AI troubleshooting prompt, and an anonymizable
+  diagnostic report based on the results
 - Codex editing assistance using the current file, selection, and unsaved text,
   with configurable approval behavior
 - four approval levels: Confirm first, Consultation only, Confirm when needed,
@@ -169,5 +170,5 @@ development environment. See the
 Ubuntu support and Linux packages are possible future ports and are not
 currently available.
 
-See the [release notes](docs/release-notes-v0.0.5-alpha.en.md) and
-[known issues](docs/known-issues-v0.0.5-alpha.en.md).
+See the [release notes](docs/release-notes-v0.0.6-alpha.en.md) and
+[known issues](docs/known-issues-v0.0.6-alpha.en.md).
