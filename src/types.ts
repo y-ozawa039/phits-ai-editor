@@ -148,6 +148,7 @@ export interface CodexSandboxCheck {
 
 export interface CodexSandboxProbeReport {
   state: CodexSandboxProbeState;
+  editingAvailable?: boolean;
   workspaceRoot: string;
   checkedAt: string;
   readiness: string | null;
@@ -155,6 +156,7 @@ export interface CodexSandboxProbeReport {
   allowedImplementations: string[];
   failureCategory?: CodexSandboxFailureCategory | null;
   setupRecommended?: boolean;
+  writePolicy?: "explicitRoot" | "workspaceCwd" | null;
   checks: CodexSandboxCheck[];
   messages: string[];
   supportPrompt: string;

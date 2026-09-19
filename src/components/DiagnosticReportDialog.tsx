@@ -39,7 +39,7 @@ export function DiagnosticReportDialog({
           <span><strong>パスを伏せずに保存</strong><small>実際のフォルダー構成を残します。</small></span>
         </label>
       </fieldset>
-      <p className="diagnostic-privacy-note">既知のローカルパスを置き換えますが、エラーメッセージやフォルダー名に個人情報が含まれる場合があります。外部へ共有する場合は内容をよくご確認ください。</p>
+      <p className="diagnostic-privacy-note">既知のパスに加え、検出できたローカル絶対パスも置き換えます。相対フォルダー名や自由記述には個人情報が残る場合があるため、外部へ共有する場合は内容をよくご確認ください。</p>
       <div className="diagnostic-dialog-actions">
         <button type="button" className="secondary-button" onClick={onCancel}>キャンセル</button>
         <button type="button" className="primary-button" onClick={() => onSave(anonymize)}>保存…</button>

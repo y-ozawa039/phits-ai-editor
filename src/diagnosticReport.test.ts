@@ -4,7 +4,7 @@ import { buildDiagnosticReport } from "./diagnosticReport";
 describe("buildDiagnosticReport", () => {
   it("marks reports as snapshots that are not reused", () => {
     const report = buildDiagnosticReport({
-      appVersion: "0.0.6-alpha",
+      appVersion: "0.0.7-alpha",
       workspaceRoot: "C:\\research",
       runtime: null,
       compatibility: null,

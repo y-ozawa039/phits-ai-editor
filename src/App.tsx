@@ -11,6 +11,7 @@ import { classifyCodexConnectionFailure, type CodexConnectionFailureCategory } f
 import { boundedEditorContext, defaultContextOptions, visibleHistoryText } from "./codexContext";
 import { hasDocumentRevisionConflict } from "./codexRevision";
 import { codexTurnId, isCodexTurnCompleted, isCodexTurnStarted } from "./codexEvents";
+import { sandboxEditingAvailable, type CodexSandboxSetupMode } from "./codexSandbox";
 import { CodexPanel, type ChatMessage, type ComposerDraftRequest } from "./components/CodexPanel";
 import { CodexCompatibilityStatus } from "./components/CodexCompatibilityStatus";
 import { DiagnosticInfoDialog } from "./components/DiagnosticInfoDialog";
@@ -362,6 +363,11 @@ export default function App() {
       : null
   ), [codexCompatibility, codexConnectionError]);
 
+  const sandboxWritableAvailable = useMemo(
+    () => sandboxEditingAvailable(codexSandboxReport),
+    [codexSandboxReport],
+  );
+
   const codexTroubleshootingPrompt = useMemo(() => {
     if (!workspace || (
       !codexUnavailableReason
@@ -514,15 +520,8 @@ export default function App() {
     }
   }, [notify]);
 
-  const setupCodexSandbox = useCallback(async () => {
+  const setupCodexSandbox = useCallback(async (mode: CodexSandboxSetupMode) => {
     if (!workspace || codexSandboxSetupBusy) return;
-    const configuredMode = codexSandboxReport?.implementation;
-    const allowedModes = codexSandboxReport?.allowedImplementations ?? [];
-    const mode = configuredMode === "elevated" || configuredMode === "unelevated"
-      ? configuredMode
-      : allowedModes.includes("elevated") || allowedModes.length === 0
-        ? "elevated"
-        : "unelevated";
     const warning = mode === "elevated"
       ? "CodexのSandbox設定を再構築します。Windowsの確認画面や管理者権限の確認が表示される場合があります。研究ファイルのアクセス許可をエディタが直接変更する操作ではありません。続行しますか？"
       : "CodexのSandbox設定を再確認します。完了後、このワークスペースの書込み検査をやり直します。続行しますか？";
@@ -542,7 +541,7 @@ export default function App() {
     } finally {
       setCodexSandboxSetupBusy(false);
     }
-  }, [codexSandboxReport, codexSandboxSetupBusy, notify, probeCodexSandbox, workspace]);
+  }, [codexSandboxSetupBusy, notify, probeCodexSandbox, workspace]);
 
   const updateDiagnostics = useCallback(async (root?: string) => {
     if (!isTauri()) return;
@@ -1213,6 +1212,7 @@ export default function App() {
     if (!workspace) { notify("Codexを接続するワークスペースを先に開いてください。"); return; }
     try {
       setCodexBusy(true);
+      setCodexSandboxReport(null);
       const connection = await api.codexConnect(workspace.root);
       const available = connection.models;
       const selected = available.find((entry) => entry.isDefault) ?? available[0];
@@ -1240,7 +1240,7 @@ export default function App() {
 
   const disconnectCodex = useCallback(async () => {
     try { await api.codexDisconnect(); } catch { /* safe local disconnected state */ }
-    setCodexConnected(false); setThreadId(null); setTurnId(null); setCodexBusy(false); setApprovals([]); setDiffReview(null); setCodexConnectionError(null); setCodexConnectionCategory(null); fileChangeBasesRef.current.clear(); turnHistoryIdsRef.current.clear(); setSessionApprovalActive(false);
+    setCodexConnected(false); setCodexSandboxReport(null); setThreadId(null); setTurnId(null); setCodexBusy(false); setApprovals([]); setDiffReview(null); setCodexConnectionError(null); setCodexConnectionCategory(null); fileChangeBasesRef.current.clear(); turnHistoryIdsRef.current.clear(); setSessionApprovalActive(false);
   }, []);
 
   useEffect(() => {
@@ -1342,7 +1342,8 @@ export default function App() {
     let contextEntry = activeDocument;
     let forceReadOnly = approvalMode === "consultationOnly"
       || !codexFeatureAvailable(codexCompatibility, "fileEditing")
-      || !codexFeatureAvailable(codexCompatibility, "approvals");
+      || !codexFeatureAvailable(codexCompatibility, "approvals")
+      || !sandboxWritableAvailable;
     if (activeDocument?.dirty && !forceReadOnly) {
       const saveBeforeSend = window.confirm("この未保存ファイルを保存し、Codexが編集できる状態で送信しますか？\n\nOK: 保存して送信 / キャンセル: 次の選択へ");
       if (saveBeforeSend) {
@@ -1402,7 +1403,7 @@ export default function App() {
       return false;
     }
     return true;
-  }, [activeDocument, approvalMode, buildEditorContext, codexCompatibility, model, notify, reasoning, saveDocumentAs, threadId, workspace]);
+  }, [activeDocument, approvalMode, buildEditorContext, codexCompatibility, model, notify, reasoning, sandboxWritableAvailable, saveDocumentAs, threadId, workspace]);
 
   const interruptCodex = useCallback(async () => {
     if (!threadId || !turnId) { notify("CodexのターンIDを待っています。もう一度中断してください。"); return; }
@@ -1939,7 +1940,7 @@ export default function App() {
           <OutputPanel lines={output} collapsed={outputCollapsed} height={outputHeight} onToggle={() => setOutputCollapsed((value) => !value)} onClear={() => setOutput([])} onResizeStart={startHorizontalResize}/>
         </main>
 
-        <CodexPanel open={codexOpen} width={codexWidth} fontSize={codexFontSize} connected={codexConnected} connectionError={codexUnavailableReason} troubleshootingPrompt={codexTroubleshootingPrompt} busy={codexBusy} models={models} model={model} reasoning={reasoning} approvalMode={approvalMode} sessionApprovalActive={sessionApprovalActive} threadId={threadId} threads={threadLinks} chatAvailable={codexFeatureAvailable(codexCompatibility, "chat")} threadsAvailable={codexFeatureAvailable(codexCompatibility, "threads")} writableAvailable={codexFeatureAvailable(codexCompatibility, "fileEditing") && codexFeatureAvailable(codexCompatibility, "approvals")} phitsAgentSetup={phitsAgentSetup} sandboxReport={codexSandboxReport} workspaceEnvironment={workspaceEnvironment} sandboxBusy={codexSandboxBusy} sandboxSetupBusy={codexSandboxSetupBusy} messages={messages} approval={currentApproval} approvalCount={approvals.length} approvalCanAccept={approvalCanAccept} contextChips={contextChips} draftRequest={draftRequest} onToggle={() => setCodexOpen((value) => !value)} onResizeStart={startVerticalResize} onResizeReset={() => setCodexPanelRatio(DEFAULT_CODEX_PANEL_RATIO)} onOpenDiff={() => { if (!currentApproval) return; setDiffReview((current) => current?.requestKey === approvalRequestKey(currentApproval) ? { ...current, selectedFileIndex: 0 } : current); }} onConnect={connectCodex} onDisconnect={disconnectCodex} onModelChange={setModel} onReasoningChange={setReasoning} onApprovalModeChange={setApprovalMode} onNewThread={startThread} onResumeThread={resumeThread} onRenameThread={renameThread} onDeleteThread={deleteThread} onRemoveContext={removeContext} onSend={sendCodex} onInterrupt={interruptCodex} onApproval={resolveApproval} onSandboxSetup={() => void setupCodexSandbox()} onSaveDiagnosticReport={() => setDiagnosticDialog("report")}/>
+        <CodexPanel open={codexOpen} width={codexWidth} fontSize={codexFontSize} connected={codexConnected} connectionError={codexUnavailableReason} troubleshootingPrompt={codexTroubleshootingPrompt} busy={codexBusy} models={models} model={model} reasoning={reasoning} approvalMode={approvalMode} sessionApprovalActive={sessionApprovalActive} threadId={threadId} threads={threadLinks} chatAvailable={codexFeatureAvailable(codexCompatibility, "chat")} threadsAvailable={codexFeatureAvailable(codexCompatibility, "threads")} writableAvailable={codexFeatureAvailable(codexCompatibility, "fileEditing") && codexFeatureAvailable(codexCompatibility, "approvals") && sandboxWritableAvailable} phitsAgentSetup={phitsAgentSetup} sandboxReport={codexSandboxReport} workspaceEnvironment={workspaceEnvironment} sandboxBusy={codexSandboxBusy} sandboxSetupBusy={codexSandboxSetupBusy} messages={messages} approval={currentApproval} approvalCount={approvals.length} approvalCanAccept={approvalCanAccept} contextChips={contextChips} draftRequest={draftRequest} onToggle={() => setCodexOpen((value) => !value)} onResizeStart={startVerticalResize} onResizeReset={() => setCodexPanelRatio(DEFAULT_CODEX_PANEL_RATIO)} onOpenDiff={() => { if (!currentApproval) return; setDiffReview((current) => current?.requestKey === approvalRequestKey(currentApproval) ? { ...current, selectedFileIndex: 0 } : current); }} onConnect={connectCodex} onDisconnect={disconnectCodex} onModelChange={setModel} onReasoningChange={setReasoning} onApprovalModeChange={setApprovalMode} onNewThread={startThread} onResumeThread={resumeThread} onRenameThread={renameThread} onDeleteThread={deleteThread} onRemoveContext={removeContext} onSend={sendCodex} onInterrupt={interruptCodex} onApproval={resolveApproval} onSandboxSetup={(mode) => void setupCodexSandbox(mode)} onSaveDiagnosticReport={() => setDiagnosticDialog("report")}/>
       </div>
 
       {settingsSection && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsSection(null); }}>

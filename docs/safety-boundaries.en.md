@@ -49,10 +49,18 @@ support, or Codex integration is customized.
   are rejected by Rust.
 - Session approvals expire when the App Server connection ends.
 - Access-rule diagnostics for the Codex editing environment are read-only. A
-  sandbox setup retry is offered only for a classified setup failure and uses
-  the official App Server request after explicit user action and confirmation.
-  It never recursively resets access rules, takes ownership, disables the
-  sandbox, or switches to full access.
+  sandbox setup retry is offered only for a classified setup failure or when
+  live writes fail under the `unelevated` implementation. It uses the official
+  App Server request after explicit user action and confirmation, recommends
+  `elevated` when permitted, and also lets the user choose `unelevated`. It never
+  recursively resets access rules, takes ownership, disables the sandbox, or
+  switches to full access.
+- Codex editing modes require both compatible schemas and a successful live
+  check of command execution, root creation, existing-file-equivalent changes,
+  and child-folder creation in the current workspace. The successful
+  `workspaceWrite` policy is reused for normal turns in that connection. If it
+  cannot be verified, the Rust boundary also restricts the connection to
+  consultation-only turns.
 - Separate entry to an MCP tool from permission to run PHITS. Only a gate matched
   to the `phits_ai_editor/run_phits` item and arguments in the same turn is
   forwarded to the editor's run review. Runner checks and approval modes still
@@ -76,9 +84,10 @@ support, or Codex integration is customized.
 - Do not cache diagnostic results in workspaces or settings, and never reuse a
   saved diagnostic report or startup log to decide availability. Startup logs
   must not contain workspace paths, input contents, or credentials.
-- Diagnostic-report redaction replaces known local paths, but error text and
-  folder names may still contain personal information. Users must review the
-  contents before sharing them externally.
+- Diagnostic-report redaction replaces known local paths, known paths altered
+  by inserted whitespace, and other detectable local absolute paths. Relative
+  folder names or free-form text can still contain personal information, so
+  users must review the contents before sharing them externally.
 - A release executable and installer must be built from the commit carrying the
   matching version/tag. Publish hashes and do not replace assets under an
   existing tag.

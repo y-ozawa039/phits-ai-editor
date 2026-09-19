@@ -443,20 +443,42 @@ fn anonymize_diagnostic_report(
     owned.sort_by_key(|(value, _)| std::cmp::Reverse(value.len()));
     for (value, replacement) in owned {
         report = replace_path_case_insensitive(&report, &value, replacement);
+        report = replace_path_with_inserted_whitespace(&report, &value, replacement);
         let alternate = if value.contains('\\') {
             value.replace('\\', "/")
         } else {
             value.replace('/', "\\")
         };
         report = replace_path_case_insensitive(&report, &alternate, replacement);
+        report = replace_path_with_inserted_whitespace(&report, &alternate, replacement);
     }
-    report
+    redact_remaining_absolute_paths(&report)
 }
 
 fn replace_path_case_insensitive(source: &str, value: &str, replacement: &str) -> String {
     Regex::new(&format!("(?i){}", regex::escape(value)))
         .map(|pattern| pattern.replace_all(source, replacement).into_owned())
         .unwrap_or_else(|_| source.to_owned())
+}
+
+fn replace_path_with_inserted_whitespace(source: &str, value: &str, replacement: &str) -> String {
+    let pattern = value
+        .chars()
+        .map(|character| regex::escape(&character.to_string()))
+        .collect::<Vec<_>>()
+        .join(r"\s*");
+    Regex::new(&format!("(?i){pattern}"))
+        .map(|pattern| pattern.replace_all(source, replacement).into_owned())
+        .unwrap_or_else(|_| source.to_owned())
+}
+
+fn redact_remaining_absolute_paths(source: &str) -> String {
+    let quoted = Regex::new(r#"(?i)(?:'|")(?:[a-z]:[\\/]|\\\\)[^'"\r\n]*(?:'|")"#)
+        .expect("valid quoted local path regex");
+    let unquoted = Regex::new(r#"(?i)(?:\b[a-z]:[\\/]|\\\\)[^\s'"\r\n)\],;]+"#)
+        .expect("valid local path regex");
+    let report = quoted.replace_all(source, "'<LOCAL_PATH>'");
+    unquoted.replace_all(&report, "<LOCAL_PATH>").into_owned()
 }
 
 pub(crate) struct ResolvedPhitsRoot {
@@ -1051,6 +1073,16 @@ mod tests {
         let redacted = anonymize_diagnostic_report(report, Some(workspace), None, None);
         assert!(!redacted.contains(workspace));
         assert!(redacted.contains("<WORKSPACE>"));
+    }
+
+    #[test]
+    fn anonymizes_paths_split_by_powershell_error_formatting() {
+        let workspace = r"D:\experiment\Angio_room\2026\20260905_testAI-agent\case";
+        let report = r#"access denied: 'D:\experiment\Angio_room\2026\20260905_t  estAI-agent\case\.probe.tmp' command('D:\experiment\Angio_room\2026\2026090 ..."#.to_string();
+        let redacted = anonymize_diagnostic_report(report, Some(workspace), None, None);
+        assert!(!redacted.contains(r"D:\experiment"));
+        assert!(redacted.contains("<WORKSPACE>"));
+        assert!(redacted.contains("<LOCAL_PATH>"));
     }
 
     #[test]

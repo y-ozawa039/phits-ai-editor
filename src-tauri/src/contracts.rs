@@ -346,6 +346,7 @@ pub struct CodexSandboxCheck {
 #[serde(rename_all = "camelCase")]
 pub struct CodexSandboxProbeReport {
     pub state: CodexSandboxProbeState,
+    pub editing_available: bool,
     pub workspace_root: String,
     pub checked_at: String,
     pub readiness: Option<String>,
@@ -353,6 +354,7 @@ pub struct CodexSandboxProbeReport {
     pub allowed_implementations: Vec<String>,
     pub failure_category: Option<CodexSandboxFailureCategory>,
     pub setup_recommended: bool,
+    pub write_policy: Option<String>,
     pub checks: Vec<CodexSandboxCheck>,
     pub messages: Vec<String>,
     pub support_prompt: String,

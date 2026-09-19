@@ -96,17 +96,20 @@ insert it into the Codex composer. If connection is unavailable, the same prompt
 can be copied to a local Codex task in ChatGPT desktop. It is never sent
 automatically and remains editable so paths can be reviewed first.
 
-The Codex editing-environment probe uses the same `workspaceWrite` policy as a
-real turn and separately checks a command that does not write, creation at the
-workspace root, modification of an editor-created existing-file equivalent,
-and creation inside an editor-created child directory. Access-rule inspection
-is read-only and reports protected inheritance, explicit deny entries, and
-reparse points; those observations alone do not produce a warning when all
-functional write checks pass. Failures are classified as sandbox setup,
-workspace access rules, command launch, or result verification. Only a sandbox
-setup failure offers an explicit, confirmed App Server
-`windowsSandbox/setupStart` action followed by automatic re-diagnosis. The
-editor never automatically changes access rules, ownership, or sandbox mode.
+The Codex editing-environment probe separately checks a command that does not
+write, creation at the workspace root, modification of an editor-created
+existing-file equivalent, and creation inside an editor-created child
+directory. Access-rule inspection is read-only and reports protected
+inheritance, explicit deny entries, and reparse points; those observations
+alone do not produce a warning when all functional write checks pass. Explicit
+writable roots and the current working-directory boundary are checked in a
+safe order, and only a policy that passes every required check is reused for
+normal turns in that connection. A connection without verified writes is
+restricted to consultation-only in Rust even when its schemas are compatible.
+A classified setup failure or a live write failure under `unelevated` offers
+explicit App Server setup actions followed by automatic re-diagnosis.
+`elevated` is recommended when allowed, while retrying `unelevated` remains a
+choice. The editor does not directly change access rules or ownership.
 
 After a workspace opens, a non-recursive check reports drive and file-system
 type, UNC paths, reparse points, the read-only attribute, path length, and
@@ -119,9 +122,10 @@ The startup log is size-limited under AppData with one rotated generation. It
 records startup, basic diagnostic, and Codex-connection stages and failure
 categories, but not workspace paths, input contents, or credentials. A
 diagnostic report is generated only when the user saves one. Its save dialog
-defaults to redacting known local paths and also offers an explicit path-preserving
-option. Report actions stay out of the compact runtime panel and are opened from
-warnings or the Help menu.
+defaults to redacting known paths, known paths altered by inserted whitespace,
+and other detectable local absolute paths. It also offers an explicit
+path-preserving option. Report actions stay out of the compact runtime panel
+and are opened from warnings or the Help menu.
 
 App Server `fileChange` and diff events identify real edits. Before a change,
 the backend validates paths and records before snapshots. After completion it

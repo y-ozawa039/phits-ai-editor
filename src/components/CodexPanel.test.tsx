@@ -483,7 +483,7 @@ describe("CodexPanel", () => {
     expect(alert).toHaveTextContent("ワークスペース直下への作成");
   });
 
-  it("offers an explicit Sandbox setup retry only for setup failures", () => {
+  it("offers the explicit elevated Sandbox setup path", () => {
     const onSandboxSetup = vi.fn();
     render(<CodexPanel {...baseProps} onSandboxSetup={onSandboxSetup} sandboxReport={{
       state: "unavailable",
@@ -499,10 +499,34 @@ describe("CodexPanel", () => {
       supportPrompt: "",
     }} />);
 
-    const retry = screen.getByRole("button", { name: "Sandboxを再セットアップ" });
+    const retry = screen.getByRole("button", { name: "elevatedで再セットアップ（推奨）" });
     fireEvent.click(retry);
-    expect(onSandboxSetup).toHaveBeenCalledOnce();
+    expect(onSandboxSetup).toHaveBeenCalledWith("elevated");
     expect(screen.getByRole("alert")).toHaveTextContent("完了後に自動で再診断します");
+  });
+
+  it("offers elevated setup and an unelevated retry after an unelevated write failure", () => {
+    const onSandboxSetup = vi.fn();
+    render(<CodexPanel {...baseProps} writableAvailable={false} onSandboxSetup={onSandboxSetup} sandboxReport={{
+      state: "unavailable",
+      editingAvailable: false,
+      workspaceRoot: "C:\\work",
+      checkedAt: "2026-09-20T00:00:00Z",
+      readiness: "ready",
+      implementation: "unelevated",
+      allowedImplementations: [],
+      failureCategory: "workspacePermissions",
+      setupRecommended: true,
+      checks: [{ id: "workspaceCreate", state: "unavailable", detail: "アクセスが拒否されました" }],
+      messages: [],
+      supportPrompt: "",
+    }} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "elevatedで再セットアップ（推奨）" }));
+    fireEvent.click(screen.getByRole("button", { name: "unelevatedで再セットアップ" }));
+    expect(onSandboxSetup).toHaveBeenNthCalledWith(1, "elevated");
+    expect(onSandboxSetup).toHaveBeenNthCalledWith(2, "unelevated");
+    expect(screen.getByText(/実動作検査でワークスペース書込みを確認できない/)).toBeInTheDocument();
   });
 
   it("follows streaming messages while the transcript is at the latest position", () => {

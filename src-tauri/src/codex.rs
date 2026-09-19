@@ -4,7 +4,7 @@ use std::{
     process::Stdio,
     sync::{
         Arc, OnceLock,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
 };
 
@@ -86,6 +86,8 @@ struct CodexConnection {
     thread_revisions: Mutex<HashMap<String, DiskRevision>>,
     change_histories: Mutex<HashMap<String, String>>,
     sandbox_setup_waiters: Mutex<HashMap<String, oneshot::Sender<CodexSandboxSetupResult>>>,
+    sandbox_write_ready: AtomicBool,
+    sandbox_write_policy: Mutex<Option<WorkspaceWritePolicy>>,
     mcp_host: McpHost,
     next_id: AtomicU64,
     workspace_root: PathBuf,
@@ -103,14 +105,31 @@ fn approval_policy(mode: ApprovalMode) -> &'static str {
     }
 }
 
-fn sandbox_policy(mode: ApprovalMode, _workspace_root: &Path) -> Value {
+fn effective_approval_mode(
+    requested: ApprovalMode,
+    force_read_only: bool,
+    sandbox_write_ready: bool,
+) -> ApprovalMode {
+    if force_read_only || !sandbox_write_ready {
+        ApprovalMode::ConsultationOnly
+    } else {
+        requested
+    }
+}
+
+fn sandbox_policy(
+    mode: ApprovalMode,
+    workspace_root: &Path,
+    write_policy: Option<WorkspaceWritePolicy>,
+) -> Value {
     match mode {
         ApprovalMode::ConsultationOnly => json!({ "type": "readOnly" }),
         ApprovalMode::ConfirmFirst
         | ApprovalMode::OnRequest
-        | ApprovalMode::AutonomousWorkspace => json!({
-            "type": "workspaceWrite", "networkAccess": false
-        }),
+        | ApprovalMode::AutonomousWorkspace => workspace_write_probe_policy(
+            workspace_root,
+            write_policy.unwrap_or(WorkspaceWritePolicy::WorkspaceCwd),
+        ),
     }
 }
 
@@ -1571,6 +1590,8 @@ async fn start_connection(
         thread_revisions: Mutex::new(HashMap::new()),
         change_histories: Mutex::new(HashMap::new()),
         sandbox_setup_waiters: Mutex::new(HashMap::new()),
+        sandbox_write_ready: AtomicBool::new(false),
+        sandbox_write_policy: Mutex::new(None),
         mcp_host,
         next_id: AtomicU64::new(1),
         workspace_root,
@@ -1692,6 +1713,7 @@ fn sandbox_support_prompt(
     implementation: Option<&str>,
     allowed_implementations: &[String],
     failure_category: Option<CodexSandboxFailureCategory>,
+    write_policy: Option<WorkspaceWritePolicy>,
 ) -> String {
     let check_lines = checks
         .iter()
@@ -1699,7 +1721,7 @@ fn sandbox_support_prompt(
         .collect::<Vec<_>>()
         .join("\n");
     format!(
-        "PHITS AI EditorのCodex編集環境診断で問題が見つかりました。次の診断結果を確認し、原因を特定してください。必要な変更を提案する前に、CodexのSandbox、Codex CLI設定、組織ポリシー、ワークスペース固有のアクセス規則のどこで失敗しているかを切り分けてください。Windows標準機能の『Windows Sandbox』が必要だとは決めつけず、Codexが現在使用している方式と実動作検査の結果を優先してください。セキュリティ制限を一括解除せず、所有権取得やアクセス規則の再帰的初期化も自動実行せず、PHITSワークスペース内の編集に必要な最小限の修正を提案してください。\n\nワークスペース: {}\n推定分類: {}\nSandbox readiness: {}\n現在のSandbox方式: {}\n組織ポリシーで許可された方式: {}\n診断結果:\n{}",
+        "PHITS AI EditorのCodex編集環境診断で問題が見つかりました。次の診断結果を確認し、原因を特定してください。必要な変更を提案する前に、CodexのSandbox、Codex CLI設定、組織ポリシー、ワークスペース固有のアクセス規則のどこで失敗しているかを切り分けてください。Windows標準機能の『Windows Sandbox』が必要だとは決めつけず、Codexが現在使用している方式と実動作検査の結果を優先してください。セキュリティ制限を一括解除せず、所有権取得やアクセス規則の再帰的初期化も自動実行せず、PHITSワークスペース内の編集に必要な最小限の修正を提案してください。\n\nワークスペース: {}\n推定分類: {}\nSandbox readiness: {}\n現在のSandbox方式: {}\n組織ポリシーで許可された方式: {}\n利用できた書込み方針: {}\n診断結果:\n{}",
         workspace_root.display(),
         failure_category
             .map(|value| format!("{value:?}"))
@@ -1711,6 +1733,9 @@ fn sandbox_support_prompt(
         } else {
             allowed_implementations.join(", ")
         },
+        write_policy
+            .map(|value| value.report_value())
+            .unwrap_or("確認できませんでした"),
         check_lines
     )
 }
@@ -1719,6 +1744,28 @@ fn sandbox_support_prompt(
 struct SandboxCommandAttempt {
     success: bool,
     detail: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum WorkspaceWritePolicy {
+    ExplicitRoot,
+    WorkspaceCwd,
+}
+
+impl WorkspaceWritePolicy {
+    fn report_value(self) -> &'static str {
+        match self {
+            Self::ExplicitRoot => "explicitRoot",
+            Self::WorkspaceCwd => "workspaceCwd",
+        }
+    }
+
+    fn success_detail(self) -> &'static str {
+        match self {
+            Self::ExplicitRoot => "明示した書込みルートで実行できました。",
+            Self::WorkspaceCwd => "現在の作業フォルダーを基準に実行できました。",
+        }
+    }
 }
 
 #[cfg(windows)]
@@ -1737,11 +1784,18 @@ fn workspace_write_probe_command(marker_path: &Path, marker: &str) -> Vec<String
     ]
 }
 
-fn workspace_write_probe_policy() -> Value {
-    json!({
-        "type": "workspaceWrite",
-        "networkAccess": false
-    })
+fn workspace_write_probe_policy(workspace: &Path, policy: WorkspaceWritePolicy) -> Value {
+    match policy {
+        WorkspaceWritePolicy::ExplicitRoot => json!({
+            "type": "workspaceWrite",
+            "writableRoots": [workspace],
+            "networkAccess": false
+        }),
+        WorkspaceWritePolicy::WorkspaceCwd => json!({
+            "type": "workspaceWrite",
+            "networkAccess": false
+        }),
+    }
 }
 
 #[cfg(windows)]
@@ -1781,6 +1835,7 @@ async fn run_sandbox_command_probe(
     connection: &CodexConnection,
     workspace: &Path,
     command: Vec<String>,
+    policy: WorkspaceWritePolicy,
 ) -> SandboxCommandAttempt {
     match connection
         .request(
@@ -1788,7 +1843,7 @@ async fn run_sandbox_command_probe(
             json!({
                 "command": command,
                 "cwd": workspace,
-                "sandboxPolicy": workspace_write_probe_policy(),
+                "sandboxPolicy": workspace_write_probe_policy(workspace, policy),
                 "timeoutMs": 10_000
             }),
         )
@@ -1797,7 +1852,7 @@ async fn run_sandbox_command_probe(
         Ok(result) if result.get("exitCode").and_then(Value::as_i64) == Some(0) => {
             SandboxCommandAttempt {
                 success: true,
-                detail: "通常編集と同じワークスペース境界で実行できました。".to_string(),
+                detail: policy.success_detail().to_string(),
             }
         }
         Ok(result) => {
@@ -1823,11 +1878,13 @@ async fn run_workspace_write_probe(
     workspace: &Path,
     marker_path: &Path,
     marker: &str,
+    policy: WorkspaceWritePolicy,
 ) -> SandboxCommandAttempt {
     let attempt = run_sandbox_command_probe(
         connection,
         workspace,
         workspace_write_probe_command(marker_path, marker),
+        policy,
     )
     .await;
     if !attempt.success {
@@ -1847,6 +1904,34 @@ async fn run_workspace_write_probe(
             ),
         },
     }
+}
+
+fn failed_write_policy_attempts(
+    explicit: SandboxCommandAttempt,
+    workspace_cwd: SandboxCommandAttempt,
+) -> SandboxCommandAttempt {
+    SandboxCommandAttempt {
+        success: false,
+        detail: format!(
+            "明示ルート方式: {} / 作業フォルダー方式: {}",
+            explicit.detail, workspace_cwd.detail
+        ),
+    }
+}
+
+fn sandbox_editing_available(checks: &[CodexSandboxCheck]) -> bool {
+    [
+        CodexSandboxCheckId::CommandExecution,
+        CodexSandboxCheckId::WorkspaceCreate,
+        CodexSandboxCheckId::ExistingFileWrite,
+        CodexSandboxCheckId::ChildDirectoryWrite,
+    ]
+    .iter()
+    .all(|id| {
+        checks
+            .iter()
+            .any(|check| check.id == *id && check.state == CodexSandboxProbeState::Available)
+    })
 }
 
 fn probe_check(
@@ -2050,6 +2135,7 @@ fn unavailable_sandbox_report(workspace_root: &Path, detail: String) -> CodexSan
     ];
     CodexSandboxProbeReport {
         state: CodexSandboxProbeState::Unavailable,
+        editing_available: false,
         workspace_root: path_to_string(workspace_root),
         checked_at: Utc::now().to_rfc3339(),
         readiness: None,
@@ -2057,6 +2143,7 @@ fn unavailable_sandbox_report(workspace_root: &Path, detail: String) -> CodexSan
         allowed_implementations: Vec::new(),
         failure_category: Some(CodexSandboxFailureCategory::CommandLaunch),
         setup_recommended: false,
+        write_policy: None,
         messages: vec![detail],
         support_prompt: sandbox_support_prompt(
             workspace_root,
@@ -2065,6 +2152,7 @@ fn unavailable_sandbox_report(workspace_root: &Path, detail: String) -> CodexSan
             None,
             &[],
             Some(CodexSandboxFailureCategory::CommandLaunch),
+            None,
         ),
         checks,
     }
@@ -2100,6 +2188,12 @@ pub async fn codex_sandbox_probe(
             }
         }
     };
+    if !temporary {
+        connection
+            .sandbox_write_ready
+            .store(false, Ordering::Release);
+        *connection.sandbox_write_policy.lock().await = None;
+    }
 
     let mut checks = vec![sandbox_check(
         CodexSandboxCheckId::AppServer,
@@ -2189,19 +2283,66 @@ pub async fn codex_sandbox_probe(
     let child_path = workspace.join(format!(".phits-editor-codex-child-{probe_id}"));
     let child_marker_path = child_path.join("workspace-write.txt");
 
-    let command_attempt =
-        run_sandbox_command_probe(&connection, &workspace, command_execution_probe_command()).await;
+    let mut command_attempt = run_sandbox_command_probe(
+        &connection,
+        &workspace,
+        command_execution_probe_command(),
+        WorkspaceWritePolicy::WorkspaceCwd,
+    )
+    .await;
+
+    let root_marker = format!("PHITS_AI_EDITOR_CREATE_PROBE:{probe_id}");
+    let _ = std::fs::remove_file(&root_create_path);
+    let explicit_root_attempt = run_workspace_write_probe(
+        &connection,
+        &workspace,
+        &root_create_path,
+        &root_marker,
+        WorkspaceWritePolicy::ExplicitRoot,
+    )
+    .await;
+    let (write_policy, root_attempt) = if explicit_root_attempt.success {
+        (
+            Some(WorkspaceWritePolicy::ExplicitRoot),
+            explicit_root_attempt,
+        )
+    } else {
+        let _ = std::fs::remove_file(&root_create_path);
+        let workspace_cwd_attempt = run_workspace_write_probe(
+            &connection,
+            &workspace,
+            &root_create_path,
+            &root_marker,
+            WorkspaceWritePolicy::WorkspaceCwd,
+        )
+        .await;
+        if workspace_cwd_attempt.success {
+            (
+                Some(WorkspaceWritePolicy::WorkspaceCwd),
+                workspace_cwd_attempt,
+            )
+        } else {
+            (
+                None,
+                failed_write_policy_attempts(explicit_root_attempt, workspace_cwd_attempt),
+            )
+        }
+    };
+    if !command_attempt.success && write_policy == Some(WorkspaceWritePolicy::ExplicitRoot) {
+        command_attempt = run_sandbox_command_probe(
+            &connection,
+            &workspace,
+            command_execution_probe_command(),
+            WorkspaceWritePolicy::ExplicitRoot,
+        )
+        .await;
+    }
     checks.push(probe_check(
         CodexSandboxCheckId::CommandExecution,
         "Sandbox内で書込みを伴わない検査コマンドを実行できました。",
         "Sandbox内で検査コマンドを実行できませんでした",
         command_attempt,
     ));
-
-    let root_marker = format!("PHITS_AI_EDITOR_CREATE_PROBE:{probe_id}");
-    let _ = std::fs::remove_file(&root_create_path);
-    let root_attempt =
-        run_workspace_write_probe(&connection, &workspace, &root_create_path, &root_marker).await;
     checks.push(probe_check(
         CodexSandboxCheckId::WorkspaceCreate,
         "ワークスペース直下へ新規ファイルを作成できました。",
@@ -2217,6 +2358,7 @@ pub async fn codex_sandbox_probe(
                 &workspace,
                 &existing_path,
                 &existing_marker,
+                write_policy.unwrap_or(WorkspaceWritePolicy::WorkspaceCwd),
             )
             .await;
             checks.push(probe_check(
@@ -2244,6 +2386,7 @@ pub async fn codex_sandbox_probe(
                 &workspace,
                 &child_marker_path,
                 &child_marker,
+                write_policy.unwrap_or(WorkspaceWritePolicy::WorkspaceCwd),
             )
             .await;
             checks.push(probe_check(
@@ -2276,9 +2419,22 @@ pub async fn codex_sandbox_probe(
         ));
     }
 
+    let editing_available = write_policy.is_some() && sandbox_editing_available(&checks);
+    let verified_write_policy = if editing_available {
+        write_policy
+    } else {
+        None
+    };
     let state = sandbox_probe_state(&checks);
     let failure_category = sandbox_failure_category(&checks, readiness.as_deref());
-    let setup_recommended = failure_category == Some(CodexSandboxFailureCategory::SandboxSetup);
+    let setup_recommended = failure_category == Some(CodexSandboxFailureCategory::SandboxSetup)
+        || (!editing_available && implementation.as_deref() == Some("unelevated"));
+    if !temporary {
+        connection
+            .sandbox_write_ready
+            .store(editing_available, Ordering::Release);
+        *connection.sandbox_write_policy.lock().await = verified_write_policy;
+    }
     let support_prompt = sandbox_support_prompt(
         &workspace,
         &checks,
@@ -2286,9 +2442,11 @@ pub async fn codex_sandbox_probe(
         implementation.as_deref(),
         &allowed_implementations,
         failure_category,
+        verified_write_policy,
     );
     Ok(CodexSandboxProbeReport {
         state,
+        editing_available,
         workspace_root: path_to_string(&workspace),
         checked_at: Utc::now().to_rfc3339(),
         readiness,
@@ -2296,6 +2454,7 @@ pub async fn codex_sandbox_probe(
         allowed_implementations,
         failure_category,
         setup_recommended,
+        write_policy: verified_write_policy.map(|value| value.report_value().to_string()),
         checks,
         messages,
         support_prompt,
@@ -2327,6 +2486,10 @@ pub async fn codex_sandbox_setup(
     };
 
     let (sender, receiver) = oneshot::channel();
+    connection
+        .sandbox_write_ready
+        .store(false, Ordering::Release);
+    *connection.sandbox_write_policy.lock().await = None;
     let already_running = {
         let mut waiters = connection.sandbox_setup_waiters.lock().await;
         if waiters.contains_key(&mode) {
@@ -2708,11 +2871,9 @@ pub async fn codex_turn_start(
     }
     let connection = current_connection().await?;
     require_codex_feature(&connection.compatibility, CodexFeatureId::Chat, "chat")?;
-    let effective_mode = if force_read_only {
-        ApprovalMode::ConsultationOnly
-    } else {
-        approval_mode
-    };
+    let sandbox_write_ready = connection.sandbox_write_ready.load(Ordering::Acquire);
+    let effective_mode =
+        effective_approval_mode(approval_mode, force_read_only, sandbox_write_ready);
     if effective_mode != ApprovalMode::ConsultationOnly {
         require_codex_feature(
             &connection.compatibility,
@@ -2803,10 +2964,11 @@ pub async fn codex_turn_start(
         .mcp_host
         .set_active_turn(thread_id.clone(), effective_mode, context.as_ref())
         .await;
+    let write_policy = *connection.sandbox_write_policy.lock().await;
     let result = connection.request("turn/start", json!({
         "threadId": thread_id.clone(), "input": input, "cwd": connection.workspace_root,
         "model": model, "effort": reasoning_effort, "approvalPolicy": approval_policy(effective_mode),
-        "sandboxPolicy": sandbox_policy(effective_mode, &connection.workspace_root)
+        "sandboxPolicy": sandbox_policy(effective_mode, &connection.workspace_root, write_policy)
     })).await;
     if result.is_err() {
         connection.mcp_host.clear_active_turn(&thread_id).await;
@@ -2951,11 +3113,32 @@ mod tests {
 
     #[test]
     fn workspace_probe_matches_normal_turn_policy_and_never_disables_the_sandbox() {
-        let policy = workspace_write_probe_policy();
-        assert_eq!(policy["type"], "workspaceWrite");
-        assert!(policy.get("writableRoots").is_none());
-        assert_eq!(policy["networkAccess"], false);
-        assert_ne!(policy["type"], "dangerFullAccess");
+        let workspace = Path::new(r"C:\work");
+        let explicit = workspace_write_probe_policy(workspace, WorkspaceWritePolicy::ExplicitRoot);
+        assert_eq!(explicit["type"], "workspaceWrite");
+        assert_eq!(explicit["writableRoots"][0], r"C:\work");
+        assert_eq!(explicit["networkAccess"], false);
+        let inherited = workspace_write_probe_policy(workspace, WorkspaceWritePolicy::WorkspaceCwd);
+        assert_eq!(inherited["type"], "workspaceWrite");
+        assert!(inherited.get("writableRoots").is_none());
+        assert_eq!(inherited["networkAccess"], false);
+        assert_ne!(explicit["type"], "dangerFullAccess");
+    }
+
+    #[test]
+    fn unverified_sandbox_forces_consultation_only_at_the_backend_boundary() {
+        assert_eq!(
+            effective_approval_mode(ApprovalMode::AutonomousWorkspace, false, false),
+            ApprovalMode::ConsultationOnly
+        );
+        assert_eq!(
+            effective_approval_mode(ApprovalMode::OnRequest, true, true),
+            ApprovalMode::ConsultationOnly
+        );
+        assert_eq!(
+            effective_approval_mode(ApprovalMode::ConfirmFirst, false, true),
+            ApprovalMode::ConfirmFirst
+        );
     }
 
     #[test]
@@ -3231,24 +3414,39 @@ mod tests {
             "untrusted"
         );
         assert_eq!(
-            sandbox_policy(ApprovalMode::ConsultationOnly, Path::new(r"C:\work"))["type"],
+            sandbox_policy(ApprovalMode::ConsultationOnly, Path::new(r"C:\work"), None)["type"],
             "readOnly"
         );
         assert_eq!(
-            sandbox_policy(ApprovalMode::ConfirmFirst, Path::new(r"C:\work"))["networkAccess"],
+            sandbox_policy(
+                ApprovalMode::ConfirmFirst,
+                Path::new(r"C:\work"),
+                Some(WorkspaceWritePolicy::WorkspaceCwd)
+            )["networkAccess"],
             false
         );
         assert_eq!(
-            sandbox_policy(ApprovalMode::AutonomousWorkspace, Path::new(r"C:\work"))["type"],
+            sandbox_policy(
+                ApprovalMode::AutonomousWorkspace,
+                Path::new(r"C:\work"),
+                Some(WorkspaceWritePolicy::ExplicitRoot)
+            )["type"],
             "workspaceWrite"
         );
-        assert!(
-            sandbox_policy(ApprovalMode::AutonomousWorkspace, Path::new(r"C:\work"))
-                .get("writableRoots")
-                .is_none()
+        assert_eq!(
+            sandbox_policy(
+                ApprovalMode::AutonomousWorkspace,
+                Path::new(r"C:\work"),
+                Some(WorkspaceWritePolicy::ExplicitRoot)
+            )["writableRoots"][0],
+            r"C:\work"
         );
         assert_eq!(
-            sandbox_policy(ApprovalMode::AutonomousWorkspace, Path::new(r"C:\work"))["networkAccess"],
+            sandbox_policy(
+                ApprovalMode::AutonomousWorkspace,
+                Path::new(r"C:\work"),
+                Some(WorkspaceWritePolicy::ExplicitRoot)
+            )["networkAccess"],
             false
         );
     }

@@ -9,11 +9,11 @@ PHITS-Padに近い編集・実行機能と、CodexによるAI編集支援を一�
 現在のalpha版はWindows 11 x64専用です。
 
 - **通常利用（推奨）:**
-  [インストーラー版をダウンロード](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.6-alpha/PHITS-AI-Editor-v0.0.6-alpha-windows-x64-setup.exe)
+  [インストーラー版をダウンロード](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.7-alpha/PHITS-AI-Editor-v0.0.7-alpha-windows-x64-setup.exe)
 - **試用・持ち運び・複数版の比較:**
-  [ポータブル版をダウンロード](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.6-alpha/PHITS-AI-Editor-v0.0.6-alpha-windows-x64-portable.zip)
+  [ポータブル版をダウンロード](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.7-alpha/PHITS-AI-Editor-v0.0.7-alpha-windows-x64-portable.zip)
 - **ダウンロード後の確認:**
-  [SHA-256一覧](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.6-alpha/SHA256SUMS.txt)
+  [SHA-256一覧](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.7-alpha/SHA256SUMS.txt)
 
 | 目的 | 選ぶファイル | 選択理由 |
 |---|---|---|
@@ -66,7 +66,7 @@ Codex CLIへ次のように依頼してください。
 
 ## 動作環境
 
-- Windows 11 x64（`0.0.6-alpha`の配布対象）
+- Windows 11 x64（`0.0.7-alpha`の配布対象）
 - PHITS実行環境（入力ファイルを実行する場合。`PHITSPATH`からの自動検出または設定画面で指定）
 - Codex CLI 0.153.1以降（AI支援を使う場合）
 
@@ -108,7 +108,7 @@ IssueおよびPull Requestの方針は[CONTRIBUTING.md](CONTRIBUTING.md)を参�
 JAEA、PHITS開発チーム、OpenAIまたは著者の所属機関による開発・承認・後援・
 保証を受けた公式製品ではありません。
 
-## Windows alpha版（0.0.6-alpha）
+## Windows alpha版（0.0.7-alpha）
 
 実装済みの主な機能:
 
@@ -138,5 +138,5 @@ Windows 11 x64の開発環境および別端末で、インストール、ファ
 確認済みです。詳細は[Windows alpha試験報告](docs/windows-alpha-test-report.md)を参照してください。
 Ubuntu対応とLinux配布物は今後の移植候補であり、現在は提供していません。
 
-現在のalpha版の概要は[リリースノート](docs/release-notes-v0.0.6-alpha.md)、
-制限事項は[既知の問題](docs/known-issues-v0.0.6-alpha.md)を参照してください。
+現在のalpha版の概要は[リリースノート](docs/release-notes-v0.0.7-alpha.md)、
+制限事項は[既知の問題](docs/known-issues-v0.0.7-alpha.md)を参照してください。

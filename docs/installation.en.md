@@ -2,7 +2,7 @@
 
 [日本語](installation.md) | English
 
-This guide covers the `0.0.6-alpha` distribution for Windows 11 x64. PHITS AI
+This guide covers the `0.0.7-alpha` distribution for Windows 11 x64. PHITS AI
 Editor is an independently developed alpha application. Back up important
 input files before use.
 
@@ -10,8 +10,8 @@ input files before use.
 
 | Artifact | Recommended for | Windows integration |
 | --- | --- | --- |
-| `PHITS-AI-Editor-v0.0.6-alpha-windows-x64-setup.exe` | Normal use | Yes |
-| `PHITS-AI-Editor-v0.0.6-alpha-windows-x64-portable.zip` | Evaluation, side-by-side versions, development, and investigation | No |
+| `PHITS-AI-Editor-v0.0.7-alpha-windows-x64-setup.exe` | Normal use | Yes |
+| `PHITS-AI-Editor-v0.0.7-alpha-windows-x64-portable.zip` | Evaluation, side-by-side versions, development, and investigation | No |
 
 We recommend the installer for normal use. GitHub's automatically generated
 `Source code (zip)` is not the portable Windows application. Although a bare
@@ -103,15 +103,30 @@ special folders, the read-only attribute, path length, and OneDrive scope withou
 recursively scanning the workspace. Existing diagnostic results and the generated
 AI troubleshooting prompt remain available in the Codex panel. Save a diagnostic
 report from a warning or **Help > Save diagnostic report...**. The default option
-redacts known workspace, PHITS, Codex CLI, and user-profile paths; an explicit
-option preserves them. Error text and folder names may still contain personal
-information, so review the contents carefully before sharing them externally.
+redacts known workspace, PHITS, Codex CLI, and user-profile paths, paths whose
+characters were separated by command-output whitespace, and other detectable
+local absolute paths; an explicit option preserves them. Relative folder names
+and free-form error text may still contain personal information, so review the
+contents carefully before sharing them externally.
+
+After Codex connects, the editor checks not only App Server schema compatibility
+but also a Sandbox command and three real workspace writes: creating a file at
+the workspace root, changing an existing peer file, and creating a file in a
+child folder. The writable policy that passes these checks is reused for actual
+Codex turns. If the full write sequence cannot be verified, writable approval
+modes are disabled and the Rust backend forces consultation-only operation.
+When setup recovery is applicable, the UI offers the official App Server setup
+path with **elevated (recommended where permitted)** and an explicit
+**unelevated retry**. The editor does not directly take ownership of folders,
+rewrite ACLs recursively, disable the Sandbox, or grant unrestricted access.
 
 Diagnostic results are not cached in the workspace or settings. Required checks
-run again at application start, workspace changes, Codex connection, and manual
-refresh. A size-limited startup log is stored at the location shown as **Startup
-log** in the diagnostic report. It intentionally excludes input-file contents
-and credentials and is never reused to decide feature availability.
+for PHITS and workspace metadata run again at application start and workspace
+changes. The deeper Sandbox execution and write checks run at Codex connection
+and manual refresh. A size-limited startup log is stored at the location shown
+as **Startup log** in the diagnostic report. It intentionally excludes
+input-file contents and credentials and is never reused to decide feature
+availability.
 Use **Help > Diagnostic information details...** to see the log location, the
 256 KiB limit, and the single rotated generation.
 
@@ -129,7 +144,7 @@ With the portable edition, you can:
 
 ## 7. SmartScreen warning
 
-`0.0.6-alpha` is not code-signed, so Windows SmartScreen may show a warning.
+`0.0.7-alpha` is not code-signed, so Windows SmartScreen may show a warning.
 Do not run a file obtained outside the official GitHub Release or a file whose
 SHA-256 does not match. Continue only after verifying the source and hash and
 reading the warning yourself.
@@ -137,7 +152,7 @@ reading the warning yourself.
 Use PowerShell to verify an artifact:
 
 ```powershell
-Get-FileHash .\PHITS-AI-Editor-v0.0.6-alpha-windows-x64-setup.exe -Algorithm SHA256
+Get-FileHash .\PHITS-AI-Editor-v0.0.7-alpha-windows-x64-setup.exe -Algorithm SHA256
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -168,7 +183,7 @@ release.
 
 ## 10. Before reporting a problem
 
-- Review the [known issues](known-issues-v0.0.6-alpha.en.md).
+- Review the [known issues](known-issues-v0.0.7-alpha.en.md).
 - Record the application version, Windows version, reproduction steps,
   expected result, and actual result.
 - Do not post credentials, personal information, unpublished research data, or
