@@ -32,11 +32,6 @@ environments can be isolated more easily.
 - Diagnostic and settings dialogs receive initial focus and can be closed with
   Escape.
 
-## Quality assurance
-
-- Reproducible Sandbox diagnostic scenarios are validated in Windows CI. This
-  is a development-time regression test, not an end-user feature.
-
 ## Privacy and safety boundaries
 
 The startup log does not record workspace paths, PHITS input contents, or
