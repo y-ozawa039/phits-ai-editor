@@ -11,9 +11,9 @@ environments can be isolated more easily.
 - The Sandbox probe now reports command execution, creation at the workspace
   root, modification of an existing-file equivalent, creation in a child
   directory, and folder access rules as separate checks.
-- When the normal workspace boundary fails, a direct-path fallback probe runs
-  without widening permissions, helping distinguish a general Sandbox problem
-  from a folder-specific problem.
+- Command execution that does not write files is separated from three write
+  checks, making it easier to distinguish command startup failures from denied
+  workspace writes.
 - The explicit Sandbox repair action appears only when repair is considered
   applicable.
 - The editor inspects drive kind, filesystem, UNC paths, special folders,
@@ -21,23 +21,29 @@ environments can be isolated more easily.
   scanning the workspace.
 - Windows command output that is prone to mojibake is decoded as Unicode, and
   long diagnostic results can be scrolled.
-- A Markdown diagnostic report can be saved from a problem notice or from
-  **Help > Save diagnostic report...**. Known paths such as the user profile and
-  workspace are redacted by default.
+- A diagnostic report can be saved as text or Markdown from a problem notice or
+  from **Help > Save diagnostic report...**. Known paths such as the user
+  profile and workspace are redacted by default.
 - **Help > Diagnostic information...** shows the startup-log location and
   retention rules. The log is limited to 256 KiB with one rotated generation.
-- Diagnostic results are not cached. Required checks are repeated at startup,
-  workspace changes, Codex connection, and manual refresh.
+- Diagnostic results are not cached. Lightweight environment checks run at
+  startup and on workspace changes; live Sandbox checks run when Codex connects
+  and when diagnostics are refreshed manually.
 - Diagnostic and settings dialogs receive initial focus and can be closed with
   Escape.
-- Reproducible Sandbox diagnostic scenarios are now validated in Windows CI.
+
+## Quality assurance
+
+- Reproducible Sandbox diagnostic scenarios are validated in Windows CI. This
+  is a development-time regression test, not an end-user feature.
 
 ## Privacy and safety boundaries
 
 The startup log does not record workspace paths, PHITS input contents, or
 authentication data. Connection failures are logged only as categories; raw
 error text is not copied into the startup log. Path redaction replaces known
-local paths, but error messages or folder names may still contain personal
+local paths, but paths altered by inserted line breaks or spaces inside error
+text may remain. Error messages or folder names may also contain personal
 information. Review a report carefully before sharing it externally.
 
 Diagnostics never widen permissions automatically. Codex file operations and
