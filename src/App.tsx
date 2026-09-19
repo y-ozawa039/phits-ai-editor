@@ -265,6 +265,7 @@ export default function App() {
   const [workspaceSwitchPrompt, setWorkspaceSwitchPrompt] = useState<WorkspaceSwitchPrompt | null>(null);
   const [closeApplicationPrompt, setCloseApplicationPrompt] = useState<CloseApplicationPrompt | null>(null);
   const [settingsSection, setSettingsSection] = useState<"appearance" | "phits" | null>(null);
+  const settingsOpen = settingsSection !== null;
   const [phitsSettingsMode, setPhitsSettingsMode] = useState<"auto" | "custom">("auto");
   const [phitsPathDraft, setPhitsPathDraft] = useState("");
   const [phitsSettingsSaving, setPhitsSettingsSaving] = useState(false);
@@ -282,6 +283,7 @@ export default function App() {
   const codexProbePromiseRef = useRef<Promise<CodexCompatibilityReport | null> | null>(null);
   const diagnosticsRotorRef = useRef<HTMLSpanElement | null>(null);
   const diagnosticsPulseRef = useRef<HTMLSpanElement | null>(null);
+  const settingsDialogRef = useRef<HTMLElement | null>(null);
   const diagnosticsMotionRef = useRef({
     spinning: false,
     rapidMode: false,
@@ -1241,6 +1243,22 @@ export default function App() {
     setCodexConnected(false); setThreadId(null); setTurnId(null); setCodexBusy(false); setApprovals([]); setDiffReview(null); setCodexConnectionError(null); setCodexConnectionCategory(null); fileChangeBasesRef.current.clear(); turnHistoryIdsRef.current.clear(); setSessionApprovalActive(false);
   }, []);
 
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    settingsDialogRef.current?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setSettingsSection(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("keydown", closeOnEscape);
+      previouslyFocused?.focus();
+    };
+  }, [settingsOpen]);
+
   const startThread = useCallback(async () => {
     if (!workspace) return null;
     if (!codexFeatureAvailable(codexCompatibility, "threads")) { notify("このCodex CLIではスレッド機能を利用できません。", "error"); return null; }
@@ -1925,7 +1943,7 @@ export default function App() {
       </div>
 
       {settingsSection && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsSection(null); }}>
-        <section className="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <section ref={settingsDialogRef} tabIndex={-1} className="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
           <header className="settings-dialog-header"><div><h2 id="settings-title">設定</h2><p>PHITS AI Editorの表示と実行環境を設定します。</p></div><button className="settings-close" onClick={() => setSettingsSection(null)} aria-label="設定を閉じる">×</button></header>
           <div className="settings-dialog-body">
             <nav className="settings-navigation" aria-label="設定項目">

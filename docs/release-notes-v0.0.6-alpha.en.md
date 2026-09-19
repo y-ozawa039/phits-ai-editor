@@ -28,7 +28,8 @@ environments can be isolated more easily.
   retention rules. The log is limited to 256 KiB with one rotated generation.
 - Diagnostic results are not cached. Required checks are repeated at startup,
   workspace changes, Codex connection, and manual refresh.
-- Diagnostic dialogs receive initial focus and can be closed with Escape.
+- Diagnostic and settings dialogs receive initial focus and can be closed with
+  Escape.
 - Reproducible Sandbox diagnostic scenarios are now validated in Windows CI.
 
 ## Privacy and safety boundaries
@@ -42,4 +43,3 @@ information. Review a report carefully before sharing it externally.
 Diagnostics never widen permissions automatically. Codex file operations and
 PHITS execution continue to use the approval modes and editor-owned validated
 execution path introduced in `0.0.5-alpha`.
-
