@@ -76,3 +76,8 @@ the repository's validated runner path, and the locally installed PHITS license.
 Follow [`docs/releasing.md`](docs/releasing.md). A release must be generated from
 a clean, tested commit. Do not publish, tag, push, or change repository
 visibility unless the user explicitly authorizes that external action.
+
+Do not infer publication status from local tags alone. Before describing a
+version as published or downloadable, run `scripts/audit-release-status.ps1`
+and distinguish GitHub Releases, remote tags, and non-expired Actions artifacts.
+An Actions artifact is a downloadable test build, not a formal release.

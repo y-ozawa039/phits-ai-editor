@@ -1,8 +1,13 @@
 # Release procedure
 
-The current planned release is `v0.0.7-alpha`, published as a GitHub Pre-release
+The current planned release is `v0.0.8-alpha`, published as a GitHub Pre-release
 for Windows 11 x64. Repository visibility changes, tags, pushes, and GitHub
 Release publication require explicit maintainer approval.
+
+Before describing any version as published or downloadable, run
+`scripts/audit-release-status.ps1`. Check GitHub Releases, remote tags, and
+non-expired Actions artifacts separately. An Actions artifact is a downloadable
+test build, not a formal release. See [release-status.md](release-status.md).
 
 ## 1. Freeze and audit
 
@@ -42,8 +47,8 @@ pnpm release:package:windows
 
 Create these release assets without modifying their contents afterward:
 
-- `PHITS-AI-Editor-v0.0.7-alpha-windows-x64-portable.zip`
-- `PHITS-AI-Editor-v0.0.7-alpha-windows-x64-setup.exe`
+- `PHITS-AI-Editor-v0.0.8-alpha-windows-x64-portable.zip`
+- `PHITS-AI-Editor-v0.0.8-alpha-windows-x64-setup.exe`
 - `SHA256SUMS.txt`
 - `SBOM.spdx.json` or an equivalent SBOM
 - `THIRD_PARTY_NOTICES.md` and `THIRD_PARTY_LICENSES.txt`
@@ -74,7 +79,7 @@ Record the exact artifact hashes and results in the Windows alpha test report.
 ## 5. Publish
 
 1. Confirm the artifacts' recorded commit equals the intended `main` commit.
-2. Create the annotated `v0.0.7-alpha` tag.
+2. Create the annotated `v0.0.8-alpha` tag.
 3. Confirm that the public repository contains no credentials, private research
    data, non-redistributable PHITS material, or unintended build artifacts.
 4. Create a GitHub Release marked **Pre-release**, attach every asset, and copy

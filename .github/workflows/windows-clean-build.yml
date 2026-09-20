@@ -54,6 +54,7 @@ jobs:
         run: pnpm release:package:windows
 
       - name: Locate release candidate
+        id: release_candidate
         shell: pwsh
         run: |
           $version = (Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json).version
@@ -62,12 +63,13 @@ jobs:
             throw "Release candidate directory was not generated: $releaseDirectory"
           }
           "RELEASE_CANDIDATE_DIR=$releaseDirectory" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           Get-Content -LiteralPath (Join-Path $releaseDirectory "SHA256SUMS.txt")
 
       - name: Upload Windows release candidate
         uses: actions/upload-artifact@v4
         with:
-          name: PHITS-AI-Editor-windows-x64-${{ github.sha }}
+          name: PHITS-AI-Editor-test-build-${{ steps.release_candidate.outputs.version }}-${{ github.sha }}
           path: ${{ env.RELEASE_CANDIDATE_DIR }}/*
           if-no-files-found: error
           retention-days: 14
