@@ -1211,15 +1211,10 @@ export default function App() {
         : "ワークスペース直下に実行できる.inp/.phtがありません。", "error");
       return;
     }
-    const warning = production
-      ? `未保存内容を保存後、${workspace.primaryInput} と既存出力を記録します。Codexを停止してPHITSを起動し、Editorを直ちに終了します。続行しますか？`
-      : hasDirtyDocuments ? `未保存の変更を保存して ${workspace.primaryInput} を通常実行しますか？` : `${workspace.primaryInput} を通常実行しますか？`;
-    if (!(await confirmAction(warning, {
-      title: production ? "PHITS本番実行" : "PHITS通常実行",
-      kind: "warning",
-      okLabel: production ? "本番実行を開始" : "通常実行を開始",
-      cancelLabel: "キャンセル",
-    }))) return;
+    if (production && !(await confirmAction(
+      `未保存内容を保存後、${workspace.primaryInput} と既存出力を記録します。Codexを停止してPHITSを起動し、Editorを直ちに終了します。続行しますか？`,
+      { title: "PHITS本番実行", kind: "warning", okLabel: "本番実行を開始", cancelLabel: "キャンセル" },
+    ))) return;
     try {
       setBusy(true);
       for (const entry of documents.filter((item) => item.dirty)) {
@@ -1233,34 +1228,24 @@ export default function App() {
           : item));
       }
       setOutputCollapsed(false); appendOutput(`[Editor] ${production ? "本番" : "通常"}実行を要求しました。`);
-      let overrideUnresolved = false;
       if (runStatus?.state === "unresolved") {
-        overrideUnresolved = await confirmAction(
-          "OS上でこのフォルダーのPHITSプロセスが停止していることを確認しましたか？ 確認済みの場合だけ状態不明を解除します。",
-          { title: "PHITS実行状態の確認", kind: "warning", okLabel: "停止を確認済み", cancelLabel: "キャンセル" },
-        );
-        if (!overrideUnresolved) return;
+        notify("PHITSの実行状態を確認できないため、起動しませんでした。実行中のPHITSがないことを確認してから、状態を再確認してください。", "error");
+        return;
       }
       const status = await (production
-        ? api.runProduction(workspace.root, workspace.primaryInput ?? undefined, overrideUnresolved)
-        : api.runNormal(workspace.root, workspace.primaryInput ?? undefined, overrideUnresolved)) as RunStatus;
+        ? api.runProduction(workspace.root, workspace.primaryInput ?? undefined, false)
+        : api.runNormal(workspace.root, workspace.primaryInput ?? undefined, false)) as RunStatus;
       setRunStatus(status); appendOutput(`[${status.state}] ${status.message}`);
     } catch (error) { appendOutput(`[failed] ${errorMessage(error)}`); notify(`PHITSを起動できませんでした: ${errorMessage(error)}`, "error"); }
     finally { setBusy(false); }
-  }, [appendOutput, confirmAction, documents, hasDirtyDocuments, notify, runStatus?.state, workspace]);
+  }, [appendOutput, confirmAction, documents, notify, runStatus?.state, workspace]);
 
   const runUtility = useCallback(async (kind: UtilityKind) => {
     if (!workspace || !activeDocument?.document) { notify("対象ファイルを開いて選択してください。"); return; }
     const labels: Record<UtilityKind, string> = { angel: "ANGEL", dchain: "DCHAIN", phig3d: "PHIG-3D" };
-    if (!(await confirmAction(`${labels[kind]} で ${activeDocument.name} を開きますか？`, {
-      title: `${labels[kind]}を起動`,
-      kind: "warning",
-      okLabel: "開く",
-      cancelLabel: "キャンセル",
-    }))) return;
     try { await api.runUtility(workspace.root, kind, activeDocument.document.relativePath); notify(`${labels[kind]} を起動しました。`, "success"); }
     catch (error) { notify(`${labels[kind]} を起動できませんでした: ${errorMessage(error)}`, "error"); }
-  }, [activeDocument, confirmAction, notify, workspace]);
+  }, [activeDocument, notify, workspace]);
 
   const connectCodex = useCallback(async () => {
     if (!workspace) { notify("Codexを接続するワークスペースを先に開いてください。"); return; }
@@ -1350,18 +1335,12 @@ export default function App() {
   const deleteThread = useCallback(async (id: string, title: string) => {
     if (!workspace) return;
     if (!codexFeatureAvailable(codexCompatibility, "threads")) { notify("このCodex CLIではスレッドを削除できません。", "error"); return; }
-    if (!(await confirmAction(`「${title}」を完全に削除しますか？\nこの操作は元に戻せません。`, {
-      title: "Codexスレッドを削除",
-      kind: "warning",
-      okLabel: "完全に削除",
-      cancelLabel: "キャンセル",
-    }))) return;
     try {
       await api.codexThreadDelete(workspace.root, id);
       setThreadLinks((current) => current.filter((item) => item.threadId !== id));
       if (threadId === id) { setThreadId(null); setTurnId(null); setMessages([]); }
     } catch (error) { notify(`スレッドを削除できませんでした: ${errorMessage(error)}`, "error"); }
-  }, [codexCompatibility, confirmAction, notify, threadId, workspace]);
+  }, [codexCompatibility, notify, threadId, workspace]);
 
   const buildEditorContext = useCallback((entry: OpenDocument | null, dirtyOverride?: boolean): EditorContextV1 | null => {
     if (!entry && !workspace) return null;
@@ -1406,28 +1385,15 @@ export default function App() {
       || !codexFeatureAvailable(codexCompatibility, "approvals")
       || !sandboxWritableAvailable;
     if (activeDocument?.dirty && !forceReadOnly) {
-      const saveBeforeSend = await confirmAction(
-        "この未保存ファイルを保存し、Codexが編集できる状態で送信しますか？",
-        { title: "Codexへ送信", kind: "warning", okLabel: "保存して送信", cancelLabel: "次の選択へ" },
-      );
-      if (saveBeforeSend) {
-        try {
-          const saved = activeDocument.document
-            ? await api.saveDocument(workspace!.root, activeDocument.document, activeDocument.content)
-            : await saveDocumentAs(activeDocument);
-          if (!saved) return false;
-          contextEntry = { ...activeDocument, id: saved.path, name: fileName(saved.relativePath), document: saved, content: saved.content, dirty: false };
-          setDocuments((current) => current.map((item) => item.id === activeDocument!.id ? contextEntry! : item));
-          setActiveId(saved.path);
-        } catch (error) { notify(`送信前に保存できませんでした: ${errorMessage(error)}`, "error"); return false; }
-      } else if (await confirmAction("保存せず、相談のみ（読み取り専用）で送信しますか？", {
-        title: "Codexへ相談のみで送信",
-        kind: "warning",
-        okLabel: "相談のみで送信",
-        cancelLabel: "送信しない",
-      })) {
-        forceReadOnly = true;
-      } else return false;
+      try {
+        const saved = activeDocument.document
+          ? await api.saveDocument(workspace!.root, activeDocument.document, activeDocument.content)
+          : await saveDocumentAs(activeDocument);
+        if (!saved) return false;
+        contextEntry = { ...activeDocument, id: saved.path, name: fileName(saved.relativePath), document: saved, content: saved.content, dirty: false };
+        setDocuments((current) => current.map((item) => item.id === activeDocument!.id ? contextEntry! : item));
+        setActiveId(saved.path);
+      } catch (error) { notify(`送信前に保存できませんでした: ${errorMessage(error)}`, "error"); return false; }
     }
     const userMessage = { id: crypto.randomUUID(), role: "user" as const, text };
     const assistantMessage = { id: crypto.randomUUID(), role: "assistant" as const, text: "", streaming: true };
@@ -1472,7 +1438,7 @@ export default function App() {
       return false;
     }
     return true;
-  }, [activeDocument, approvalMode, buildEditorContext, codexCompatibility, confirmAction, model, notify, reasoning, sandboxWritableAvailable, saveDocumentAs, threadId, workspace]);
+  }, [activeDocument, approvalMode, buildEditorContext, codexCompatibility, model, notify, reasoning, sandboxWritableAvailable, saveDocumentAs, threadId, workspace]);
 
   const interruptCodex = useCallback(async () => {
     if (!threadId || !turnId) { notify("CodexのターンIDを待っています。もう一度中断してください。"); return; }

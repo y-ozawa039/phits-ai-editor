@@ -258,7 +258,20 @@ describe("CodexPanel", () => {
     fireEvent.contextMenu(screen.getAllByText("旧タイトル")[0]);
     expect(screen.getByRole("menuitem", { name: "名前を変更" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("menuitem", { name: "完全に削除" }));
+    expect(onDeleteThread).not.toHaveBeenCalled();
+    expect(screen.getByText(/この操作は元に戻せません/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitem", { name: "削除を確定" }));
     expect(onDeleteThread).toHaveBeenCalledWith("thread-1", "旧タイトル");
+  });
+
+  it("renames a thread inside the context menu without opening a prompt", () => {
+    const onRenameThread = vi.fn();
+    render(<CodexPanel {...baseProps} threads={[{ threadId: "thread-1", title: "旧タイトル", lastUsedAt: "2026-09-06T00:00:00+09:00" }]} onRenameThread={onRenameThread} />);
+    fireEvent.contextMenu(screen.getAllByText("旧タイトル")[0]);
+    fireEvent.click(screen.getByRole("menuitem", { name: "名前を変更" }));
+    fireEvent.change(screen.getByLabelText("スレッド名"), { target: { value: "新タイトル" } });
+    fireEvent.click(screen.getByRole("menuitem", { name: "名前を変更" }));
+    expect(onRenameThread).toHaveBeenCalledWith("thread-1", "新タイトル");
   });
 
   it("changes approval mode and allows removing context chips", () => {

@@ -470,6 +470,9 @@ kbd, .text-button, .output-content { color: #555555; }
 .thread-context-menu button { padding: 7px 10px; text-align: left; background: transparent; border: 0; border-radius: 3px; }
 .thread-context-menu button:hover { background: #ededed; }
 .thread-context-menu button.danger { color: #9b1c1c; }
+.thread-context-menu label { display: grid; gap: 4px; padding: 7px 10px; color: #333; }
+.thread-context-menu input { min-width: 220px; padding: 6px 8px; border: 1px solid #aaa; border-radius: 3px; }
+.thread-delete-warning { max-width: 280px; padding: 8px 10px; color: #6f1a1a; line-height: 1.5; }
 .chat-message { margin-bottom: 20px; color: #2f2f2f; }
 .chat-message.user { margin-left: 30px; padding: 10px 12px; background: #ededed; border-radius: 10px; }
 .chat-message.assistant { margin-right: 0; padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; }

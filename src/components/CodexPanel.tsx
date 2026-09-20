@@ -48,7 +48,7 @@ export function CodexPanel(props: CodexPanelProps) {
   const [troubleshootingDraft, setTroubleshootingDraft] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
   const [troubleshootingInsertBusy, setTroubleshootingInsertBusy] = useState(false);
-  const [menu, setMenu] = useState<{ thread: CodexThreadLink; x: number; y: number } | null>(null);
+  const [menu, setMenu] = useState<{ thread: CodexThreadLink; x: number; y: number; mode: "default" | "rename" | "delete"; draftTitle: string } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const followLatestRef = useRef(true);
@@ -84,8 +84,13 @@ export function CodexPanel(props: CodexPanelProps) {
 
   if (!props.open) return <aside className="codex-rail" style={{ "--codex-font-size": `${props.fontSize ?? 14}px` } as CSSProperties}><button className="codex-rail-button" onClick={props.onToggle} title="Codexパネルを開く"><Icon name="spark" /><span>Codex</span></button></aside>;
   const send = async () => { const text = draft.trim(); if (!text || props.busy) return; followLatestRef.current = true; if (await props.onSend(text)) setDraft(""); };
-  const openMenu = (thread: CodexThreadLink, x: number, y: number) => setMenu({ thread, x, y });
-  const rename = () => { if (!menu) return; const title = window.prompt("スレッド名", menu.thread.title)?.trim(); if (title && title !== menu.thread.title) props.onRenameThread(menu.thread.threadId, title); setMenu(null); };
+  const openMenu = (thread: CodexThreadLink, x: number, y: number) => setMenu({ thread, x, y, mode: "default", draftTitle: thread.title });
+  const rename = () => {
+    if (!menu) return;
+    const title = menu.draftTitle.trim();
+    if (title && title !== menu.thread.title) props.onRenameThread(menu.thread.threadId, title);
+    setMenu(null);
+  };
   const remove = () => { if (menu) props.onDeleteThread(menu.thread.threadId, menu.thread.title); setMenu(null); };
   const agentSetup = props.phitsAgentSetup;
   const agentSetupNeedsAttention = Boolean(agentSetup && ["mismatch", "missing", "unreadable"].includes(agentSetup.state));
@@ -180,6 +185,19 @@ export function CodexPanel(props: CodexPanelProps) {
     <div ref={transcriptRef} className="chat-transcript" aria-live="polite" onScroll={(event) => { const element = event.currentTarget; followLatestRef.current = element.scrollHeight - element.scrollTop - element.clientHeight <= 48; }}>{props.messages.length === 0 ? <div className="codex-empty"><div className="codex-orb"><Icon name="spark" /></div><strong>入力を一緒に仕上げましょう</strong><p>現在のファイルや選択範囲を含めて相談できます。</p></div> : props.messages.map((message) => <article className={`chat-message ${message.role}`} key={message.id}><div className="message-role">{message.role === "user" ? "あなた" : message.role === "assistant" ? "Codex" : "システム"}</div><div className="message-text"><MessageMarkdown text={message.text} />{message.streaming && <span className="stream-caret" />}</div></article>)}</div>
     {props.approval && <ApprovalCard approval={props.approval} queuedCount={props.approvalCount ?? 1} fontSize={props.fontSize ?? 14} onDecision={props.onApproval} onOpenDiff={props.onOpenDiff} allowApproval={props.approvalCanAccept} />}
     <div className="composer">{!!props.contextChips?.length && <div className="context-chips" aria-label="送信するEditorコンテキスト">{props.contextChips.map((chip) => <span className={`context-chip ${chip.warning ? "warning" : ""}`} key={chip.id}>{chip.label}<button aria-label={`${chip.label}をコンテキストから外す`} onClick={() => props.onRemoveContext(chip.id)}>×</button></span>)}</div>}<textarea rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }} placeholder={props.connected ? (props.threadId ? "Codexにメッセージを送信…" : "[新しいスレッド]をクリックするか、既存スレッドを選択してください") : "先にCodexへ接続してください"} disabled={!props.connected || !props.threadId || !chatAvailable} /><div className="composer-footer"><span>Enterで送信 · Shift+Enterで改行</span>{props.busy ? <button className="stop-chat-button" onClick={props.onInterrupt}><Icon name="stop" />中断</button> : <button className="send-button" onClick={() => void send()} disabled={!draft.trim() || !props.threadId || !chatAvailable}><span>送信</span>↑</button>}</div></div>
-    {menu && <div ref={menuRef} className="thread-context-menu" role="menu" style={{ left: menu.x, top: menu.y }}><button role="menuitem" onClick={rename}>名前を変更</button><button role="menuitem" className="danger" onClick={remove}>完全に削除</button></div>}
+    {menu && <div ref={menuRef} className="thread-context-menu" role="menu" style={{ left: menu.x, top: menu.y }}>
+      {menu.mode === "rename" ? <>
+        <label>スレッド名<input autoFocus value={menu.draftTitle} onChange={(event) => setMenu({ ...menu, draftTitle: event.target.value })} onKeyDown={(event) => { if (event.key === "Enter") rename(); if (event.key === "Escape") setMenu({ ...menu, mode: "default" }); }} /></label>
+        <button role="menuitem" onClick={rename} disabled={!menu.draftTitle.trim()}>名前を変更</button>
+        <button role="menuitem" onClick={() => setMenu({ ...menu, mode: "default" })}>戻る</button>
+      </> : menu.mode === "delete" ? <>
+        <span className="thread-delete-warning">「{menu.thread.title}」を完全に削除します。この操作は元に戻せません。</span>
+        <button role="menuitem" className="danger" onClick={remove}>削除を確定</button>
+        <button role="menuitem" onClick={() => setMenu({ ...menu, mode: "default" })}>戻る</button>
+      </> : <>
+        <button role="menuitem" onClick={() => setMenu({ ...menu, mode: "rename" })}>名前を変更</button>
+        <button role="menuitem" className="danger" onClick={() => setMenu({ ...menu, mode: "delete" })}>完全に削除</button>
+      </>}
+    </div>}
   </aside>;
 }
