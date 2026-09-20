@@ -458,9 +458,9 @@ kbd, .text-button, .output-content { color: #555555; }
 .codex-troubleshooting-details textarea { box-sizing: border-box; width: 100%; min-height: 150px; margin-top: 4px; padding: 7px; resize: vertical; color: #222; background: #fff; border: 1px solid #c8c8c8; border-radius: 4px; font-family: Consolas, "Yu Gothic UI", monospace; font-size: 12px; line-height: 1.45; }
 .troubleshooting-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
 .troubleshooting-actions span { color: #555; font-size: 12px; }
-.sandbox-setup-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 6px; }
-.sandbox-setup-options button { min-width: 0; white-space: normal; }
-.sandbox-setup-options span { grid-column: 1 / -1; color: #555; font-size: 12px; }
+.sandbox-guidance { display: grid; gap: 6px; margin-top: 6px; }
+.sandbox-guidance > span { color: #555; font-size: 12px; }
+.sandbox-guidance button { justify-self: start; max-width: 100%; white-space: normal; }
 .saved-threads { display: grid; gap: 3px; margin-top: 6px; }
 .saved-thread { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; width: 100%; padding: 6px 7px; color: #2f2f2f; text-align: left; background: transparent; border: 1px solid transparent; border-radius: 4px; }
 .saved-thread:hover, .saved-thread.active { background: #ececec; border-color: #d8d8d8; }

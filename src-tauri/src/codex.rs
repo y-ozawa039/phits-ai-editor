@@ -33,8 +33,8 @@ use crate::{
         ApprovalMode, CodexCompatibilityReport, CodexConnectResult, CodexFeatureId,
         CodexFeatureState, CodexModel, CodexSandboxCheck, CodexSandboxCheckId,
         CodexSandboxFailureCategory, CodexSandboxProbeReport, CodexSandboxProbeState,
-        CodexSandboxSetupResult, CodexThreadLink, EditorContextV1, PhitsAgentSetupCheck,
-        PhitsAgentSetupState, PhitsAgentSetupStatus,
+        CodexThreadLink, EditorContextV1, PhitsAgentSetupCheck, PhitsAgentSetupState,
+        PhitsAgentSetupStatus,
     },
     diagnostics::{codex_compatibility_probe, resolve_codex_executable, resolve_phits_root},
     error::{AppError, AppResult},
@@ -85,7 +85,6 @@ struct CodexConnection {
     thread_modes: Mutex<HashMap<String, ApprovalMode>>,
     thread_revisions: Mutex<HashMap<String, DiskRevision>>,
     change_histories: Mutex<HashMap<String, String>>,
-    sandbox_setup_waiters: Mutex<HashMap<String, oneshot::Sender<CodexSandboxSetupResult>>>,
     sandbox_write_ready: AtomicBool,
     sandbox_write_policy: Mutex<Option<WorkspaceWritePolicy>>,
     mcp_host: McpHost,
@@ -559,29 +558,6 @@ async fn record_notification_state(connection: &CodexConnection, method: &str, p
     }
 }
 
-async fn resolve_sandbox_setup_notification(connection: &CodexConnection, params: &Value) {
-    let Some(mode) = params.get("mode").and_then(Value::as_str) else {
-        return;
-    };
-    let result = CodexSandboxSetupResult {
-        mode: mode.to_owned(),
-        success: params
-            .get("success")
-            .and_then(Value::as_bool)
-            .unwrap_or(false),
-        error: params
-            .get("error")
-            .filter(|value| !value.is_null())
-            .map(|value| match value.as_str() {
-                Some(message) => message.to_owned(),
-                None => value.to_string(),
-            }),
-    };
-    if let Some(waiter) = connection.sandbox_setup_waiters.lock().await.remove(mode) {
-        let _ = waiter.send(result);
-    }
-}
-
 fn file_change_event(method: &str, params: &Value) -> Option<Value> {
     if !matches!(method, "item/started" | "item/completed") {
         return None;
@@ -952,9 +928,6 @@ async fn reader_loop(
         }
         if let Some(method) = message.get("method").and_then(Value::as_str) {
             let raw_params = message.get("params").cloned().unwrap_or(Value::Null);
-            if method == "windowsSandbox/setupCompleted" {
-                resolve_sandbox_setup_notification(&connection, &raw_params).await;
-            }
             let params = match normalize_file_change_params(&connection.workspace_root, &raw_params)
             {
                 Ok(params) => params,
@@ -1589,7 +1562,6 @@ async fn start_connection(
         thread_modes: Mutex::new(HashMap::new()),
         thread_revisions: Mutex::new(HashMap::new()),
         change_histories: Mutex::new(HashMap::new()),
-        sandbox_setup_waiters: Mutex::new(HashMap::new()),
         sandbox_write_ready: AtomicBool::new(false),
         sandbox_write_policy: Mutex::new(None),
         mcp_host,
@@ -1721,7 +1693,7 @@ fn sandbox_support_prompt(
         .collect::<Vec<_>>()
         .join("\n");
     format!(
-        "PHITS AI EditorのCodex編集環境診断で問題が見つかりました。次の診断結果を確認し、原因を特定してください。必要な変更を提案する前に、CodexのSandbox、Codex CLI設定、組織ポリシー、ワークスペース固有のアクセス規則のどこで失敗しているかを切り分けてください。Windows標準機能の『Windows Sandbox』が必要だとは決めつけず、Codexが現在使用している方式と実動作検査の結果を優先してください。セキュリティ制限を一括解除せず、所有権取得やアクセス規則の再帰的初期化も自動実行せず、PHITSワークスペース内の編集に必要な最小限の修正を提案してください。\n\nワークスペース: {}\n推定分類: {}\nSandbox readiness: {}\n現在のSandbox方式: {}\n組織ポリシーで許可された方式: {}\n利用できた書込み方針: {}\n診断結果:\n{}",
+        "PHITS AI EditorのCodex編集環境診断で問題が見つかりました。次の診断結果を確認し、原因を特定してください。必要な変更を提案する前に、CodexのSandbox、Codex CLI設定、組織ポリシー、ワークスペース固有のアクセス規則のどこで失敗しているかを切り分けてください。Windows標準機能の『Windows Sandbox』が必要だとは決めつけず、Codexが現在使用している方式と実動作検査の結果を優先してください。まず読取り専用の確認を行い、Sandboxの再セットアップ、ローカルユーザー、ファイアウォール、ローカルポリシー、所有権、アクセス規則を自動変更しないでください。変更が必要な場合は、影響範囲と元に戻す方法を先に説明し、利用者の明示的な判断を求めてください。PHITS計算や研究ファイルの変更は行わず、PHITSワークスペース内の編集に必要な最小限の修正だけを提案してください。\n\nワークスペース: {}\n推定分類: {}\nSandbox readiness: {}\n現在のSandbox方式: {}\n組織ポリシーで許可された方式: {}\n利用できた書込み方針: {}\n診断結果:\n{}",
         workspace_root.display(),
         failure_category
             .map(|value| format!("{value:?}"))
@@ -2142,7 +2114,6 @@ fn unavailable_sandbox_report(workspace_root: &Path, detail: String) -> CodexSan
         implementation: None,
         allowed_implementations: Vec::new(),
         failure_category: Some(CodexSandboxFailureCategory::CommandLaunch),
-        setup_recommended: false,
         write_policy: None,
         messages: vec![detail],
         support_prompt: sandbox_support_prompt(
@@ -2427,8 +2398,6 @@ pub async fn codex_sandbox_probe(
     };
     let state = sandbox_probe_state(&checks);
     let failure_category = sandbox_failure_category(&checks, readiness.as_deref());
-    let setup_recommended = failure_category == Some(CodexSandboxFailureCategory::SandboxSetup)
-        || (!editing_available && implementation.as_deref() == Some("unelevated"));
     if !temporary {
         connection
             .sandbox_write_ready
@@ -2453,104 +2422,11 @@ pub async fn codex_sandbox_probe(
         implementation,
         allowed_implementations,
         failure_category,
-        setup_recommended,
         write_policy: verified_write_policy.map(|value| value.report_value().to_string()),
         checks,
         messages,
         support_prompt,
     })
-}
-
-#[tauri::command]
-pub async fn codex_sandbox_setup(
-    app: AppHandle,
-    workspace_root: String,
-    mode: String,
-) -> AppResult<CodexSandboxSetupResult> {
-    if !matches!(mode.as_str(), "elevated" | "unelevated") {
-        return Err(AppError::Message(
-            "Unsupported Windows Sandbox setup mode".into(),
-        ));
-    }
-    let workspace = canonical_workspace(&workspace_root)?;
-    let existing = connection_slot().lock().await.clone();
-    let (connection, temporary) = match existing {
-        Some(connection) if connection.workspace_root == workspace => (connection, false),
-        _ => {
-            let compatibility = codex_compatibility_probe().await?;
-            (
-                start_connection(app, workspace.clone(), compatibility).await?,
-                true,
-            )
-        }
-    };
-
-    let (sender, receiver) = oneshot::channel();
-    connection
-        .sandbox_write_ready
-        .store(false, Ordering::Release);
-    *connection.sandbox_write_policy.lock().await = None;
-    let already_running = {
-        let mut waiters = connection.sandbox_setup_waiters.lock().await;
-        if waiters.contains_key(&mode) {
-            true
-        } else {
-            waiters.insert(mode.clone(), sender);
-            false
-        }
-    };
-    if already_running {
-        if temporary {
-            let _ = close_connection(&connection).await;
-        }
-        return Err(AppError::Message("Sandbox setup is already running".into()));
-    }
-
-    let start_result = connection
-        .request("windowsSandbox/setupStart", json!({ "mode": mode.clone() }))
-        .await;
-    let result = match start_result {
-        Ok(value) if value.get("started").and_then(Value::as_bool) == Some(true) => {
-            match timeout(Duration::from_secs(180), receiver).await {
-                Ok(Ok(result)) => result,
-                Ok(Err(_)) => CodexSandboxSetupResult {
-                    mode: mode.clone(),
-                    success: false,
-                    error: Some("Sandboxセットアップの完了通知を受け取れませんでした。".into()),
-                },
-                Err(_) => {
-                    connection.sandbox_setup_waiters.lock().await.remove(&mode);
-                    CodexSandboxSetupResult {
-                        mode: mode.clone(),
-                        success: false,
-                        error: Some(
-                            "Sandboxセットアップの完了を待機中に時間切れになりました。".into(),
-                        ),
-                    }
-                }
-            }
-        }
-        Ok(_) => {
-            connection.sandbox_setup_waiters.lock().await.remove(&mode);
-            CodexSandboxSetupResult {
-                mode: mode.clone(),
-                success: false,
-                error: Some("Codex App ServerがSandboxセットアップを開始しませんでした。".into()),
-            }
-        }
-        Err(error) => {
-            connection.sandbox_setup_waiters.lock().await.remove(&mode);
-            CodexSandboxSetupResult {
-                mode: mode.clone(),
-                success: false,
-                error: Some(short_probe_error(error)),
-            }
-        }
-    };
-    if temporary {
-        let _ = close_connection(&connection).await;
-    }
-    Ok(result)
 }
 
 #[tauri::command]

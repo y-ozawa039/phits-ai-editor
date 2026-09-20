@@ -2,7 +2,7 @@
 
 [日本語](installation.md) | English
 
-This guide covers the `0.0.7-alpha` distribution for Windows 11 x64. PHITS AI
+This guide covers the `0.0.8-alpha` distribution for Windows 11 x64. PHITS AI
 Editor is an independently developed alpha application. Back up important
 input files before use.
 
@@ -10,8 +10,8 @@ input files before use.
 
 | Artifact | Recommended for | Windows integration |
 | --- | --- | --- |
-| `PHITS-AI-Editor-v0.0.7-alpha-windows-x64-setup.exe` | Normal use | Yes |
-| `PHITS-AI-Editor-v0.0.7-alpha-windows-x64-portable.zip` | Evaluation, side-by-side versions, development, and investigation | No |
+| `PHITS-AI-Editor-v0.0.8-alpha-windows-x64-setup.exe` | Normal use | Yes |
+| `PHITS-AI-Editor-v0.0.8-alpha-windows-x64-portable.zip` | Evaluation, side-by-side versions, development, and investigation | No |
 
 We recommend the installer for normal use. GitHub's automatically generated
 `Source code (zip)` is not the portable Windows application. Although a bare
@@ -115,10 +115,12 @@ the workspace root, changing an existing peer file, and creating a file in a
 child folder. The writable policy that passes these checks is reused for actual
 Codex turns. If the full write sequence cannot be verified, writable approval
 modes are disabled and the Rust backend forces consultation-only operation.
-When setup recovery is applicable, the UI offers the official App Server setup
-path with **elevated (recommended where permitted)** and an explicit
-**unelevated retry**. The editor does not directly take ownership of folders,
-rewrite ACLs recursively, disable the Sandbox, or grant unrestricted access.
+When the result indicates a Sandbox setup problem, the UI links to the
+[official OpenAI Windows Sandbox guidance](https://developers.openai.com/docs/windows/windows-sandbox).
+The editor does not run Sandbox setup or change local users,
+firewall rules, local policies, folder ownership, or access permissions. A
+workspace-specific permission result offers a diagnostic report, AI
+troubleshooting prompt, and retry without recommending machine-wide repair.
 
 Diagnostic results are not cached in the workspace or settings. Required checks
 for PHITS and workspace metadata run again at application start and workspace
@@ -144,7 +146,7 @@ With the portable edition, you can:
 
 ## 7. SmartScreen warning
 
-`0.0.7-alpha` is not code-signed, so Windows SmartScreen may show a warning.
+`0.0.8-alpha` is not code-signed, so Windows SmartScreen may show a warning.
 Do not run a file obtained outside the official GitHub Release or a file whose
 SHA-256 does not match. Continue only after verifying the source and hash and
 reading the warning yourself.
@@ -152,7 +154,7 @@ reading the warning yourself.
 Use PowerShell to verify an artifact:
 
 ```powershell
-Get-FileHash .\PHITS-AI-Editor-v0.0.7-alpha-windows-x64-setup.exe -Algorithm SHA256
+Get-FileHash .\PHITS-AI-Editor-v0.0.8-alpha-windows-x64-setup.exe -Algorithm SHA256
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -183,7 +185,7 @@ release.
 
 ## 10. Before reporting a problem
 
-- Review the [known issues](known-issues-v0.0.7-alpha.en.md).
+- Review the [known issues](known-issues-v0.0.8-alpha.en.md).
 - Record the application version, Windows version, reproduction steps,
   expected result, and actual result.
 - Do not post credentials, personal information, unpublished research data, or

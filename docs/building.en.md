@@ -123,7 +123,7 @@ pnpm release:package:windows
 ```
 
 Draft output is written below
-`src-tauri/target/release/release-candidate/v0.0.7-alpha/` and remains ignored.
+`src-tauri/target/release/release-candidate/v0.0.8-alpha/` and remains ignored.
 
 ## Approval lifecycle test
 

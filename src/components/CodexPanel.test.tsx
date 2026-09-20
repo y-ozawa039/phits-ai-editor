@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { CodexPanel } from "./CodexPanel";
+import { CODEX_WINDOWS_SANDBOX_GUIDE_URL, CodexPanel } from "./CodexPanel";
 
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn(() => Promise.resolve()) }));
 
@@ -34,7 +34,10 @@ const baseProps = {
   onApproval: vi.fn(),
 };
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.mocked(openUrl).mockClear();
+});
 
 describe("CodexPanel", () => {
   it("uses the product spelling Codex without all-caps transformation", () => {
@@ -483,9 +486,9 @@ describe("CodexPanel", () => {
     expect(alert).toHaveTextContent("ワークスペース直下への作成");
   });
 
-  it("offers the explicit elevated Sandbox setup path", () => {
-    const onSandboxSetup = vi.fn();
-    render(<CodexPanel {...baseProps} onSandboxSetup={onSandboxSetup} sandboxReport={{
+  it("offers read-only official guidance and a retry for a Sandbox setup failure", async () => {
+    const onRetrySandboxProbe = vi.fn();
+    render(<CodexPanel {...baseProps} onRetrySandboxProbe={onRetrySandboxProbe} sandboxReport={{
       state: "unavailable",
       workspaceRoot: "C:\\work",
       checkedAt: "2026-09-18T00:00:00Z",
@@ -493,21 +496,22 @@ describe("CodexPanel", () => {
       implementation: "elevated",
       allowedImplementations: ["elevated"],
       failureCategory: "sandboxSetup",
-      setupRecommended: true,
       checks: [{ id: "workspaceCreate", state: "unavailable", detail: "setup refresh had errors" }],
       messages: [],
       supportPrompt: "",
     }} />);
 
-    const retry = screen.getByRole("button", { name: "elevatedで再セットアップ（推奨）" });
-    fireEvent.click(retry);
-    expect(onSandboxSetup).toHaveBeenCalledWith("elevated");
-    expect(screen.getByRole("alert")).toHaveTextContent("完了後に自動で再診断します");
+    expect(screen.queryByRole("button", { name: /再セットアップ/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "OpenAI公式のSandbox手順を開く" }));
+    await waitFor(() => expect(openUrl).toHaveBeenCalledWith(CODEX_WINDOWS_SANDBOX_GUIDE_URL));
+    fireEvent.click(screen.getByRole("button", { name: "再診断" }));
+    expect(onRetrySandboxProbe).toHaveBeenCalledOnce();
+    expect(screen.getByRole("alert")).toHaveTextContent("このエディタは端末のSandbox設定を変更しません");
   });
 
-  it("offers elevated setup and an unelevated retry after an unelevated write failure", () => {
-    const onSandboxSetup = vi.fn();
-    render(<CodexPanel {...baseProps} writableAvailable={false} onSandboxSetup={onSandboxSetup} sandboxReport={{
+  it("does not recommend machine-wide Sandbox repair for workspace permissions", () => {
+    const onRetrySandboxProbe = vi.fn();
+    render(<CodexPanel {...baseProps} writableAvailable={false} onRetrySandboxProbe={onRetrySandboxProbe} sandboxReport={{
       state: "unavailable",
       editingAvailable: false,
       workspaceRoot: "C:\\work",
@@ -516,16 +520,15 @@ describe("CodexPanel", () => {
       implementation: "unelevated",
       allowedImplementations: [],
       failureCategory: "workspacePermissions",
-      setupRecommended: true,
       checks: [{ id: "workspaceCreate", state: "unavailable", detail: "アクセスが拒否されました" }],
       messages: [],
       supportPrompt: "",
     }} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "elevatedで再セットアップ（推奨）" }));
-    fireEvent.click(screen.getByRole("button", { name: "unelevatedで再セットアップ" }));
-    expect(onSandboxSetup).toHaveBeenNthCalledWith(1, "elevated");
-    expect(onSandboxSetup).toHaveBeenNthCalledWith(2, "unelevated");
+    expect(screen.queryByRole("button", { name: /Sandbox手順/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /再セットアップ/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "再診断" }));
+    expect(onRetrySandboxProbe).toHaveBeenCalledOnce();
     expect(screen.getByText(/実動作検査でワークスペース書込みを確認できない/)).toBeInTheDocument();
   });
 

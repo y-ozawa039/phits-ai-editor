@@ -353,19 +353,10 @@ pub struct CodexSandboxProbeReport {
     pub implementation: Option<String>,
     pub allowed_implementations: Vec<String>,
     pub failure_category: Option<CodexSandboxFailureCategory>,
-    pub setup_recommended: bool,
     pub write_policy: Option<String>,
     pub checks: Vec<CodexSandboxCheck>,
     pub messages: Vec<String>,
     pub support_prompt: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct CodexSandboxSetupResult {
-    pub mode: String,
-    pub success: bool,
-    pub error: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

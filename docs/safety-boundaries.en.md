@@ -48,13 +48,12 @@ support, or Codex integration is customized.
   Unknown decisions are rejected. Consultation-only file or permission requests
   are rejected by Rust.
 - Session approvals expire when the App Server connection ends.
-- Access-rule diagnostics for the Codex editing environment are read-only. A
-  sandbox setup retry is offered only for a classified setup failure or when
-  live writes fail under the `unelevated` implementation. It uses the official
-  App Server request after explicit user action and confirmation, recommends
-  `elevated` when permitted, and also lets the user choose `unelevated`. It never
-  recursively resets access rules, takes ownership, disables the sandbox, or
-  switches to full access.
+- Access-rule diagnostics for the Codex editing environment are read-only. The
+  editor never runs Sandbox setup or changes local users, firewall rules, local
+  policies, access rules, or folder ownership. A classified setup failure links
+  to the [official OpenAI guidance](https://developers.openai.com/docs/windows/windows-sandbox).
+  A workspace-specific problem offers only a
+  diagnostic report, an AI troubleshooting prompt, and a retry.
 - Codex editing modes require both compatible schemas and a successful live
   check of command execution, root creation, existing-file-equivalent changes,
   and child-folder creation in the current workspace. The successful

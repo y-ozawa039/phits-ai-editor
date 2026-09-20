@@ -155,17 +155,10 @@ export interface CodexSandboxProbeReport {
   implementation?: string | null;
   allowedImplementations: string[];
   failureCategory?: CodexSandboxFailureCategory | null;
-  setupRecommended?: boolean;
   writePolicy?: "explicitRoot" | "workspaceCwd" | null;
   checks: CodexSandboxCheck[];
   messages: string[];
   supportPrompt: string;
-}
-
-export interface CodexSandboxSetupResult {
-  mode: string;
-  success: boolean;
-  error?: string | null;
 }
 
 export interface CodexEvent {
