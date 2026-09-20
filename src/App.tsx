@@ -1212,7 +1212,7 @@ export default function App() {
       return;
     }
     if (production && !(await confirmAction(
-      `未保存内容を保存後、${workspace.primaryInput} と既存出力を記録します。Codexを停止してPHITSを起動し、Editorを直ちに終了します。続行しますか？`,
+      "PHITSの本番実行を開始します。未保存の変更を保存した後、Codexを停止してPHITSを起動し、エディタを終了します。続行しますか？",
       { title: "PHITS本番実行", kind: "warning", okLabel: "本番実行を開始", cancelLabel: "キャンセル" },
     ))) return;
     try {
