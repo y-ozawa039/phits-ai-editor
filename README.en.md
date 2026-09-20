@@ -7,16 +7,16 @@ Codex-assisted input editing in one interface.
 
 ## Download for Windows
 
-The latest formally published alpha supports Windows 11 x64. The `main` branch
-is preparing `0.0.8-alpha`; the links below remain on the formally published
-`0.0.5-alpha` release.
+The latest formally published alpha is `0.0.8-alpha` for Windows 11 x64.
+See the [release page](https://github.com/y-ozawa039/phits-ai-editor/releases/tag/v0.0.8-alpha)
+for changes and important notes.
 
 - **Regular use (recommended):**
-  [Download the installer](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.5-alpha/PHITS-AI-Editor-v0.0.5-alpha-windows-x64-setup.exe)
+  [Download the installer](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.8-alpha/PHITS-AI-Editor-v0.0.8-alpha-windows-x64-setup.exe)
 - **Evaluation, portable use, or comparing versions:**
-  [Download the portable ZIP](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.5-alpha/PHITS-AI-Editor-v0.0.5-alpha-windows-x64-portable.zip)
+  [Download the portable ZIP](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.8-alpha/PHITS-AI-Editor-v0.0.8-alpha-windows-x64-portable.zip)
 - **Verify after downloading:**
-  [SHA-256 checksums](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.5-alpha/SHA256SUMS.txt)
+  [SHA-256 checksums](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.8-alpha/SHA256SUMS.txt)
 
 | Purpose | Choose | Why |
 |---|---|---|

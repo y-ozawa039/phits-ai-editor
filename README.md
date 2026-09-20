@@ -6,15 +6,15 @@ PHITS-Padに近い編集・実行機能と、CodexによるAI編集支援を一�
 
 ## Windows版をダウンロード
 
-現在の正式公開済みalpha版はWindows 11 x64専用です。`main`ブランチでは
-`0.0.8-alpha`を準備中であり、次のリンクは正式公開済みの`0.0.5-alpha`です。
+現在の正式公開済みalpha版は、Windows 11 x64向けの`0.0.8-alpha`です。
+変更内容と注意事項は[リリースページ](https://github.com/y-ozawa039/phits-ai-editor/releases/tag/v0.0.8-alpha)を参照してください。
 
 - **通常利用（推奨）:**
-  [インストーラー版をダウンロード](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.5-alpha/PHITS-AI-Editor-v0.0.5-alpha-windows-x64-setup.exe)
+  [インストーラー版をダウンロード](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.8-alpha/PHITS-AI-Editor-v0.0.8-alpha-windows-x64-setup.exe)
 - **試用・持ち運び・複数版の比較:**
-  [ポータブル版をダウンロード](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.5-alpha/PHITS-AI-Editor-v0.0.5-alpha-windows-x64-portable.zip)
+  [ポータブル版をダウンロード](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.8-alpha/PHITS-AI-Editor-v0.0.8-alpha-windows-x64-portable.zip)
 - **ダウンロード後の確認:**
-  [SHA-256一覧](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.5-alpha/SHA256SUMS.txt)
+  [SHA-256一覧](https://github.com/y-ozawa039/phits-ai-editor/releases/download/v0.0.8-alpha/SHA256SUMS.txt)
 
 | 目的 | 選ぶファイル | 選択理由 |
 |---|---|---|

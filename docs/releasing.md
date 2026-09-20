@@ -1,6 +1,6 @@
 # Release procedure
 
-The current planned release is `v0.0.8-alpha`, published as a GitHub Pre-release
+The current release baseline is `v0.0.8-alpha`, published as a GitHub Pre-release
 for Windows 11 x64. Repository visibility changes, tags, pushes, and GitHub
 Release publication require explicit maintainer approval.
 
