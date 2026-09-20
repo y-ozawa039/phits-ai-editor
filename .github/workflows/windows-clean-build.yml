@@ -50,6 +50,13 @@ jobs:
       - name: Build portable executable and NSIS installer
         run: pnpm tauri build
 
+      - name: Verify build did not modify tracked sources
+        shell: pwsh
+        run: |
+          git status --short --untracked-files=no
+          git diff --check
+          git diff --exit-code
+
       - name: Package release candidate and checksums
         run: pnpm release:package:windows
 
