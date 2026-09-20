@@ -84,7 +84,10 @@ try {
   }
 
   $commit = (git -C $projectRoot rev-parse HEAD).Trim()
-  $dirty = if (git -C $projectRoot status --porcelain) { "dirty working tree" } else { "clean working tree" }
+  # Build tools may leave ignored or otherwise untracked outputs in a fresh CI
+  # checkout.  Only tracked source changes affect reproducibility, so do not
+  # report those generated files as a dirty source tree.
+  $dirty = if (git -C $projectRoot status --porcelain --untracked-files=no) { "dirty tracked source tree" } else { "clean tracked source tree" }
   @(
     "PHITS AI Editor $Version"
     "Source commit: $commit"
