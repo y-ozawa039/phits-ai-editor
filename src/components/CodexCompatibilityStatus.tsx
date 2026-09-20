@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import type { CodexCompatibilityReport, CodexFeatureId, CodexSandboxCheckId, CodexSandboxProbeReport, PhitsAgentSetupStatus, WorkspaceDriveKind, WorkspaceEnvironmentReport } from "../types";
+import type { CodexCompatibilityReport, CodexEditingAccessState, CodexFeatureId, CodexSandboxCheckId, CodexSandboxProbeReport, PhitsAgentSetupStatus, WorkspaceDriveKind, WorkspaceEnvironmentReport } from "../types";
 import { Icon } from "./Icons";
 
 const FEATURE_LABELS: Record<CodexFeatureId, string> = {
@@ -63,8 +63,9 @@ function combinedState(
   report: CodexCompatibilityReport,
   sandbox: CodexSandboxProbeReport | null,
   setup: PhitsAgentSetupStatus | null,
+  editingAccess: CodexEditingAccessState,
 ) {
-  if (report.state === "incompatible" || sandbox?.state === "unavailable") return "incompatible" as const;
+  if (report.state === "incompatible" || (sandbox?.state === "unavailable" && editingAccess === "none")) return "incompatible" as const;
   if (
     report.state === "checking" ||
     report.state === "limited" ||
@@ -78,9 +79,12 @@ function combinedLabel(
   report: CodexCompatibilityReport,
   sandbox: CodexSandboxProbeReport | null,
   setup: PhitsAgentSetupStatus | null,
+  editingAccess: CodexEditingAccessState,
 ) {
+  if (editingAccess === "liveProbe") return "Codex編集環境：実編集確認済み";
+  if (editingAccess === "userOverride") return "Codex編集環境：利用者の選択で有効";
   if (!sandbox) return overallLabel(report);
-  const state = combinedState(report, sandbox, setup);
+  const state = combinedState(report, sandbox, setup, editingAccess);
   if (state === "compatible") return "Codex編集環境：確認済み";
   if (state === "limited") return "Codex編集環境：要確認";
   return "Codex編集環境：書込み未確認";
@@ -93,6 +97,7 @@ export function CodexCompatibilityStatus({
   sandboxBusy = false,
   setup = null,
   workspaceEnvironment = null,
+  editingAccess = "none",
 }: {
   report: CodexCompatibilityReport | null;
   busy: boolean;
@@ -100,6 +105,7 @@ export function CodexCompatibilityStatus({
   sandboxBusy?: boolean;
   setup?: PhitsAgentSetupStatus | null;
   workspaceEnvironment?: WorkspaceEnvironmentReport | null;
+  editingAccess?: CodexEditingAccessState;
 }) {
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();
@@ -108,8 +114,8 @@ export function CodexCompatibilityStatus({
     return <section className="codex-compatibility" aria-label="Codex機能の互換性"><p className="codex-probe-summary">Codex機能を確認中…</p></section>;
   }
   if (!report) return null;
-  const state = combinedState(report, sandbox, setup);
-  const label = combinedLabel(report, sandbox, setup);
+  const state = combinedState(report, sandbox, setup, editingAccess);
+  const label = combinedLabel(report, sandbox, setup, editingAccess);
   const displayLabel = busy || sandboxBusy ? "Codex編集環境：確認中…" : label;
   const windowsSandboxCheck = sandbox?.checks.find((check) => check.id === "windowsSandbox");
   const commandExecutionCheck = sandbox?.checks.find((check) => check.id === "commandExecution");
@@ -155,6 +161,11 @@ export function CodexCompatibilityStatus({
         <small>{sandboxStateLabel(workspaceEditState)}</small>
       </div>}
       {workspacePermissionCheck && renderSandboxCheck(workspacePermissionCheck)}
+      {editingAccess !== "none" && <div className="codex-feature-row" title={editingAccess === "liveProbe" ? "Codex App Serverの実際のターンで検査用ファイルの変更を確認しました。" : "診断結果に基づくエディタ側の制限だけを現在の接続中に解除しています。"}>
+        <span className={`diagnostic-dot ${editingAccess === "liveProbe" ? "ok" : "warn"}`} />
+        <span>編集可否</span>
+        <small>{editingAccess === "liveProbe" ? "実編集確認済み" : "利用者の選択で有効"}</small>
+      </div>}
       {workspaceEnvironment && <div className="codex-feature-row" title={workspaceEnvironment.messages.join("\n") || "保存場所に明確な注意事項はありません。"}>
         <span className={`diagnostic-dot ${workspaceEnvironment.state === "normal" ? "ok" : workspaceEnvironment.state === "attention" ? "warn" : "muted"}`} />
         <span>保存場所</span>

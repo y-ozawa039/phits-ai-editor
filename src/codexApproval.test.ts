@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { approvalRequestKey, changeKindLabel, normalizeApprovalRequest, normalizeAvailableDecisions, sameRequestId, stripAnsi, truncateDiff, unifiedDiffSides } from "./codexApproval";
+import { approvalCanBeAccepted, approvalRequestKey, changeKindLabel, normalizeApprovalRequest, normalizeAvailableDecisions, sameRequestId, stripAnsi, truncateDiff, unifiedDiffSides } from "./codexApproval";
 
 describe("Codex approval normalization", () => {
   it("normalizes a file change request and ignores unknown methods", () => {
@@ -17,6 +17,16 @@ describe("Codex approval normalization", () => {
       threadId: "thread-1",
       changes: [{ path: "main.inp" }],
     });
+  });
+
+  it("requires the normal diff review before a file change can be accepted", () => {
+    const fileChange = normalizeApprovalRequest({
+      requestId: "change",
+      method: "item/fileChange/requestApproval",
+      changes: [{ path: "main.inp", kind: { type: "update" }, diff: "" }],
+    });
+    expect(approvalCanBeAccepted(fileChange, false)).toBe(false);
+    expect(approvalCanBeAccepted(fileChange, true)).toBe(true);
   });
 
   it("keeps numeric and string request IDs distinct", () => {

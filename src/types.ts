@@ -161,6 +161,22 @@ export interface CodexSandboxProbeReport {
   supportPrompt: string;
 }
 
+export type CodexLiveEditProbeState = "available" | "unavailable";
+export type CodexLiveEditProbeRoute = "fileChange" | "commandExecution" | "none";
+export type CodexEditingAccessState = "none" | "liveProbe" | "userOverride";
+
+export interface CodexLiveEditProbeReport {
+  state: CodexLiveEditProbeState;
+  workspaceRoot: string;
+  checkedAt: string;
+  model: string | null;
+  reasoningEffort: string | null;
+  route: CodexLiveEditProbeRoute;
+  detail: string;
+  cleanupSucceeded: boolean;
+  threadCleanupSucceeded: boolean;
+}
+
 export interface CodexEvent {
   method: string;
   params: unknown;

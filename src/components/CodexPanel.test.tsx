@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { CODEX_WINDOWS_SANDBOX_GUIDE_URL, CodexPanel } from "./CodexPanel";
+import { CodexPanel } from "./CodexPanel";
 
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn(() => Promise.resolve()) }));
 
@@ -486,9 +486,11 @@ describe("CodexPanel", () => {
     expect(alert).toHaveTextContent("ワークスペース直下への作成");
   });
 
-  it("offers read-only official guidance and a retry for a Sandbox setup failure", async () => {
+  it("offers actual-edit diagnostics, an explicit Editor override and a retry for a Sandbox setup failure", () => {
     const onRetrySandboxProbe = vi.fn();
-    render(<CodexPanel {...baseProps} onRetrySandboxProbe={onRetrySandboxProbe} sandboxReport={{
+    const onStartLiveEditProbe = vi.fn();
+    const onEnableEditingOverride = vi.fn();
+    render(<CodexPanel {...baseProps} onRetrySandboxProbe={onRetrySandboxProbe} onStartLiveEditProbe={onStartLiveEditProbe} onEnableEditingOverride={onEnableEditingOverride} sandboxReport={{
       state: "unavailable",
       workspaceRoot: "C:\\work",
       checkedAt: "2026-09-18T00:00:00Z",
@@ -502,8 +504,11 @@ describe("CodexPanel", () => {
     }} />);
 
     expect(screen.queryByRole("button", { name: /再セットアップ/ })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "OpenAI公式のSandbox手順を開く" }));
-    await waitFor(() => expect(openUrl).toHaveBeenCalledWith(CODEX_WINDOWS_SANDBOX_GUIDE_URL));
+    expect(screen.queryByRole("button", { name: /Sandbox手順/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "実際のCodex編集経路を確認" }));
+    expect(onStartLiveEditProbe).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "診断結果にかかわらず編集を許可" }));
+    expect(onEnableEditingOverride).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole("button", { name: "再診断" }));
     expect(onRetrySandboxProbe).toHaveBeenCalledOnce();
     expect(screen.getByRole("alert")).toHaveTextContent("このエディタは端末のSandbox設定を変更しません");

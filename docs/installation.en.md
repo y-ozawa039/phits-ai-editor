@@ -110,17 +110,20 @@ and free-form error text may still contain personal information, so review the
 contents carefully before sharing them externally.
 
 After Codex connects, the editor checks not only App Server schema compatibility
-but also a Sandbox command and three real workspace writes: creating a file at
+but also an App Server command and three real workspace writes: creating a file at
 the workspace root, changing an existing peer file, and creating a file in a
 child folder. The writable policy that passes these checks is reused for actual
 Codex turns. If the full write sequence cannot be verified, writable approval
 modes are disabled and the Rust backend forces consultation-only operation.
-When the result indicates a Sandbox setup problem, the UI links to the
-[official OpenAI Windows Sandbox guidance](https://developers.openai.com/docs/windows/windows-sandbox).
-The editor does not run Sandbox setup or change local users,
-firewall rules, local policies, folder ownership, or access permissions. A
-workspace-specific permission result offers a diagnostic report, AI
-troubleshooting prompt, and retry without recommending machine-wide repair.
+If the result is questionable, the user can run an optional real-edit diagnostic
+that uses the selected model and reasoning effort to modify only a dedicated
+temporary file, independently of the normal approval mode. Before it starts,
+the editor explains the file creation, one-line edit, and cleanup; only the
+verified diagnostic-file change is then accepted automatically. The user may also explicitly remove only the
+editor's diagnostic gate for the current workspace and connection. Neither
+choice changes Sandbox or approval settings, PHITS-run validation, or machine
+configuration. The editor does not run Sandbox setup or change local users,
+firewall rules, local policies, folder ownership, or access permissions.
 
 Diagnostic results are not cached in the workspace or settings. Required checks
 for PHITS and workspace metadata run again at application start and workspace

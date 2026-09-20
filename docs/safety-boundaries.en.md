@@ -50,16 +50,23 @@ support, or Codex integration is customized.
 - Session approvals expire when the App Server connection ends.
 - Access-rule diagnostics for the Codex editing environment are read-only. The
   editor never runs Sandbox setup or changes local users, firewall rules, local
-  policies, access rules, or folder ownership. A classified setup failure links
-  to the [official OpenAI guidance](https://developers.openai.com/docs/windows/windows-sandbox).
-  A workspace-specific problem offers only a
-  diagnostic report, an AI troubleshooting prompt, and a retry.
+  policies, access rules, or folder ownership. Problems offer a diagnostic
+  report, an AI troubleshooting prompt, and a retry.
 - Codex editing modes require both compatible schemas and a successful live
   check of command execution, root creation, existing-file-equivalent changes,
   and child-folder creation in the current workspace. The successful
   `workspaceWrite` policy is reused for normal turns in that connection. If it
   cannot be verified, the Rust boundary also restricts the connection to
   consultation-only turns.
+- The optional real-edit diagnostic uses only a dedicated temporary file and a
+  non-persisted thread. App Server must request file-change approval first;
+  Rust verifies that the target is the single diagnostic file and then accepts
+  it automatically. This acceptance applies only to the diagnostic that the
+  user started after reviewing its file creation, one-line edit, and cleanup.
+  Changes to any other file, command execution, and PHITS execution are
+  rejected. A user override removes only the editor's diagnostic
+  gate for the current workspace and App Server connection; it does not change
+  Sandbox or approval settings.
 - Separate entry to an MCP tool from permission to run PHITS. Only a gate matched
   to the `phits_ai_editor/run_phits` item and arguments in the same turn is
   forwarded to the editor's run review. Runner checks and approval modes still

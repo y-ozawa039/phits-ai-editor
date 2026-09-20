@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { ApprovalDecision, ApprovalMode, ApprovalRequest, CodexChangeGroupV1, CodexChangeHistoryEntryV1, CodexCompatibilityReport, CodexConnectResult, CodexHistoryChangeInput, CodexHistoryPreview, CodexSandboxProbeReport, DocumentData, EditorContextV1, PhitsAgentSetupStatus, PhitsAppSettings, RuntimeDiagnostics, StartupOpenRequest, UtilityKind, WorkspaceEnvironmentReport, WorkspaceInfo } from "./types";
+import type { ApprovalDecision, ApprovalMode, ApprovalRequest, CodexChangeGroupV1, CodexChangeHistoryEntryV1, CodexCompatibilityReport, CodexConnectResult, CodexHistoryChangeInput, CodexHistoryPreview, CodexLiveEditProbeReport, CodexSandboxProbeReport, DocumentData, EditorContextV1, PhitsAgentSetupStatus, PhitsAppSettings, RuntimeDiagnostics, StartupOpenRequest, UtilityKind, WorkspaceEnvironmentReport, WorkspaceInfo } from "./types";
 
 export const api = {
   openWorkspace: (path: string, restoreRunState = true, preferredInput?: string) => invoke<WorkspaceInfo>("workspace_open", { path, restoreRunState, preferredInput }),
@@ -14,6 +14,8 @@ export const api = {
   openStartupLogFolder: () => invoke<void>("open_startup_log_folder"),
   codexCompatibilityProbe: () => invoke<CodexCompatibilityReport>("codex_compatibility_probe"),
   codexSandboxProbe: (workspaceRoot: string) => invoke<CodexSandboxProbeReport>("codex_sandbox_probe", { workspaceRoot }),
+  codexLiveEditProbe: (workspaceRoot: string, model: string | undefined, reasoningEffort: string | undefined) => invoke<CodexLiveEditProbeReport>("codex_live_edit_probe", { workspaceRoot, model, reasoningEffort }),
+  codexEditingOverrideSet: (workspaceRoot: string, enabled: boolean) => invoke<void>("codex_editing_override_set", { workspaceRoot, enabled }),
   getPhitsSettings: () => invoke<PhitsAppSettings>("phits_settings_get"),
   setPhitsSettings: (phitsRoot?: string | null) => invoke<PhitsAppSettings>("phits_settings_set", { phitsRoot: phitsRoot ?? null }),
   loadLanguageSpec: (phitsRoot?: string) => invoke<unknown>("language_spec_load", { phitsRoot }),

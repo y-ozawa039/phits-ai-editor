@@ -69,6 +69,8 @@ pub fn run() {
             runner::run_utility,
             codex::phits_agent_setup_inspect,
             codex::codex_sandbox_probe,
+            codex::codex_live_edit_probe,
+            codex::codex_editing_override_set,
             codex::codex_connect,
             codex::codex_disconnect,
             codex::codex_thread_start,

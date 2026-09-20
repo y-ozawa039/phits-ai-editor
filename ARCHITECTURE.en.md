@@ -106,10 +106,18 @@ writable roots and the current working-directory boundary are checked in a
 safe order, and only a policy that passes every required check is reused for
 normal turns in that connection. A connection without verified writes is
 restricted to consultation-only in Rust even when its schemas are compatible.
-A classified setup failure or a live write failure under `unelevated` offers
-explicit App Server setup actions followed by automatic re-diagnosis.
-`elevated` is recommended when allowed, while retrying `unelevated` remains a
-choice. The editor does not directly change access rules or ownership.
+To distinguish a probe mismatch from a real Codex editing failure, the user can
+explicitly run an optional diagnostic with a dedicated temporary file and
+non-persisted thread. It uses the selected model and reasoning effort. Before
+the user starts it, the editor explains the temporary file's creation, one-line
+edit, and cleanup. Rust verifies that App Server's change request targets that
+exact diagnostic file and then accepts it automatically.
+Commands and changes to any other file are rejected. Success enables
+editing only for that connection. The user may alternatively remove only the
+editor's diagnostic gate for the current workspace and connection. This does
+not change the Sandbox, approval settings, workspace boundary, or PHITS-run
+validation. The editor never changes access rules, ownership, or Sandbox
+configuration.
 
 After a workspace opens, a non-recursive check reports drive and file-system
 type, UNC paths, reparse points, the read-only attribute, path length, and

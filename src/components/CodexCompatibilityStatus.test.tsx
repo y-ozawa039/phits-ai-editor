@@ -131,6 +131,24 @@ describe("CodexCompatibilityStatus", () => {
     expect(workspaceEditing).toHaveAttribute("title", expect.stringContaining("子階層への作成: 子階層は利用不可"));
   });
 
+  it("distinguishes a verified real edit from an explicit user override", () => {
+    const sandbox: CodexSandboxProbeReport = {
+      state: "unavailable",
+      workspaceRoot: "C:\\work",
+      checkedAt: "2026-09-20T00:00:00Z",
+      readiness: "ready",
+      allowedImplementations: [],
+      checks: [{ id: "workspaceCreate", state: "unavailable", detail: "書込み未確認" }],
+      messages: [],
+      supportPrompt: "",
+    };
+    const { rerender } = render(<CodexCompatibilityStatus report={report} busy={false} sandbox={sandbox} editingAccess="liveProbe" />);
+    expect(screen.getByRole("button", { name: "Codex編集環境：実編集確認済み" })).toBeInTheDocument();
+
+    rerender(<CodexCompatibilityStatus report={report} busy={false} sandbox={sandbox} editingAccess="userOverride" />);
+    expect(screen.getByRole("button", { name: "Codex編集環境：利用者の選択で有効" })).toBeInTheDocument();
+  });
+
   it("shows storage context without adding report actions to the compact panel", () => {
     const { container } = render(<CodexCompatibilityStatus
       report={report}

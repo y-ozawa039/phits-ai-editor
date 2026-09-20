@@ -31,7 +31,8 @@ use crate::{
     codex_mcp::McpHost,
     contracts::{
         ApprovalMode, CodexCompatibilityReport, CodexConnectResult, CodexFeatureId,
-        CodexFeatureState, CodexModel, CodexSandboxCheck, CodexSandboxCheckId,
+        CodexFeatureState, CodexLiveEditProbeReport, CodexLiveEditProbeRoute,
+        CodexLiveEditProbeState, CodexModel, CodexSandboxCheck, CodexSandboxCheckId,
         CodexSandboxFailureCategory, CodexSandboxProbeReport, CodexSandboxProbeState,
         CodexThreadLink, EditorContextV1, PhitsAgentSetupCheck, PhitsAgentSetupState,
         PhitsAgentSetupStatus,
@@ -53,6 +54,9 @@ The application appends a PHITS_EDITOR_CONTEXT_V1 item to every user turn. Treat
 When the user asks to edit, create, rename, move, or delete a file and the turn is writable, perform the requested change now with Codex's built-in file-editing capability so the App Server emits a fileChange item and the PHITS AI Editor can present its review and approval UI. Do not merely print a unified diff, patch, replacement text, or instructions in chat unless the user explicitly asks only for a proposal or explanation. Never claim a file was changed unless the built-in editing action completed.
 
 When the turn is read-only, discuss the requested change without attempting to modify files. Request approval through the App Server whenever its policy requires it."#;
+const LIVE_EDIT_PROBE_INSTRUCTIONS: &str = r#"You are running a narrowly scoped PHITS AI Editor diagnostic.
+
+Modify only the exact diagnostic file named by the user. Use Codex's built-in file-editing capability so the App Server emits a fileChange item. Do not run shell commands, do not call MCP tools, do not access the network, do not inspect or modify any other file, and do not run PHITS or any related utility. If the requested edit cannot be completed with the built-in file editor, say so without taking another action."#;
 type PendingResponse = oneshot::Sender<Result<Value, String>>;
 
 fn editor_context_input(context: &EditorContextV1) -> AppResult<String> {
@@ -67,6 +71,21 @@ struct PendingApproval {
     method: String,
     proposed_execpolicy_amendment: Option<Value>,
     interaction_params: Option<Value>,
+}
+
+#[derive(Debug, Default)]
+struct LiveEditProbeProgress {
+    route: Option<CodexLiveEditProbeRoute>,
+    file_change_completed: bool,
+    item_status: Option<String>,
+    turn_status: Option<String>,
+    failure: Option<String>,
+}
+
+struct LiveEditProbeRuntime {
+    expected_relative_path: String,
+    progress: Mutex<LiveEditProbeProgress>,
+    completion: Mutex<Option<oneshot::Sender<()>>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -85,6 +104,7 @@ struct CodexConnection {
     thread_modes: Mutex<HashMap<String, ApprovalMode>>,
     thread_revisions: Mutex<HashMap<String, DiskRevision>>,
     change_histories: Mutex<HashMap<String, String>>,
+    live_edit_probes: Mutex<HashMap<String, Arc<LiveEditProbeRuntime>>>,
     sandbox_write_ready: AtomicBool,
     sandbox_write_policy: Mutex<Option<WorkspaceWritePolicy>>,
     mcp_host: McpHost,
@@ -349,12 +369,8 @@ fn normalize_codex_change_path(workspace_root: &Path, value: &str) -> AppResult<
     Ok(path_to_string(relative))
 }
 
-fn normalize_file_change_item(workspace_root: &Path, item: &Value) -> AppResult<Value> {
-    if item.get("type").and_then(Value::as_str) != Some("fileChange") {
-        return Ok(item.clone());
-    }
-    let mut normalized = item.clone();
-    let changes = normalized
+fn normalize_file_change_changes(workspace_root: &Path, value: &mut Value) -> AppResult<()> {
+    let changes = value
         .get_mut("changes")
         .and_then(Value::as_array_mut)
         .ok_or_else(|| AppError::Message("Codex file change omitted its changes".into()))?;
@@ -375,6 +391,15 @@ fn normalize_file_change_item(workspace_root: &Path, item: &Value) -> AppResult<
             change["kind"]["move_path"] = Value::String(relative_move);
         }
     }
+    Ok(())
+}
+
+fn normalize_file_change_item(workspace_root: &Path, item: &Value) -> AppResult<Value> {
+    if item.get("type").and_then(Value::as_str) != Some("fileChange") {
+        return Ok(item.clone());
+    }
+    let mut normalized = item.clone();
+    normalize_file_change_changes(workspace_root, &mut normalized)?;
     Ok(normalized)
 }
 
@@ -384,6 +409,9 @@ fn normalize_file_change_params(workspace_root: &Path, params: &Value) -> AppRes
         && item.get("type").and_then(Value::as_str) == Some("fileChange")
     {
         normalized["item"] = normalize_file_change_item(workspace_root, &item)?;
+    }
+    if normalized.get("changes").is_some() {
+        normalize_file_change_changes(workspace_root, &mut normalized)?;
     }
     Ok(normalized)
 }
@@ -698,6 +726,126 @@ fn validate_approval_file_paths(
     Ok(())
 }
 
+async fn live_edit_probe_for_params(
+    connection: &CodexConnection,
+    params: &Value,
+) -> Option<Arc<LiveEditProbeRuntime>> {
+    let thread_id = params.get("threadId").and_then(Value::as_str)?;
+    connection
+        .live_edit_probes
+        .lock()
+        .await
+        .get(thread_id)
+        .cloned()
+}
+
+fn live_edit_probe_change_error(
+    runtime: &LiveEditProbeRuntime,
+    params: &Value,
+    item: Option<&Value>,
+) -> Option<String> {
+    let changes = params
+        .get("changes")
+        .or_else(|| item.and_then(|value| value.get("changes")))
+        .and_then(Value::as_array);
+    let Some(changes) = changes else {
+        return Some("診断用のファイル変更に対象パスがありません。".into());
+    };
+    if changes.is_empty() {
+        return Some("診断用のファイル変更が空でした。".into());
+    }
+    for change in changes {
+        let Some(path) = change.get("path").and_then(Value::as_str) else {
+            return Some("診断用のファイル変更に対象パスがありません。".into());
+        };
+        if path != runtime.expected_relative_path {
+            return Some(format!("診断対象外のファイル変更を拒否しました: {path}"));
+        }
+        if change
+            .get("kind")
+            .and_then(|kind| kind.get("move_path"))
+            .is_some()
+        {
+            return Some("診断用ファイルの移動要求を拒否しました。".into());
+        }
+    }
+    None
+}
+
+async fn fail_live_edit_probe(runtime: &LiveEditProbeRuntime, detail: String) {
+    let mut progress = runtime.progress.lock().await;
+    if progress.failure.is_none() {
+        progress.failure = Some(detail);
+    }
+}
+
+async fn handle_live_edit_probe_notification(
+    connection: &CodexConnection,
+    method: &str,
+    params: &Value,
+) -> bool {
+    let Some(runtime) = live_edit_probe_for_params(connection, params).await else {
+        return false;
+    };
+    let item = params.get("item");
+    match method {
+        "item/started" | "item/completed" => {
+            match item
+                .and_then(|value| value.get("type"))
+                .and_then(Value::as_str)
+            {
+                Some("fileChange") => {
+                    let mut progress = runtime.progress.lock().await;
+                    progress.route = Some(CodexLiveEditProbeRoute::FileChange);
+                    if let Some(error) = live_edit_probe_change_error(&runtime, params, item) {
+                        progress.failure.get_or_insert(error);
+                    }
+                    if method == "item/completed" {
+                        progress.item_status = item
+                            .and_then(|value| value.get("status"))
+                            .and_then(Value::as_str)
+                            .map(str::to_owned);
+                        progress.file_change_completed = progress
+                            .item_status
+                            .as_deref()
+                            .is_some_and(|status| status.eq_ignore_ascii_case("completed"));
+                    }
+                }
+                Some("commandExecution") => {
+                    let mut progress = runtime.progress.lock().await;
+                    progress.route = Some(CodexLiveEditProbeRoute::CommandExecution);
+                    progress.failure.get_or_insert_with(|| {
+                        "診断では許可していないコマンド実行が要求されました。".into()
+                    });
+                }
+                _ => {}
+            }
+        }
+        "turn/completed" => {
+            {
+                let mut progress = runtime.progress.lock().await;
+                progress.turn_status = params
+                    .pointer("/turn/status")
+                    .or_else(|| params.get("status"))
+                    .and_then(Value::as_str)
+                    .map(str::to_owned);
+            }
+            if let Some(sender) = runtime.completion.lock().await.take() {
+                let _ = sender.send(());
+            }
+        }
+        "serverRequest/resolved" => {
+            if let Some(request_id) = params.get("requestId")
+                && let Ok(key) = approval_key(request_id)
+            {
+                connection.approvals.lock().await.remove(&key);
+            }
+        }
+        _ => {}
+    }
+    true
+}
+
 async fn reader_loop(
     connection: Arc<CodexConnection>,
     stdout: tokio::process::ChildStdout,
@@ -755,6 +903,40 @@ async fn reader_loop(
                     }
                     item => (item, None),
                 };
+                if let Some(runtime) = live_edit_probe_for_params(&connection, &params).await {
+                    if method == "item/commandExecution/requestApproval" {
+                        {
+                            let mut progress = runtime.progress.lock().await;
+                            progress.route = Some(CodexLiveEditProbeRoute::CommandExecution);
+                            progress.failure.get_or_insert_with(|| {
+                                "診断では許可していないコマンド実行が要求されました。".into()
+                            });
+                        }
+                        let _ = connection
+                            .send_json(&json!({ "id": id, "result": { "decision": "decline" } }))
+                            .await;
+                        continue;
+                    }
+                    let diagnostic_error = params_path_error
+                        .clone()
+                        .or(item_path_error.clone())
+                        .or_else(|| live_edit_probe_change_error(&runtime, &params, item.as_ref()));
+                    if let Some(reason) = diagnostic_error {
+                        fail_live_edit_probe(&runtime, reason).await;
+                        let _ = connection
+                            .send_json(&json!({ "id": id, "result": { "decision": "decline" } }))
+                            .await;
+                        continue;
+                    }
+                    runtime.progress.lock().await.route = Some(CodexLiveEditProbeRoute::FileChange);
+                    // Pressing "検査を開始" is the user's consent for this single,
+                    // explained edit. Auto-accept only after the exact temporary-file
+                    // path and built-in file-change route have passed the checks above.
+                    let _ = connection
+                        .send_json(&json!({ "id": id, "result": { "decision": "accept" } }))
+                        .await;
+                    continue;
+                }
                 let approval_mode =
                     if let Some(thread_id) = params.get("threadId").and_then(Value::as_str) {
                         connection.thread_modes.lock().await.get(thread_id).copied()
@@ -945,6 +1127,20 @@ async fn reader_loop(
                 }
             };
             record_notification_state(&connection, method, &params).await;
+            if handle_live_edit_probe_notification(&connection, method, &params).await {
+                if method == "serverRequest/resolved"
+                    && let Some(request_id) = params.get("requestId")
+                {
+                    let _ = app.emit(
+                        "codex://approval-resolved",
+                        json!({
+                            "requestId": request_id,
+                            "threadId": params.get("threadId").cloned().unwrap_or(Value::Null)
+                        }),
+                    );
+                }
+                continue;
+            }
             if method == "thread/name/updated"
                 && let (Some(thread_id), Some(name)) = (
                     params.get("threadId").and_then(Value::as_str),
@@ -1077,6 +1273,19 @@ async fn reader_loop(
     let mut pending = connection.pending.lock().await;
     for (_, sender) in pending.drain() {
         let _ = sender.send(Err("Codex App Server exited".into()));
+    }
+    let probes = connection
+        .live_edit_probes
+        .lock()
+        .await
+        .drain()
+        .map(|(_, runtime)| runtime)
+        .collect::<Vec<_>>();
+    for runtime in probes {
+        fail_live_edit_probe(&runtime, "Codex App Serverが診断中に終了しました。".into()).await;
+        if let Some(sender) = runtime.completion.lock().await.take() {
+            let _ = sender.send(());
+        }
     }
     let _ = app.emit("codex://disconnected", ());
 }
@@ -1562,6 +1771,7 @@ async fn start_connection(
         thread_modes: Mutex::new(HashMap::new()),
         thread_revisions: Mutex::new(HashMap::new()),
         change_histories: Mutex::new(HashMap::new()),
+        live_edit_probes: Mutex::new(HashMap::new()),
         sandbox_write_ready: AtomicBool::new(false),
         sandbox_write_policy: Mutex::new(None),
         mcp_host,
@@ -2430,6 +2640,267 @@ pub async fn codex_sandbox_probe(
 }
 
 #[tauri::command]
+pub async fn codex_editing_override_set(workspace_root: String, enabled: bool) -> AppResult<()> {
+    let connection = current_connection().await?;
+    ensure_workspace(&connection, &workspace_root).await?;
+    if enabled {
+        require_codex_feature(
+            &connection.compatibility,
+            CodexFeatureId::FileEditing,
+            "file editing",
+        )?;
+        require_codex_feature(
+            &connection.compatibility,
+            CodexFeatureId::Approvals,
+            "approvals",
+        )?;
+        *connection.sandbox_write_policy.lock().await = Some(WorkspaceWritePolicy::WorkspaceCwd);
+        connection
+            .sandbox_write_ready
+            .store(true, Ordering::Release);
+        crate::startup_log::append(
+            "Codex editing enabled for the current connection by explicit user override",
+        );
+    } else {
+        connection
+            .sandbox_write_ready
+            .store(false, Ordering::Release);
+        *connection.sandbox_write_policy.lock().await = None;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn codex_live_edit_probe(
+    workspace_root: String,
+    model: Option<String>,
+    reasoning_effort: Option<String>,
+) -> AppResult<CodexLiveEditProbeReport> {
+    let connection = current_connection().await?;
+    require_codex_feature(&connection.compatibility, CodexFeatureId::Chat, "chat")?;
+    require_codex_feature(
+        &connection.compatibility,
+        CodexFeatureId::Threads,
+        "threads",
+    )?;
+    require_codex_feature(
+        &connection.compatibility,
+        CodexFeatureId::FileEditing,
+        "file editing",
+    )?;
+    require_codex_feature(
+        &connection.compatibility,
+        CodexFeatureId::Approvals,
+        "approvals",
+    )?;
+    ensure_workspace(&connection, &workspace_root).await?;
+    if !connection.live_edit_probes.lock().await.is_empty() {
+        return Err(AppError::Message(
+            "実際のCodex編集経路をすでに検査しています。".into(),
+        ));
+    }
+
+    let probe_id = Uuid::new_v4();
+    let file_name = format!(".phits-editor-codex-live-probe-{probe_id}.txt");
+    let probe_path = connection.workspace_root.join(&file_name);
+    let before_marker = format!("PHITS_AI_EDITOR_LIVE_EDIT_PROBE:{probe_id}:BEFORE\n");
+    let after_marker = format!("PHITS_AI_EDITOR_LIVE_EDIT_PROBE:{probe_id}:AFTER\n");
+    std::fs::write(&probe_path, &before_marker).map_err(|error| {
+        AppError::Message(format!(
+            "実編集診断用ファイルを準備できませんでした: {error}"
+        ))
+    })?;
+
+    let thread_result = connection
+        .request(
+            "thread/start",
+            json!({
+                "cwd": connection.workspace_root,
+                "model": model.clone(),
+                "approvalPolicy": "untrusted",
+                "sandbox": "workspace-write",
+                "developerInstructions": LIVE_EDIT_PROBE_INSTRUCTIONS,
+                "ephemeral": true
+            }),
+        )
+        .await;
+    let thread_result = match thread_result {
+        Ok(result) => result,
+        Err(error) => {
+            let cleanup_succeeded = std::fs::remove_file(&probe_path).is_ok();
+            return Ok(CodexLiveEditProbeReport {
+                state: CodexLiveEditProbeState::Unavailable,
+                workspace_root: path_to_string(&connection.workspace_root),
+                checked_at: Utc::now().to_rfc3339(),
+                model,
+                reasoning_effort,
+                route: CodexLiveEditProbeRoute::None,
+                detail: format!("診断用スレッドを開始できませんでした: {error}"),
+                cleanup_succeeded,
+                thread_cleanup_succeeded: true,
+            });
+        }
+    };
+    let Some(thread_id) = thread_result
+        .pointer("/thread/id")
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+    else {
+        let cleanup_succeeded = std::fs::remove_file(&probe_path).is_ok();
+        return Ok(CodexLiveEditProbeReport {
+            state: CodexLiveEditProbeState::Unavailable,
+            workspace_root: path_to_string(&connection.workspace_root),
+            checked_at: Utc::now().to_rfc3339(),
+            model,
+            reasoning_effort,
+            route: CodexLiveEditProbeRoute::None,
+            detail: "Codexから診断用スレッドIDを取得できませんでした。".into(),
+            cleanup_succeeded,
+            thread_cleanup_succeeded: true,
+        });
+    };
+    let actual_model = model.clone().or_else(|| {
+        thread_result
+            .pointer("/thread/model")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+    });
+    let (completion_tx, completion_rx) = oneshot::channel();
+    let runtime = Arc::new(LiveEditProbeRuntime {
+        expected_relative_path: file_name.clone(),
+        progress: Mutex::new(LiveEditProbeProgress::default()),
+        completion: Mutex::new(Some(completion_tx)),
+    });
+    connection
+        .live_edit_probes
+        .lock()
+        .await
+        .insert(thread_id.clone(), runtime.clone());
+    let prompt = format!(
+        "Edit only `{file_name}` with the built-in file editor. Replace the complete line `{before}` with `{after}`. Do not run any command and do not inspect or modify another file.",
+        before = before_marker.trim_end(),
+        after = after_marker.trim_end(),
+    );
+    let turn_result = connection
+        .request(
+            "turn/start",
+            json!({
+                "threadId": thread_id.clone(),
+                "input": [{ "type": "text", "text": prompt }],
+                "cwd": connection.workspace_root,
+                "model": actual_model.clone(),
+                "effort": reasoning_effort.clone(),
+                // Always make the App Server request approval so this client can verify that
+                // the proposed change targets only the single diagnostic file. The selected
+                // Editor mode still controls whether that verified request is shown or accepted
+                // automatically.
+                "approvalPolicy": "untrusted",
+                "sandboxPolicy": workspace_write_probe_policy(
+                    &connection.workspace_root,
+                    WorkspaceWritePolicy::WorkspaceCwd,
+                )
+            }),
+        )
+        .await;
+    let turn_id = turn_result
+        .as_ref()
+        .ok()
+        .and_then(|result| result.pointer("/turn/id"))
+        .and_then(Value::as_str)
+        .map(str::to_owned);
+    if let Err(error) = turn_result {
+        fail_live_edit_probe(
+            &runtime,
+            format!("診断用ターンを開始できませんでした: {error}"),
+        )
+        .await;
+        if let Some(sender) = runtime.completion.lock().await.take() {
+            let _ = sender.send(());
+        }
+    } else if timeout(Duration::from_secs(120), completion_rx)
+        .await
+        .is_err()
+    {
+        fail_live_edit_probe(
+            &runtime,
+            "Codexの編集診断が120秒以内に完了しませんでした。".into(),
+        )
+        .await;
+        if let Some(turn_id) = turn_id.as_deref() {
+            let _ = connection
+                .request(
+                    "turn/interrupt",
+                    json!({ "threadId": thread_id, "turnId": turn_id }),
+                )
+                .await;
+        }
+    }
+
+    let progress = runtime.progress.lock().await;
+    let route = progress.route.unwrap_or(CodexLiveEditProbeRoute::None);
+    let observed = std::fs::read_to_string(&probe_path).ok();
+    let content_matches = observed.as_deref() == Some(after_marker.as_str());
+    let success = progress.failure.is_none()
+        && route == CodexLiveEditProbeRoute::FileChange
+        && progress.file_change_completed
+        && content_matches;
+    let state = if success {
+        CodexLiveEditProbeState::Available
+    } else {
+        CodexLiveEditProbeState::Unavailable
+    };
+    let detail = if success {
+        "Codex App Serverの実際のターンから、組込みファイル編集と内容照合まで確認しました。"
+            .to_string()
+    } else if let Some(failure) = progress.failure.as_ref() {
+        failure.clone()
+    } else if !content_matches {
+        "Codexのターンは終了しましたが、検査用ファイルの内容が期待値と一致しませんでした。"
+            .to_string()
+    } else {
+        format!(
+            "Codexの実編集を確認できませんでした（項目状態: {}、ターン状態: {}）。",
+            progress.item_status.as_deref().unwrap_or("未取得"),
+            progress.turn_status.as_deref().unwrap_or("未取得")
+        )
+    };
+    drop(progress);
+
+    connection.live_edit_probes.lock().await.remove(&thread_id);
+    connection.thread_modes.lock().await.remove(&thread_id);
+    // Ephemeral root threads are kept only in memory and cannot be deleted via
+    // thread/delete. Removing the runtime registration is the required cleanup.
+    let thread_cleanup_succeeded = true;
+    let cleanup_succeeded = match std::fs::remove_file(&probe_path) {
+        Ok(()) => true,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => true,
+        Err(_) => false,
+    };
+    if success {
+        *connection.sandbox_write_policy.lock().await = Some(WorkspaceWritePolicy::WorkspaceCwd);
+        connection
+            .sandbox_write_ready
+            .store(true, Ordering::Release);
+    }
+    crate::startup_log::append(if success {
+        "Codex live edit diagnostic completed successfully"
+    } else {
+        "Codex live edit diagnostic did not confirm editing"
+    });
+    Ok(CodexLiveEditProbeReport {
+        state,
+        workspace_root: path_to_string(&connection.workspace_root),
+        checked_at: Utc::now().to_rfc3339(),
+        model: actual_model,
+        reasoning_effort,
+        route,
+        detail,
+        cleanup_succeeded,
+        thread_cleanup_succeeded,
+    })
+}
+
+#[tauri::command]
 pub async fn codex_connect(
     app: AppHandle,
     workspace_root: String,
@@ -2949,6 +3420,7 @@ pub async fn codex_approval_resolve(
         .send_json(&json!({ "id": request_id, "result": result }))
         .await?;
     approvals.remove(&key);
+    drop(approvals);
     let outcome = match decision.as_str() {
         "decline" => "[userDeclined] ユーザーがこの操作を拒否しました。",
         "cancel" => "[userCancelled] ユーザーが確認要求を中止しました。",
@@ -3675,6 +4147,23 @@ mod tests {
     }
 
     #[test]
+    fn normalizes_absolute_paths_in_top_level_approval_changes() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("probe.txt");
+        std::fs::write(&path, "before\n").unwrap();
+        let params = json!({
+            "threadId": "diagnostic-thread",
+            "changes": [{
+                "path": path,
+                "kind": { "type": "update", "move_path": null },
+                "diff": "@@ -1 +1 @@\n-before\n+after"
+            }]
+        });
+        let normalized = normalize_file_change_params(directory.path(), &params).unwrap();
+        assert_eq!(normalized["changes"][0]["path"], "probe.txt");
+    }
+
+    #[test]
     fn rejects_absolute_app_server_paths_outside_the_workspace() {
         let directory = tempfile::tempdir().unwrap();
         let outside = tempfile::tempdir().unwrap();
@@ -3749,6 +4238,26 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let item = json!({ "changes": [{ "path": "../escape.inp" }] });
         assert!(validate_approval_file_paths(directory.path(), &Value::Null, Some(&item)).is_err());
+    }
+
+    #[test]
+    fn live_edit_probe_accepts_only_the_exact_diagnostic_file() {
+        let (completion, _receiver) = oneshot::channel();
+        let runtime = LiveEditProbeRuntime {
+            expected_relative_path: ".phits-editor-codex-live-probe-test.txt".into(),
+            progress: Mutex::new(LiveEditProbeProgress::default()),
+            completion: Mutex::new(Some(completion)),
+        };
+        let allowed = json!({ "changes": [{ "path": ".phits-editor-codex-live-probe-test.txt", "kind": { "type": "update" } }] });
+        assert!(live_edit_probe_change_error(&runtime, &allowed, None).is_none());
+
+        let unrelated =
+            json!({ "changes": [{ "path": "research.inp", "kind": { "type": "update" } }] });
+        assert!(
+            live_edit_probe_change_error(&runtime, &unrelated, None)
+                .unwrap()
+                .contains("診断対象外")
+        );
     }
 
     #[test]

@@ -118,6 +118,10 @@ export function sameRequestId(left: number | string, right: number | string): bo
   return typeof left === typeof right && left === right;
 }
 
+export function approvalCanBeAccepted(request: ApprovalRequest | null, reviewReady: boolean): boolean {
+  return request?.kind !== "fileChange" || reviewReady;
+}
+
 export function stripAnsi(value: string): string {
   return value
     .replace(/\u001b\][^\u0007]*(?:\u0007|\u001b\\)/g, "")

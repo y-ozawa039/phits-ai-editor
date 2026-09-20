@@ -144,10 +144,10 @@ Implemented features include:
   status for available features
 - staged diagnostics for the PHITS Codex setup, workspace storage, and editing
   environment, covering drive and file-system type, long and synchronized paths,
-  command execution, workspace writes, and access rules; details
-  include reasons and the actual sandbox implementation, with a link to the
-  official OpenAI guidance, an AI troubleshooting prompt, and an anonymizable
-  diagnostic report based on the results
+  App Server command execution, workspace writes, and access rules; an optional
+  real-edit diagnostic; details include reasons and the actual sandbox
+  implementation, an AI troubleshooting prompt, and an anonymizable diagnostic
+  report based on the results
 - Codex editing assistance using the current file, selection, and unsaved text,
   with configurable approval behavior
 - four approval levels: Confirm first, Consultation only, Confirm when needed,

@@ -9,9 +9,19 @@ does not directly change Codex Sandbox or Windows security settings.
 
 ## Main changes
 
-- When Sandbox preparation fails, the editor offers a fixed link to official
-  OpenAI guidance, re-diagnosis, a diagnostic report, and a prompt for asking
-  a generative AI for help.
+- When automatic writes cannot be verified, the user can run an optional
+  real-edit diagnostic that uses the current model and reasoning effort to
+  modify only a dedicated temporary file. The editor explains creation, the
+  one-line edit, and cleanup before it starts. After the user starts the test,
+  Rust accepts only a change verified to target that diagnostic file; no second
+  approval card is shown for the same change.
+- A successful real-edit diagnostic enables editing only for the same
+  connection. The user may alternatively select **Allow editing regardless of
+  diagnostic result** to remove only the editor's diagnostic gate for the
+  current workspace and connection. Neither choice changes the
+  Sandbox, approval settings, workspace boundary, or PHITS-run validation.
+- When Codex cannot connect, the UI explains how to paste the diagnostic prompt
+  into a local Codex task in the ChatGPT desktop app.
 - Buttons that started `elevated` or `unelevated` setup from the editor were
   removed. The editor does not change local users, firewall rules, local
   policies, ownership, or access rules.

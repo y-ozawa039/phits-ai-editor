@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { openUrl } from "@tauri-apps/plugin-opener";
-import type { ApprovalDecision, ApprovalMode, ApprovalRequest, CodexModel, CodexSandboxProbeReport, CodexThreadLink, PhitsAgentSetupStatus, WorkspaceEnvironmentReport } from "../types";
+import type { ApprovalDecision, ApprovalMode, ApprovalRequest, CodexLiveEditProbeReport, CodexModel, CodexSandboxProbeReport, CodexThreadLink, PhitsAgentSetupStatus, WorkspaceEnvironmentReport } from "../types";
 import { sandboxEditingAvailable } from "../codexSandbox";
 import { ApprovalCard } from "./ApprovalCard";
 import { Icon } from "./Icons";
@@ -10,8 +9,6 @@ export interface ChatMessage { id: string; role: "user" | "assistant" | "system"
 export interface CodexContextChip { id: string; label: string; warning?: boolean }
 export interface ComposerDraftRequest { id: number; text: string }
 
-export const CODEX_WINDOWS_SANDBOX_GUIDE_URL = "https://developers.openai.com/ja-JP/docs/windows/windows-sandbox";
-
 interface CodexPanelProps {
   open: boolean; width: number; fontSize?: number; connected: boolean; busy: boolean;
   connectionError?: string | null; troubleshootingPrompt?: string | null;
@@ -20,6 +17,8 @@ interface CodexPanelProps {
   chatAvailable?: boolean; threadsAvailable?: boolean; writableAvailable?: boolean;
   phitsAgentSetup?: PhitsAgentSetupStatus | null;
   sandboxReport?: CodexSandboxProbeReport | null; sandboxBusy?: boolean;
+  liveEditProbeReport?: CodexLiveEditProbeReport | null; liveEditProbeBusy?: boolean;
+  editingAccess?: "none" | "liveProbe" | "userOverride";
   workspaceEnvironment?: WorkspaceEnvironmentReport | null;
   messages: ChatMessage[]; approval: ApprovalRequest | null; approvalCount?: number;
   contextChips?: CodexContextChip[]; draftRequest?: ComposerDraftRequest | null;
@@ -31,6 +30,9 @@ interface CodexPanelProps {
   onRemoveContext: (id: string) => void; onSend: (text: string) => boolean | Promise<boolean>;
   onInterrupt: () => void; onApproval: (decision: ApprovalDecision, answers?: Record<string, string>) => void;
   onRetrySandboxProbe?: () => void;
+  onStartLiveEditProbe?: () => void;
+  onEnableEditingOverride?: () => void;
+  onRestoreEditingRestriction?: () => void;
   onSaveDiagnosticReport?: () => void;
   onOpenDiff?: () => void; onResizeReset?: () => void;
   approvalCanAccept?: boolean;
@@ -45,7 +47,6 @@ export function CodexPanel(props: CodexPanelProps) {
   const [draft, setDraft] = useState("");
   const [troubleshootingDraft, setTroubleshootingDraft] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
-  const [sandboxGuideStatus, setSandboxGuideStatus] = useState("");
   const [troubleshootingInsertBusy, setTroubleshootingInsertBusy] = useState(false);
   const [menu, setMenu] = useState<{ thread: CodexThreadLink; x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -92,13 +93,17 @@ export function CodexPanel(props: CodexPanelProps) {
   const workspaceDriveLabels = { fixed: "ローカル", removable: "取り外し可能", network: "ネットワーク", optical: "光学ドライブ", ramDisk: "RAMディスク", unknown: "種別不明" } as const;
   const sandboxCheckLabels = { appServer: "Codex App Server", windowsSandbox: "Sandbox準備", commandExecution: "Sandbox内コマンド実行", workspaceCreate: "ワークスペース直下への作成", existingFileWrite: "既存相当ファイルの変更", childDirectoryWrite: "子フォルダーへの作成", workspacePermissions: "フォルダーのアクセス規則" } as const;
   const sandbox = props.sandboxReport;
-  const sandboxWritable = sandboxEditingAvailable(sandbox);
+  const editingAccess = props.editingAccess ?? "none";
+  const sandboxWritable = sandboxEditingAvailable(sandbox) || editingAccess !== "none";
   const sandboxNeedsAttention = Boolean(sandbox && sandbox.state !== "available");
-  const sandboxSetupNeedsGuidance = sandbox?.failureCategory === "sandboxSetup";
   const environmentNeedsAttention = Boolean(agentSetup?.configured === false || sandboxNeedsAttention);
   const workspaceEnvironmentNeedsAttention = props.workspaceEnvironment?.state === "attention";
-  const environmentIsAlert = agentSetupNeedsAttention || sandbox?.state === "unavailable";
-  const environmentTitle = sandbox?.state === "unavailable"
+  const environmentIsAlert = editingAccess === "none" && (agentSetupNeedsAttention || sandbox?.state === "unavailable");
+  const environmentTitle = editingAccess === "liveProbe"
+    ? "実際のCodex編集経路を確認しました"
+    : editingAccess === "userOverride"
+      ? "利用者の選択でCodex編集を有効にしています"
+      : sandbox?.state === "unavailable"
     ? sandbox.failureCategory === "sandboxSetup"
       ? "CodexのSandbox設定を確認してください"
       : "このワークスペースで書込みを確認できません"
@@ -107,7 +112,11 @@ export function CodexPanel(props: CodexPanelProps) {
       : agentSetup?.state === "partial"
         ? "PHITS用Codex設定を一部確認しました"
         : "PHITS用Codex設定を確認してください";
-  const environmentMessage = sandbox?.state === "unavailable"
+  const environmentMessage = editingAccess === "liveProbe"
+    ? "軽量診断では書込みを確認できませんでしたが、Codex App Serverの実際のターンによるファイル変更を確認しました。"
+    : editingAccess === "userOverride"
+      ? "診断結果に基づくエディタ側の制限だけを、このワークスペースと接続中に限って解除しています。"
+      : sandbox?.state === "unavailable"
     ? sandbox.failureCategory === "workspacePermissions"
       ? "現在のSandbox方式とこのフォルダーの組み合わせで、書込み権限が反映されていない可能性があります。"
       : sandbox.failureCategory === "sandboxSetup"
@@ -150,14 +159,6 @@ export function CodexPanel(props: CodexPanelProps) {
     }
     setDraft(troubleshootingDraft);
   };
-  const openSandboxGuide = async () => {
-    setSandboxGuideStatus("");
-    try {
-      await openUrl(CODEX_WINDOWS_SANDBOX_GUIDE_URL);
-    } catch {
-      setSandboxGuideStatus("公式手順を開けませんでした。生成AIへの相談文または診断レポートをご利用ください。");
-    }
-  };
   const troubleshootingEditor = props.troubleshootingPrompt ? <details className="codex-troubleshooting-details"><summary>生成AIへの相談文を表示</summary><p>送信前に内容とパスを確認し、必要に応じて編集してください。</p>{!props.connected && <p className="desktop-codex-guidance">ChatGPTデスクトップ版でCodexを開き、このPCを利用するローカルタスクへ次の文章を貼り付けてください。Cloudタスクではローカルファイルを確認できない場合があります。</p>}<textarea aria-label="生成AIへの相談文" rows={10} value={troubleshootingDraft} onChange={(event) => { setTroubleshootingDraft(event.target.value); setCopyStatus(""); }} /><div className="troubleshooting-actions"><button className="secondary-button" onClick={() => void copyTroubleshootingPrompt()}>相談文をコピー</button>{props.connected && <button className="secondary-button" onClick={() => void insertTroubleshootingPrompt()} disabled={troubleshootingInsertBusy || props.busy || !chatAvailable || (!props.threadId && !threadsAvailable) || !troubleshootingDraft.trim()}>{troubleshootingInsertBusy ? "相談用スレッドを準備中…" : "Codex入力欄へ挿入"}</button>}<span aria-live="polite">{copyStatus}</span></div></details> : null;
   const setupNeedsExplanation = environmentNeedsAttention || workspaceEnvironmentNeedsAttention;
 
@@ -165,7 +166,7 @@ export function CodexPanel(props: CodexPanelProps) {
     <div className="vertical-resizer" onPointerDown={props.onResizeStart} onDoubleClick={props.onResizeReset} title="ドラッグで幅を変更・ダブルクリックで既定幅" />
     <header className="codex-titlebar"><div className="panel-title codex-brand"><span className="brand-mark"><Icon name="spark" /></span>Codex</div><div className={`connection-state ${props.connected ? "online" : ""}`}><span />{props.connected ? "接続済み" : "未接続"}</div><button className="icon-button" onClick={props.onToggle} aria-label="Codexパネルを閉じる"><Icon name="panel" /></button></header>
     <div className="codex-controls">
-      {(environmentNeedsAttention || workspaceEnvironmentNeedsAttention) && <div className={`codex-compatibility-note codex-agent-setup-note ${sandbox?.state ?? agentSetup?.state ?? "partial"}`} role={environmentIsAlert ? "alert" : "status"}><strong>{environmentNeedsAttention ? environmentTitle : "ワークスペースの保存場所を確認してください"}</strong><span>{environmentNeedsAttention ? environmentMessage : "保存場所の種類または属性に確認事項があります。編集可否はCodex接続時の実動作検査で確認します。"}</span><details><summary>診断項目と検査理由</summary>{agentSetup && <div className="codex-diagnostic-group"><b>PHITS参照設定</b><ul>{agentSetup.checks.map((check) => <li className={`agent-setup-check ${check.state}`} key={check.id}><b>{agentCheckLabels[check.id]}</b><span>{check.message}</span>{check.path && <code>{check.path}</code>}</li>)}</ul></div>}{props.workspaceEnvironment && <div className="codex-diagnostic-group"><b>ワークスペース保存場所</b><ul><li className={`agent-setup-check ${props.workspaceEnvironment.state === "normal" ? "confirmed" : "partial"}`}><b>{workspaceDriveLabels[props.workspaceEnvironment.driveKind]}{props.workspaceEnvironment.fileSystem ? ` / ${props.workspaceEnvironment.fileSystem}` : ""}</b><span>{props.workspaceEnvironment.messages.join(" ") || "明確な注意事項はありません。"}</span></li></ul></div>}{sandbox && <div className="codex-diagnostic-group"><b>Codex編集環境</b><ul>{sandbox.checks.map((check) => <li className={`agent-setup-check ${check.state}`} key={check.id}><b>{sandboxCheckLabels[check.id]}</b><span>{check.detail}</span></li>)}<li className={`agent-setup-check ${sandbox.implementation ? "confirmed" : "partial"}`}><b>Sandbox方式</b><span>{sandbox.implementation ?? "取得できませんでした"}</span></li><li className={`agent-setup-check ${sandbox.writePolicy ? "confirmed" : "partial"}`}><b>書込み方針</b><span>{sandbox.writePolicy === "explicitRoot" ? "明示ルート" : sandbox.writePolicy === "workspaceCwd" ? "作業フォルダー" : "確認できませんでした"}</span></li><li className="agent-setup-check confirmed"><b>組織ポリシーの許可方式</b><span>{sandbox.allowedImplementations.length ? sandbox.allowedImplementations.join(", ") : "制限指定なし"}</span></li></ul></div>}</details>{sandboxSetupNeedsGuidance && <div className="sandbox-guidance"><span>設定変更が必要な場合は、OpenAI公式手順を確認し、必要に応じて端末管理者へご相談ください。</span><button className="secondary-button" onClick={() => void openSandboxGuide()}>OpenAI公式のSandbox手順を開く</button><span aria-live="polite">{sandboxGuideStatus}</span></div>}<div className="troubleshooting-actions">{sandboxNeedsAttention && props.onRetrySandboxProbe && <button className="secondary-button" onClick={props.onRetrySandboxProbe} disabled={props.sandboxBusy}>{props.sandboxBusy ? "再診断中…" : "再診断"}</button>}{props.onSaveDiagnosticReport && <button className="secondary-button" onClick={props.onSaveDiagnosticReport}>診断レポートを保存…</button>}</div>{props.sandboxBusy && <span aria-live="polite">Codex編集環境を診断中…</span>}{troubleshootingEditor}</div>}
+      {(environmentNeedsAttention || workspaceEnvironmentNeedsAttention) && <div className={`codex-compatibility-note codex-agent-setup-note ${sandbox?.state ?? agentSetup?.state ?? "partial"}`} role={environmentIsAlert ? "alert" : "status"}><strong>{environmentNeedsAttention ? environmentTitle : "ワークスペースの保存場所を確認してください"}</strong><span>{environmentNeedsAttention ? environmentMessage : "保存場所の種類または属性に確認事項があります。編集可否はCodex接続時の実動作検査で確認します。"}</span><details><summary>診断項目と検査理由</summary>{agentSetup && <div className="codex-diagnostic-group"><b>PHITS参照設定</b><ul>{agentSetup.checks.map((check) => <li className={`agent-setup-check ${check.state}`} key={check.id}><b>{agentCheckLabels[check.id]}</b><span>{check.message}</span>{check.path && <code>{check.path}</code>}</li>)}</ul></div>}{props.workspaceEnvironment && <div className="codex-diagnostic-group"><b>ワークスペース保存場所</b><ul><li className={`agent-setup-check ${props.workspaceEnvironment.state === "normal" ? "confirmed" : "partial"}`}><b>{workspaceDriveLabels[props.workspaceEnvironment.driveKind]}{props.workspaceEnvironment.fileSystem ? ` / ${props.workspaceEnvironment.fileSystem}` : ""}</b><span>{props.workspaceEnvironment.messages.join(" ") || "明確な注意事項はありません。"}</span></li></ul></div>}{sandbox && <div className="codex-diagnostic-group"><b>Codex編集環境</b><ul>{sandbox.checks.map((check) => <li className={`agent-setup-check ${check.state}`} key={check.id}><b>{sandboxCheckLabels[check.id]}</b><span>{check.detail}</span></li>)}<li className={`agent-setup-check ${sandbox.implementation ? "confirmed" : "partial"}`}><b>Sandbox方式</b><span>{sandbox.implementation ?? "取得できませんでした"}</span></li><li className={`agent-setup-check ${sandbox.writePolicy ? "confirmed" : "partial"}`}><b>書込み方針</b><span>{sandbox.writePolicy === "explicitRoot" ? "明示ルート" : sandbox.writePolicy === "workspaceCwd" ? "作業フォルダー" : "確認できませんでした"}</span></li><li className="agent-setup-check confirmed"><b>組織ポリシーの許可方式</b><span>{sandbox.allowedImplementations.length ? sandbox.allowedImplementations.join(", ") : "制限指定なし"}</span></li>{props.liveEditProbeReport && <li className={`agent-setup-check ${props.liveEditProbeReport.state === "available" ? "confirmed" : "unavailable"}`}><b>実際のCodex編集経路</b><span>{props.liveEditProbeReport.detail}</span></li>}{editingAccess === "userOverride" && <li className="agent-setup-check partial"><b>編集制限</b><span>利用者の選択により、この接続中だけ解除されています。</span></li>}</ul></div>}</details><div className="troubleshooting-actions">{sandboxNeedsAttention && editingAccess === "none" && props.connected && chatAvailable && props.onStartLiveEditProbe && <button className="secondary-button" onClick={props.onStartLiveEditProbe} disabled={props.liveEditProbeBusy || props.sandboxBusy}>{props.liveEditProbeBusy ? "編集経路を確認中…" : "実際のCodex編集経路を確認"}</button>}{sandboxNeedsAttention && editingAccess === "none" && props.connected && props.onEnableEditingOverride && <button className="secondary-button" onClick={props.onEnableEditingOverride} disabled={props.liveEditProbeBusy || props.sandboxBusy}>診断結果にかかわらず編集を許可</button>}{editingAccess === "userOverride" && props.onRestoreEditingRestriction && <button className="secondary-button" onClick={props.onRestoreEditingRestriction}>診断による制限へ戻す</button>}{sandboxNeedsAttention && props.onRetrySandboxProbe && <button className="secondary-button" onClick={props.onRetrySandboxProbe} disabled={props.sandboxBusy || props.liveEditProbeBusy}>{props.sandboxBusy ? "再診断中…" : "再診断"}</button>}{props.onSaveDiagnosticReport && <button className="secondary-button" onClick={props.onSaveDiagnosticReport}>診断レポートを保存…</button>}</div>{props.sandboxBusy && <span aria-live="polite">App Server経由のSandboxコマンド検査を実行中…</span>}{troubleshootingEditor}</div>}
       {!props.connected ? <><button className="primary-button wide" onClick={props.onConnect} disabled={props.busy}>Codexに接続</button>{!chatAvailable && !props.connectionError && <div className="codex-compatibility-note">App Serverの会話機能に互換性がありません。接続時にもう一度検査します。</div>}{props.connectionError && <div className="codex-compatibility-note codex-connection-error" role="alert"><strong>Codexに接続できませんでした</strong><span>{props.connectionError}</span>{!setupNeedsExplanation && props.onSaveDiagnosticReport && <div className="troubleshooting-actions"><button className="secondary-button" onClick={props.onSaveDiagnosticReport}>診断レポートを保存…</button></div>}{!setupNeedsExplanation && troubleshootingEditor}</div>}</> : <>
       <div className="select-row"><label>モデル<select value={props.model} onChange={(e) => props.onModelChange(e.target.value)}>{props.models.map((entry) => <option value={entry.id} key={entry.id}>{entry.displayName}</option>)}</select></label><label>思考<select value={props.reasoning} onChange={(e) => props.onReasoningChange(e.target.value)} disabled={!efforts.length}>{efforts.map((effort) => <option value={effort} key={effort}>{effort}</option>)}</select></label></div>
       <label className="approval-mode-label">アクションの承認<select value={writableAvailable ? props.approvalMode : "consultationOnly"} disabled={!writableAvailable} onChange={(e) => props.onApprovalModeChange(e.target.value as ApprovalMode)}><option value="confirmFirst">確認優先</option><option value="consultationOnly">相談のみ</option><option value="onRequest">必要時のみ確認</option><option value="autonomousWorkspace">自律実行（ワークスペース内）</option></select></label>

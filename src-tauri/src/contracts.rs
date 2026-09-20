@@ -361,6 +361,35 @@ pub struct CodexSandboxProbeReport {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub enum CodexLiveEditProbeState {
+    Available,
+    Unavailable,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CodexLiveEditProbeRoute {
+    FileChange,
+    CommandExecution,
+    None,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexLiveEditProbeReport {
+    pub state: CodexLiveEditProbeState,
+    pub workspace_root: String,
+    pub checked_at: String,
+    pub model: Option<String>,
+    pub reasoning_effort: Option<String>,
+    pub route: CodexLiveEditProbeRoute,
+    pub detail: String,
+    pub cleanup_succeeded: bool,
+    pub thread_cleanup_succeeded: bool,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub enum ApprovalMode {
     ConfirmFirst,
     ConsultationOnly,

@@ -1,4 +1,4 @@
-import type { CodexCompatibilityReport, CodexSandboxProbeReport, PhitsAgentSetupStatus, RuntimeDiagnostics, WorkspaceEnvironmentReport } from "./types";
+import type { CodexCompatibilityReport, CodexEditingAccessState, CodexLiveEditProbeReport, CodexSandboxProbeReport, PhitsAgentSetupStatus, RuntimeDiagnostics, WorkspaceEnvironmentReport } from "./types";
 
 export interface DiagnosticReportInput {
   appVersion: string;
@@ -7,6 +7,8 @@ export interface DiagnosticReportInput {
   compatibility: CodexCompatibilityReport | null;
   agentSetup: PhitsAgentSetupStatus | null;
   sandbox: CodexSandboxProbeReport | null;
+  liveEditProbe?: CodexLiveEditProbeReport | null;
+  editingAccess?: CodexEditingAccessState;
   workspaceEnvironment: WorkspaceEnvironmentReport | null;
   connectionCategory?: string | null;
   connectionError?: string | null;
@@ -70,6 +72,27 @@ export function buildDiagnosticReport(input: DiagnosticReportInput): string {
       ...input.sandbox.messages.map((message) => `- ${message}`),
     );
   } else output.push("未検査（Codex接続時または手動再診断時に実行）");
+  output.push("", "[任意のCodex実編集検査]");
+  if (input.liveEditProbe) {
+    output.push(
+      `状態: ${input.liveEditProbe.state}`,
+      `経路: ${input.liveEditProbe.route}`,
+      `モデル: ${line(input.liveEditProbe.model)}`,
+      `思考: ${line(input.liveEditProbe.reasoningEffort)}`,
+      `検査用ファイルの後片付け: ${input.liveEditProbe.cleanupSucceeded ? "完了" : "未完了"}`,
+      `診断スレッドの後片付け: ${input.liveEditProbe.threadCleanupSucceeded ? "完了" : "未完了"}`,
+      input.liveEditProbe.detail,
+    );
+  } else output.push("未実行");
+  output.push(
+    "",
+    "[エディタ側の編集制限]",
+    input.editingAccess === "liveProbe"
+      ? "実際のCodex編集経路を確認済み（現在の接続中のみ）"
+      : input.editingAccess === "userOverride"
+        ? "利用者の選択で解除（現在のワークスペースと接続中のみ）"
+        : "自動診断結果に従う",
+  );
   if (input.connectionError) {
     output.push("", "[Codex接続失敗]", `分類: ${line(input.connectionCategory)}`, input.connectionError);
   }
