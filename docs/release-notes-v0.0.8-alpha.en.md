@@ -10,7 +10,7 @@ does not directly change Codex Sandbox or Windows security settings.
 ## Main changes
 
 - When automatic writes cannot be verified, the user can run an optional
-  real-edit diagnostic that uses the current model and reasoning effort to
+  real-edit diagnostic that uses the selected model and reasoning effort to
   modify only a dedicated temporary file. The editor explains creation, the
   one-line edit, and cleanup before it starts. After the user starts the test,
   Rust accepts only a change verified to target that diagnostic file; no second
@@ -22,16 +22,18 @@ does not directly change Codex Sandbox or Windows security settings.
   Sandbox, approval settings, workspace boundary, or PHITS-run validation.
 - When Codex cannot connect, the UI explains how to paste the diagnostic prompt
   into a local Codex task in the ChatGPT desktop app.
-- Buttons that started `elevated` or `unelevated` setup from the editor were
-  removed. The editor does not change local users, firewall rules, local
-  policies, ownership, or access rules.
+- The buttons, introduced experimentally in v0.0.7-alpha, that started
+  `elevated` or `unelevated` setup from the editor have been removed. The
+  editor does not change local users, firewall rules, local policies,
+  ownership, or access rules.
 - Folder-specific access problems provide diagnostic details, an AI consultation
   prompt, and a retry without suggesting a machine-wide configuration change.
 - The generated consultation prompt asks the AI to investigate read-only first
   and, before any change, explain its effect and rollback method and request the
   user's decision.
-- **Help > Diagnostic information details... > Open log folder** now opens only
-  the backend-managed, fixed startup-log location.
+- **Help > Diagnostic information details... > Open log folder**, introduced
+  experimentally in v0.0.6-alpha, now opens only the backend-managed, fixed
+  startup-log location.
 - Windows test artifacts produced by GitHub Actions include the application
   version and commit ID, making them easier to distinguish from formal GitHub
   Releases.
