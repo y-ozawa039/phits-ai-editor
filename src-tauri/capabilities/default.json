@@ -6,6 +6,7 @@
   "permissions": [
     "core:default",
     "core:window:allow-destroy",
+    "dialog:allow-confirm",
     "dialog:allow-open",
     "dialog:allow-save",
     "opener:allow-open-url"

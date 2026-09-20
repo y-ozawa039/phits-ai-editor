@@ -1,7 +1,7 @@
 import Editor, { DiffEditor, type BeforeMount, type OnMount } from "@monaco-editor/react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { open, save } from "@tauri-apps/plugin-dialog";
+import { confirm as confirmDialog, open, save, type ConfirmDialogOptions } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { editor as MonacoEditor } from "monaco-editor";
 import { api } from "./api";
@@ -359,6 +359,15 @@ export default function App() {
     setToasts((current) => [...current.slice(-2), { id, kind, message }]);
     window.setTimeout(() => setToasts((current) => current.filter((toast) => toast.id !== id)), 5000);
   }, []);
+
+  const confirmAction = useCallback(async (message: string, options: ConfirmDialogOptions) => {
+    try {
+      return await confirmDialog(message, options);
+    } catch (error) {
+      notify(`確認画面を表示できなかったため、操作を中止しました: ${errorMessage(error)}`, "error");
+      return false;
+    }
+  }, [notify]);
 
   const appendOutput = useCallback((value: string) => {
     const lines = value.replace(/\r/g, "").split("\n").filter((line, index, all) => line || index < all.length - 1);
@@ -1205,7 +1214,12 @@ export default function App() {
     const warning = production
       ? `未保存内容を保存後、${workspace.primaryInput} と既存出力を記録します。Codexを停止してPHITSを起動し、Editorを直ちに終了します。続行しますか？`
       : hasDirtyDocuments ? `未保存の変更を保存して ${workspace.primaryInput} を通常実行しますか？` : `${workspace.primaryInput} を通常実行しますか？`;
-    if (!window.confirm(warning)) return;
+    if (!(await confirmAction(warning, {
+      title: production ? "PHITS本番実行" : "PHITS通常実行",
+      kind: "warning",
+      okLabel: production ? "本番実行を開始" : "通常実行を開始",
+      cancelLabel: "キャンセル",
+    }))) return;
     try {
       setBusy(true);
       for (const entry of documents.filter((item) => item.dirty)) {
@@ -1221,7 +1235,10 @@ export default function App() {
       setOutputCollapsed(false); appendOutput(`[Editor] ${production ? "本番" : "通常"}実行を要求しました。`);
       let overrideUnresolved = false;
       if (runStatus?.state === "unresolved") {
-        overrideUnresolved = window.confirm("OS上でこのフォルダーのPHITSプロセスが停止していることを確認しましたか？ 確認済みの場合だけ状態不明を解除します。");
+        overrideUnresolved = await confirmAction(
+          "OS上でこのフォルダーのPHITSプロセスが停止していることを確認しましたか？ 確認済みの場合だけ状態不明を解除します。",
+          { title: "PHITS実行状態の確認", kind: "warning", okLabel: "停止を確認済み", cancelLabel: "キャンセル" },
+        );
         if (!overrideUnresolved) return;
       }
       const status = await (production
@@ -1230,15 +1247,20 @@ export default function App() {
       setRunStatus(status); appendOutput(`[${status.state}] ${status.message}`);
     } catch (error) { appendOutput(`[failed] ${errorMessage(error)}`); notify(`PHITSを起動できませんでした: ${errorMessage(error)}`, "error"); }
     finally { setBusy(false); }
-  }, [appendOutput, documents, hasDirtyDocuments, notify, runStatus?.state, workspace]);
+  }, [appendOutput, confirmAction, documents, hasDirtyDocuments, notify, runStatus?.state, workspace]);
 
   const runUtility = useCallback(async (kind: UtilityKind) => {
     if (!workspace || !activeDocument?.document) { notify("対象ファイルを開いて選択してください。"); return; }
     const labels: Record<UtilityKind, string> = { angel: "ANGEL", dchain: "DCHAIN", phig3d: "PHIG-3D" };
-    if (!window.confirm(`${labels[kind]} で ${activeDocument.name} を開きますか？`)) return;
+    if (!(await confirmAction(`${labels[kind]} で ${activeDocument.name} を開きますか？`, {
+      title: `${labels[kind]}を起動`,
+      kind: "warning",
+      okLabel: "開く",
+      cancelLabel: "キャンセル",
+    }))) return;
     try { await api.runUtility(workspace.root, kind, activeDocument.document.relativePath); notify(`${labels[kind]} を起動しました。`, "success"); }
     catch (error) { notify(`${labels[kind]} を起動できませんでした: ${errorMessage(error)}`, "error"); }
-  }, [activeDocument, notify, workspace]);
+  }, [activeDocument, confirmAction, notify, workspace]);
 
   const connectCodex = useCallback(async () => {
     if (!workspace) { notify("Codexを接続するワークスペースを先に開いてください。"); return; }
@@ -1328,13 +1350,18 @@ export default function App() {
   const deleteThread = useCallback(async (id: string, title: string) => {
     if (!workspace) return;
     if (!codexFeatureAvailable(codexCompatibility, "threads")) { notify("このCodex CLIではスレッドを削除できません。", "error"); return; }
-    if (!window.confirm(`「${title}」を完全に削除しますか？\nこの操作は元に戻せません。`)) return;
+    if (!(await confirmAction(`「${title}」を完全に削除しますか？\nこの操作は元に戻せません。`, {
+      title: "Codexスレッドを削除",
+      kind: "warning",
+      okLabel: "完全に削除",
+      cancelLabel: "キャンセル",
+    }))) return;
     try {
       await api.codexThreadDelete(workspace.root, id);
       setThreadLinks((current) => current.filter((item) => item.threadId !== id));
       if (threadId === id) { setThreadId(null); setTurnId(null); setMessages([]); }
     } catch (error) { notify(`スレッドを削除できませんでした: ${errorMessage(error)}`, "error"); }
-  }, [codexCompatibility, notify, threadId, workspace]);
+  }, [codexCompatibility, confirmAction, notify, threadId, workspace]);
 
   const buildEditorContext = useCallback((entry: OpenDocument | null, dirtyOverride?: boolean): EditorContextV1 | null => {
     if (!entry && !workspace) return null;
@@ -1379,7 +1406,10 @@ export default function App() {
       || !codexFeatureAvailable(codexCompatibility, "approvals")
       || !sandboxWritableAvailable;
     if (activeDocument?.dirty && !forceReadOnly) {
-      const saveBeforeSend = window.confirm("この未保存ファイルを保存し、Codexが編集できる状態で送信しますか？\n\nOK: 保存して送信 / キャンセル: 次の選択へ");
+      const saveBeforeSend = await confirmAction(
+        "この未保存ファイルを保存し、Codexが編集できる状態で送信しますか？",
+        { title: "Codexへ送信", kind: "warning", okLabel: "保存して送信", cancelLabel: "次の選択へ" },
+      );
       if (saveBeforeSend) {
         try {
           const saved = activeDocument.document
@@ -1390,7 +1420,12 @@ export default function App() {
           setDocuments((current) => current.map((item) => item.id === activeDocument!.id ? contextEntry! : item));
           setActiveId(saved.path);
         } catch (error) { notify(`送信前に保存できませんでした: ${errorMessage(error)}`, "error"); return false; }
-      } else if (window.confirm("保存せず、相談のみ（読み取り専用）で送信しますか？\n\nキャンセルすると送信しません。")) {
+      } else if (await confirmAction("保存せず、相談のみ（読み取り専用）で送信しますか？", {
+        title: "Codexへ相談のみで送信",
+        kind: "warning",
+        okLabel: "相談のみで送信",
+        cancelLabel: "送信しない",
+      })) {
         forceReadOnly = true;
       } else return false;
     }
@@ -1437,7 +1472,7 @@ export default function App() {
       return false;
     }
     return true;
-  }, [activeDocument, approvalMode, buildEditorContext, codexCompatibility, model, notify, reasoning, sandboxWritableAvailable, saveDocumentAs, threadId, workspace]);
+  }, [activeDocument, approvalMode, buildEditorContext, codexCompatibility, confirmAction, model, notify, reasoning, sandboxWritableAvailable, saveDocumentAs, threadId, workspace]);
 
   const interruptCodex = useCallback(async () => {
     if (!threadId || !turnId) { notify("CodexのターンIDを待っています。もう一度中断してください。"); return; }
