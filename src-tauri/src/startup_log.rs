@@ -66,7 +66,7 @@ pub fn open_startup_log_folder(app: AppHandle) -> Result<(), String> {
         .ok_or_else(|| "起動ログのフォルダーを解決できませんでした。".to_string())?;
 
     app.opener()
-        .open_path(directory, None::<&str>)
+        .open_path(directory.to_string_lossy().into_owned(), None::<&str>)
         .map_err(|error| format!("起動ログのフォルダーを開けませんでした: {error}"))
 }
 
