@@ -7,6 +7,7 @@ use std::{
 
 use chrono::Utc;
 use tauri::{AppHandle, Manager};
+use tauri_plugin_opener::OpenerExt;
 
 const MAX_LOG_BYTES: u64 = 256 * 1024;
 static LOG_PATH: OnceLock<PathBuf> = OnceLock::new();
@@ -54,6 +55,19 @@ pub fn append(message: &str) {
 
 pub fn path() -> Option<PathBuf> {
     LOG_PATH.get().cloned()
+}
+
+#[tauri::command]
+pub fn open_startup_log_folder(app: AppHandle) -> Result<(), String> {
+    let log_path =
+        path().ok_or_else(|| "起動ログの保存場所を取得できませんでした。".to_string())?;
+    let directory = log_path
+        .parent()
+        .ok_or_else(|| "起動ログのフォルダーを解決できませんでした。".to_string())?;
+
+    app.opener()
+        .open_path(directory, None::<&str>)
+        .map_err(|error| format!("起動ログのフォルダーを開けませんでした: {error}"))
 }
 
 fn rotate_if_needed(path: &Path) {

@@ -58,6 +58,7 @@ pub fn run() {
             diagnostics::runtime_diagnose,
             diagnostics::workspace_environment_diagnose,
             diagnostics::diagnostic_report_save,
+            startup_log::open_startup_log_folder,
             diagnostics::codex_compatibility_probe,
             settings::phits_settings_get,
             settings::phits_settings_set,

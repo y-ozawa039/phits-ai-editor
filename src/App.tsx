@@ -2,7 +2,6 @@ import Editor, { DiffEditor, type BeforeMount, type OnMount } from "@monaco-edit
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { openPath } from "@tauri-apps/plugin-opener";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { editor as MonacoEditor } from "monaco-editor";
 import { api } from "./api";
@@ -611,12 +610,9 @@ export default function App() {
   }, [codexCompatibility, codexConnectionCategory, codexConnectionError, codexSandboxReport, diagnostics, notify, phitsAgentSetup, workspace, workspaceEnvironment]);
 
   const openDiagnosticLogFolder = useCallback(async () => {
-    const logPath = diagnostics?.startupLog;
-    if (!logPath) return;
-    const separator = Math.max(logPath.lastIndexOf("\\"), logPath.lastIndexOf("/"));
-    const directory = separator > 0 ? logPath.slice(0, separator) : logPath;
+    if (!diagnostics?.startupLog) return;
     try {
-      await openPath(directory);
+      await api.openStartupLogFolder();
     } catch (error) {
       notify(`ログフォルダーを開けませんでした: ${errorMessage(error)}`, "error");
     }

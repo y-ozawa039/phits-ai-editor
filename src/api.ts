@@ -11,6 +11,7 @@ export const api = {
   diagnostics: (workspaceRoot?: string) => invoke<RuntimeDiagnostics>("runtime_diagnose", { workspaceRoot }),
   workspaceEnvironmentDiagnostics: (workspaceRoot: string) => invoke<WorkspaceEnvironmentReport>("workspace_environment_diagnose", { workspaceRoot }),
   saveDiagnosticReport: (targetPath: string, report: string, anonymize: boolean, workspaceRoot?: string | null, phitsRoot?: string | null, codexPath?: string | null) => invoke<string>("diagnostic_report_save", { targetPath, report, anonymize, workspaceRoot: workspaceRoot ?? null, phitsRoot: phitsRoot ?? null, codexPath: codexPath ?? null }),
+  openStartupLogFolder: () => invoke<void>("open_startup_log_folder"),
   codexCompatibilityProbe: () => invoke<CodexCompatibilityReport>("codex_compatibility_probe"),
   codexSandboxProbe: (workspaceRoot: string) => invoke<CodexSandboxProbeReport>("codex_sandbox_probe", { workspaceRoot }),
   codexSandboxSetup: (workspaceRoot: string, mode: string) => invoke<CodexSandboxSetupResult>("codex_sandbox_setup", { workspaceRoot, mode }),
