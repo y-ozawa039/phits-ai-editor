@@ -18,9 +18,9 @@ PHITS AI Editorでは、次の状態を区別します。
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/audit-release-status.ps1
 ```
 
-2026-09-20時点では、`v0.0.5-alpha`までが正式なGitHub Releaseです。
+2026-09-21時点では、`v0.0.8-alpha`までが正式なGitHub Releaseです。
 `0.0.6-alpha`と`0.0.7-alpha`はCIテスト成果物として配布されましたが、正式な
-GitHub Releaseとリモートタグはありません。次の正式公開予定は`v0.0.8-alpha`です。
+GitHub Releaseとリモートタグはありません。
 
 CI成果物は利用者がダウンロードできる場合があるため、「未公開」と同義ではありません。
 一方、GitHub Releaseとタグが揃うまでは「正式公開済み」とも表現しません。

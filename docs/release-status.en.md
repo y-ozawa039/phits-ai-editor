@@ -18,10 +18,9 @@ artifacts together.
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/audit-release-status.ps1
 ```
 
-As of 2026-09-20, `v0.0.5-alpha` is the latest formal GitHub Release.
+As of 2026-09-21, `v0.0.8-alpha` is the latest formal GitHub Release.
 `0.0.6-alpha` and `0.0.7-alpha` were distributed as CI test artifacts, but have
-no formal GitHub Release or remote tag. The next planned formal Release is
-`v0.0.8-alpha`.
+no formal GitHub Release or remote tag.
 
 A CI artifact may be downloadable by users, so it is not equivalent to an
 unpublished build. It is also not described as formally released until both the
